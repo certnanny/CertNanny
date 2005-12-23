@@ -1,0 +1,21 @@
+Contributed and related code
+
+* sscep
+
+sscep is a command line SCEP client, available at
+http://www.klake.org/~jt/sscep/
+
+The official version published on this web site implements an older SCEP 
+draft which does not support signing a request with an existing key.
+This version works properly with CertNanny, but automatic approval
+will NOT work.
+
+To build an sscep binary that supports automatic approval, either use
+the sscep-ng.tar.gz sources or patch your downloaded sscep sources
+using sscep.patch.gz.
+
+
+* ExtractKey
+
+Source code for the ExtractKey Java class (see lib/java/) is contained
+in ExtractKey.tar.gz.

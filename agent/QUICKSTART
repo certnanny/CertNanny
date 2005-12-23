@@ -1,0 +1,53 @@
+
+Getting CertNanny up and running
+
+Please read the full documentation in README and refer to the FAQ file 
+when experiencing problems.
+
+
+- Follow the instructions in the INSTALL file to install the software.
+
+- Make sure you compiled and installed the sscep binary
+  It is recommended to read the contrib/README file before compiling sscep.
+
+- Using etc/certnanny.cfg as template, create a configuration file
+  - make sure you specify the correct paths
+  - configure at least one keystore
+  - MAKE SURE you configured at least one Root CA Certificate used in 
+    your environment
+
+- Run 
+  certnanny --cfg <yourconfigfile> check
+  to test if everything is set up properly
+
+- To test the renewal action edit the config file and modify the 
+  'autorenew_days' setting. Set a value that is higher than your normal
+  certificate validity period, so CertNanny will always think it's time
+  to renew the certificate.
+
+- Run
+  certnanny --cfg <yourconfigfile> renew
+  to run the renewal process
+
+- If CertNanny's invocation of sscep reports PENDING twice, a new
+  request should be visible in your CA system.
+
+- Rerun 
+  certnanny --cfg <yourconfigfile> renew
+  and check that PENDING is reported again (this simulates periodic
+  invocation by cron or similar)
+
+- In the CA issue the certificate based on the new request.
+  Make sure that you do NOT modify the requested DN, sscep will
+  reject the certificate otherwise.
+
+- Rerun 
+  certnanny --cfg <yourconfigfile> renew
+  This time CertNanny should find the new certificate on the server,
+  download it and create a new keystore from it (sscep message "SUCCESS").
+
+- Finetune the 'hook' definitions to act upon certain events (e. g. restart
+  your server or notify an administrator)
+
+- Set up a cron job for periodic invocation (recommended interval: once a 
+  day).

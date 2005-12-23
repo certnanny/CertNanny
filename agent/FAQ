@@ -1,0 +1,74 @@
+CertNanny FAQ
+
+* CA and SCEP server software requirements
+
+Q: Any special considerations on the CA side?
+A: The CA must not modify the requested DN, in particular adding the
+   request serial number or other data to the issued certificate DN
+   does not work. Disable this in the CA configuration.
+   You should allow issuance of multiple certificates with the same DN
+   in the CA configuration.
+
+Q: Which CA software (SCEP servers) are supported?
+A: The following CA software packages are currently supported:
+   - OpenCA 0.9.2.4 (or higher): http://www.openca.info/legacy/index.html
+
+
+* CA specific issues
+
+Q: OpenCA: How do I set up the SCEP server properly?
+A: Make sure your SCEP server is set up properly (SCEP certificate is
+   configured, private key saved without password, dummy password specified 
+   in the configuration)
+   - OpenCA scep.conf:
+     ScepAllowRenewal "YES"
+
+Q: OpenCA: How do I enable automatic approval with existing private key?
+A: - CertNanny keystore section:
+     keystore.<label>.scepsignaturekey = old
+   - OpenCA scep.conf:
+     ScepAutoApprove "YES"
+
+
+* Installation
+
+Q: Which version of sscep do I need?
+A: sscep version 20040325 (http://www.klake.org/~jt/sscep/) is known
+   to work, but it does NOT support automatic approval of the new request
+   based on the existing key.
+   Apply contrib/sscep.patch.gz to the sources to build a version
+   that allows automatic approval.
+
+Q: What is gsk6cmd?
+A: Trust me, you really don't want to know! (It's a command line tool
+   for maintaining IBM GSKit keystores which is sometimes ... let's say
+   not very intuitive.)
+
+Q: Do I need gsk6cmd?
+A: Unless you want to renew IBM GSK certificates, no.
+
+
+* Operating and maintenance
+
+Q: sscep fails miserably
+A: Are you sure you are NOT using OpenSSL 0.9.7d?
+
+Q: sscep refuses to accept the generated certificate
+A: It has been observed that OpenSSL 0.9.7a can cause problems. Check
+   again with the latest OpenSSL 0.9.7 version.
+
+Q: Can I reset the renewal state of a certain keystore?
+A: The renewal state (including the new key and request) is stored
+   in 'statedir'.
+   To start over with the keystore with the label 'foo'
+   (keystore.foo.location = ...)
+   simply remove statedir/foo*
+   It is safe to remove the contents of the state directory entirely
+   between invocations. CertNanny will then restart with the renewal
+   process from scratch.
+   Note that depending on CA policy the SCEP server may reject new
+   requests for a DN for which a request is already pending, so it
+   might be a good idea to clean up on the CA side as well.
+
+
+

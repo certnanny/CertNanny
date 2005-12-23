@@ -1,0 +1,85 @@
+This document describes how to install the program.
+
+Please read the README file for an introduction to this software and
+for configuration documentation.
+
+
+Prerequisites
+
+In order to run this software you will need 
+- Perl 5.6.1 or higher
+- OpenSSL 0.9.7 (does NOT work with 0.9.7d!)
+- sscep Release 20040325 (http://www.klake.org/~jt/sscep/)
+  sscep patches to these sources are included in this distribution,
+  see the contrib/ directory.
+
+
+3rd party tool installation
+
+- Make sure OpenSSL is installed on your system. It is not recommended
+  to use OpenSSL 0.9.7d to avoid problems with sscep. 0.9.7a, c, e and g
+  are known to work. 
+
+- Compile sscep. You will need the OpenSSL development libraries for this.
+
+  It is recommended to apply the patch included in the contrib/ directory
+  to create a sscep binary that supports automatic approval.
+  See contrib/README for details.
+
+  IMPORTANT: DO NOT COMPILE sscep WITH OPENSSL 0.9.7d
+  If you are using OpenSSL 0.9.7d on your system, make sure you
+  compile sscep STATICALLY with a version different than 0.9.7d.
+
+  Problems have been observed with OpenSSL 0.9.7a. If sscep is compiled
+  against this version, it may happen that sscep does not recognize
+  the certificate fetched from the SCEP server to match with its request.
+  This is due to different ASN.1 encodings of the Subject Name in
+  request and certificate. Although the string represented by these
+  encodings are the same, sscep may complain that the downloaded certificate
+  does not match the request.
+  If this behaviour is observed it is recommended to use the latest
+  OpenSSL 0.9.7 version available.
+
+  CertNanny has not yet been tested with OpenSSL 0.9.8.
+
+
+Program installation
+- copy the bin/certnanny binary to a location of your choice, e. g.
+  /usr/local/bin/ or ~/bin/
+- copy the lib directory to a library directory where Perl can
+  find it:
+  cp -a lib /usr/local             (for system-wide installation)
+  or
+  cp -a lib ~/                     (for a user-only installation)
+- it is recommended to have the following directory layout:
+  <prefix>/bin/certnanny
+  <prefix>/lib/perl/...
+  <prefix>/lib/java/...
+
+  The reason is that the certnanny binary automatically detects its
+  Perl modules and Java tools if the directory layout is similar to 
+  this without requiring special configuration via PERL5LIB or similar.
+
+
+Check installation:
+
+- make sure the Perl interpreter can access the newly installed library
+  by running the certnanny without any options binary to check if the
+  software was installed properly
+
+If Perl complains that it "can't locate CertNanny.pm in @INC" the
+lib/perl files are not found by the Perl interpreter.
+
+To remedy this situation you can set PERL5LIB to the corresponding
+directory:
+
+export PERL5LIB="<path>"
+
+Replace <path> with the installation directory from above where
+CertNanny.pm can be found.
+
+
+Rerun the program and verify that it outputs a usage note.
+
+CertNanny is now ready for use.
+
