@@ -8,7 +8,12 @@
 
 package CertNanny::Keystore::MQ;
 
+use base qw(Exporter CertNanny::Keystore::OpenSSL);
+
 use strict;
+
+# use Smart::Comments;
+
 use vars qw(@ISA @EXPORT @EXPORT_OK %EXPORT_TAGS $VERSION);
 use Exporter;
 use Carp;
@@ -23,7 +28,7 @@ use File::Basename;
 use Cwd;
 
 $VERSION = 0.6;
-@ISA = qw(Exporter CertNanny::Keystore::OpenSSL);
+
 
 
 # constructor parameters:
@@ -253,7 +258,8 @@ sub getkey {
     my $p8file = $self->gettmpfile();
     chmod 0600, $p8file;
 
-    my $extractkey_jar = File::Spec->catfile($self->{OPTIONS}->{CONFIG}->get("path.libjava", "FILE"),
+    my $extractkey_jar = 
+	File::Spec->catfile($self->{OPTIONS}->{CONFIG}->get("path.libjava", "FILE"),
 					     'ExtractKey.jar');
     if (! -r $extractkey_jar) {
 	$self->seterror("getkey(): could not locate ExtractKey.jar file");
@@ -291,29 +297,21 @@ sub getkey {
 	return undef;
     }
 
-    # convert to PEM encoded private key
-    @cmd = (qq("$openssl"),
-	    'pkcs8',
-	    '-inform',
-	    'der',
-	    '-nocrypt',
-	    '-in',
-	    qq("$p8file"),
-	);
-    
-    my $cmd = join(' ', @cmd);
-    $self->log({ MSG => "Execute: $cmd",
-		 PRIO => 'debug' });
-    my $keydata = `$cmd`;
-
+    my $keydata = $self->read_file($p8file);
     unlink $p8file;
 
-    if (($? != 0) or (! defined $keydata) or ($keydata eq "")) {
+    if ((! defined $keydata) or ($keydata eq "")) {
 	$self->seterror("getkey(): Could not convert private key");
 	return undef;
     }
 
-    return ({ KEYDATA => $keydata });
+    return (
+	{ 
+	    KEYDATA => $keydata,
+	    KEYTYPE => 'PKCS8',
+	    KEYFORMAT => 'DER',
+	    # no keypass, unencrypted
+	});
 }
 
 

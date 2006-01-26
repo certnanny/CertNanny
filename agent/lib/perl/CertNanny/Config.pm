@@ -37,6 +37,8 @@
 
 package CertNanny::Config;
 
+use base qw(Exporter);
+
 use IO::File;
 
 use strict;
@@ -44,7 +46,6 @@ use vars qw(@ISA @EXPORT @EXPORT_OK %EXPORT_TAGS $VERSION);
 use Exporter;
 
 $VERSION = 0.6;
-@ISA = qw(Exporter);
 
 #@EXPORT      = qw(...);       # Symbols to autoexport (:DEFAULT tag)
 

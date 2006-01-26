@@ -8,6 +8,8 @@
 
 package CertNanny;
 
+use base qw(Exporter);
+
 use strict;
 use vars qw(@ISA @EXPORT @EXPORT_OK %EXPORT_TAGS $VERSION $AUTOLOAD);
 use Exporter;
@@ -21,10 +23,6 @@ use CertNanny::Keystore;
 use Data::Dumper;
 
 $VERSION = 0.6;
-@ISA = qw(Exporter);
-
-#@EXPORT      = qw(...);       # Symbols to autoexport (:DEFAULT tag)
-
 
 
 sub new 

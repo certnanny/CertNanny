@@ -7,6 +7,9 @@
 #
 
 package CertNanny::Keystore;
+use base qw(Exporter);
+
+#use Smart::Comments;
 
 use File::Glob qw(:globally :nocase);
 use File::Spec;
@@ -21,14 +24,10 @@ use Data::Dumper;
 use CertNanny::Util;
 
 use strict;
-use vars qw(@ISA @EXPORT @EXPORT_OK %EXPORT_TAGS $VERSION $AUTOLOAD %accessible);
+use vars qw( $VERSION );
 use Exporter;
 
 $VERSION = 0.6;
-@ISA = qw(Exporter);
-
-# Authorize get/set access to certain attributes
-for my $attr ( qw() ) { $accessible{$attr}++; }
 
 
 # constructor parameters:
@@ -92,7 +91,7 @@ sub new
 
     # instantiate keystore
     my $type = $args{ENTRY}->{type};
-    if ($type eq "none") {
+    if (! defined $type || ($type eq "none")) {
 	print STDERR "Skipping keystore (no keystore type defined)\n";
 	return undef;
     }
@@ -165,7 +164,7 @@ sub setcert {
 
 
 # convert certificate to other formats
-# input: hash ref
+# input: hash
 # CERTDATA => string containing certificate data OR
 # CERTFILE => file containing certificate data
 # CERTFORMAT => certificate encoding format (PEM or DER), default: DER
@@ -182,6 +181,14 @@ sub convertcert {
 	OUTFORMAT => 'DER',
 	@_,         # argument pair list
 	);
+
+    # sanity checks
+    foreach my $key qw( CERTFORMAT OUTFORMAT ) {
+	if ($options{$key} !~ m{ \A (?: DER | PEM ) \z }xms) {
+	    $self->seterror("convertcert(): Incorrect $key: $options{$key}");
+	    return undef;
+	}
+    }
 
     my $output;
 
@@ -214,6 +221,9 @@ sub convertcert {
     $output->{CERTFORMAT} = $options{OUTFORMAT};
 
     my $cmd = join(' ', @cmd);
+    $self->log({ MSG => "Execute: " . $cmd,
+		 PRIO => 'debug' });
+
     $output->{CERTDATA} = `$cmd`;
     unlink $infile if defined $infile;
 
@@ -224,6 +234,148 @@ sub convertcert {
     
     return $output;
 }
+
+
+# convert private keys to other formats
+# input: hash
+# KEYDATA => string containing private key data OR
+# KEYFILE => file containing private key
+# KEYTYPE => private key type (OpenSSL or PKCS8), default: OpenSSL
+# KEYFORMAT => private key encoding format (PEM or DER), default: DER
+# KEYPASS => private key pass phrase, may be undef or empty
+# OUTFORMAT => desired output key format (PEM or DER), default: DER
+# OUTTYPE => desired output private key type (OpenSSL or PKCS8), 
+#            default: OpenSSL
+# OUTPASS => private key pass phrase, may be undef or empty
+#
+# return: hash
+# KEYDATA => string containing key data
+# KEYFORMAT => key encoding format (PEM or DER)
+# KEYTYPE => key type (OpenSSL or PKCS8)
+# KEYPASS => private key pass phrase
+# or undef on error
+sub convertkey {
+    my $self = shift;
+    my %options = (
+	KEYFORMAT => 'DER',
+	KEYTYPE   => 'OpenSSL',
+	OUTFORMAT => 'DER',
+	OUTTYPE   => 'OpenSSL',
+	@_,         # argument pair list
+	);
+
+    # sanity checks
+    foreach my $key qw( KEYFORMAT OUTFORMAT ) {
+	if ($options{$key} !~ m{ \A (?: DER | PEM ) \z }xms) {
+	    $self->seterror("convertkey(): Incorrect $key: $options{$key}");
+	    return;
+	}
+    }
+
+    foreach my $key qw( KEYTYPE OUTTYPE ) {
+	if ($options{$key} !~ m{ \A (?: OpenSSL | PKCS8 ) \z }xms) {
+	    $self->seterror("convertkey(): Incorrect $key: $options{$key}");
+	    return;
+	}
+    }
+
+    my $openssl = $self->{OPTIONS}->{openssl_shell};
+    my $output;
+
+    my @cmd = (qq("$openssl"),
+	);
+
+    # KEYTYPE OUTTYPE  CMD
+    # OpenSSL OpenSSL  rsa
+    # OpenSSL PKCS8    pkcs8 -topk8
+    # PKCS8   OpenSSL  pkcs8
+    # PKCS8   PKCS8    pkcs8 -topk8
+    if ($options{KEYTYPE} eq 'OpenSSL') {
+	if ($options{OUTTYPE} eq 'OpenSSL') {
+	    push(@cmd, 'rsa');
+	} 
+	else 
+	{
+	    # must be PKCS#8, see above
+	    push(@cmd, 'pkcs8');
+	}
+    } 
+    else 
+    {
+	# must be PKCS#8, see above
+	push(@cmd, 'pkcs8');
+    }
+    
+    if ($options{OUTTYPE} eq 'PKCS8') {
+	push(@cmd, '-topk8');
+    } 
+
+    push(@cmd, 
+	 '-inform', $options{KEYFORMAT},
+	 '-outform', $options{OUTFORMAT},
+	);
+    
+
+    # prepare output
+    $output->{KEYTYPE}   = $options{OUTTYPE};
+    $output->{KEYFORMAT} = $options{OUTFORMAT};
+    $output->{KEYPASS}   = $options{OUTPASS};
+    
+    my $infile;
+    push(@cmd, '-in');
+    if (exists $options{KEYDATA}) {
+	$infile = $self->gettmpfile();
+	my $fh = new IO::File(">$infile");
+	if (! $fh)
+	{
+	    $self->seterror("convertkey(): Could not create temporary file");
+	    return undef;
+	}
+	print $fh $options{KEYDATA};
+	$fh->close();
+	push(@cmd, qq("$infile"));
+    } else {
+	push(@cmd, qq("$options{KEYFILE}"));
+    }
+
+    $ENV{PASSIN} = "";
+    if (exists $options{KEYPASS} && ($options{KEYPASS} ne "")) {
+	$ENV{PASSIN} = $options{KEYPASS};
+    }
+    push(@cmd, '-passin', 'env:PASSIN');
+
+    $ENV{PASSOUT} = "";
+    if (exists $options{OUTPASS} && ($options{OUTPASS} ne "")) {
+	$ENV{PASSOUT} = $options{OUTPASS};
+	if (($options{KEYTYPE} eq 'OpenSSL')
+	    && ($options{OUTTYPE} eq 'OpenSSL')) {
+	    push(@cmd, '-des3');
+	}
+    }
+    push(@cmd, '-passout', 'env:PASSOUT');
+    
+    my $cmd = join(' ', @cmd);
+
+    $self->log({ MSG => "Execute: " . $cmd,
+		 PRIO => 'debug' });
+
+    ### PASSIN: $ENV{PASSOUT}
+    ### PASSOUT: $ENV{PASSOUT}
+    $output->{KEYDATA} = `$cmd 2>/dev/null`;
+    ### keydata: $output->{KEYDATA}
+
+    delete $ENV{PASSIN};
+    delete $ENV{PASSOUT};
+    unlink $infile if defined $infile;
+    
+    if ($? != 0) {
+	$self->seterror("convertkey(): Could not convert key");
+	return;
+    }
+    
+    return $output;
+}
+
 
 
 sub loglevel {
@@ -399,29 +551,6 @@ sub load_keystore_handler
     return 1;
 }
 
-# sub AUTOLOAD
-# {
-#     my $self = shift;
-#     my $attr = $AUTOLOAD;
-#     $attr =~ s/.*:://;
-#     return if $attr eq 'DESTROY';   
-    
-#     if ($accessible{$attr}) {
-#         $self->{uc $attr} = shift if @_;
-#         return $self->{uc $attr};
-#     } else {
-# 	if (exists $self->{INSTANCE} and
-# 	    $self->{INSTANCE}->can($attr)) {
-# 	    $self->{INSTANCE}->$attr(@_);
-# 	}
-# 	else
-# 	{
-# 	    croak "Cannot autoload $attr";
-# 	    die;
-# 	}
-#     } 
-# }
-
 
 # NOTE: this is UNSAFE (beware of race conditions). We cannot use a file
 # handle here because we are calling external programs to use these
@@ -439,6 +568,95 @@ sub gettmpfile
     
     push (@{$self->{TMPFILE}}, $tmpfile);
     return ($tmpfile);
+}
+
+
+# read (slurp) file from disk
+# Example: $self->read_file($filename);
+
+sub read_file
+{
+    my $self     = shift;
+    my $filename = shift;
+
+    if (! -e $filename)
+    {
+	$self->seterror("read_file(): file does not exist");
+	return;
+    }
+
+    if (! -r $filename)
+    {
+	$self->seterror("read_file(): file is not readable");
+	return;
+    }
+
+    my $result = do {
+	open my $HANDLE, "<", $filename;
+	if (! $HANDLE) {
+	    $self->seterror("read_file(): file open failed");
+	    return;
+	}
+	local $/;
+	<$HANDLE>;
+    };
+
+    return $result;
+}
+
+
+# write file to disk
+#
+# Example: $self->write_file (FILENAME => $filename, CONTENT => $data);
+#
+# The method will return false if the file already exists unless
+# the optional argument FORCE is set. In this case the method will overwrite
+# the specified file.
+# 
+# Example: $self->write_file (FILENAME => $filename, CONTENT => $data, FORCE => 1);
+# 
+
+sub write_file
+{
+    my $self     = shift;
+    my $keys     = { @_ };
+    my $filename = $keys->{FILENAME};
+    my $content  = $keys->{CONTENT};
+
+    if (! defined $filename)
+    {
+	$self->seterror("write_file(): no filename specified");
+	return;
+    }
+
+    if (! defined $content)
+    {
+	$self->seterror("write_file(): no content specified");
+	return;
+    }
+
+    if ((-e $filename) && (! $keys->{FORCE}))
+    {
+	$self->seterror("write_file(): file already exists");
+	return;
+    }
+
+
+    my $mode = O_WRONLY;
+    if (! -e $filename) {
+	$mode |= O_EXCL | O_CREAT;
+    }
+
+    my $HANDLE;
+    if (not sysopen($HANDLE, $filename, $mode))
+    {
+	$self->seterror("write_file(): file open failed");
+	return;
+    }
+    print {$HANDLE} $content;
+    close $HANDLE;
+
+    return 1;
 }
 
 
@@ -811,6 +1029,13 @@ sub renew {
 
 	    # reset state
 	    $self->renewalstate(undef);
+
+	    # clean state entry
+	    foreach my $entry qw( CERTFILE KEYFILE REQUESTFILE ) {
+		unlink $self->{STATE}->{DATA}->{RENEWAL}->{REQUEST}->{$entry};
+	    }
+	    # FIXME: delete state file
+
 	    last;
 	}
 	else
@@ -843,7 +1068,12 @@ sub getcert {
 # caller must return a hash ref containing the unencrypted private key in
 # OpenSSL format
 # Return:
-# KEYDATA => string containg the PEM encoded private key data
+# hashref (as expected by convertkey()), containing:
+# KEYDATA => string containg the private key OR
+# KEYFILE => file containing the key data
+# KEYFORMAT => 'PEM' or 'DER'
+# KEYTYPE => format (e. g. 'PKCS8' or 'OpenSSL'
+# KEYPASS => key pass phrase (only if protected by pass phrase)
 sub getkey {
     return undef;
 }
@@ -1064,8 +1294,13 @@ sub getcacerts {
     # delete existing ca certs
     my $ii = 0;
     while (-e $cacertbase . "-" . $ii) {
-	$self->debug("Unlinking " . $cacertbase . "-" . $ii);
-	unlink $cacertbase . "-" . $ii;
+	my $file = $cacertbase . "-" . $ii;
+	$self->debug("Unlinking $file");
+	unlink $file;
+	if (-e $file) {
+	    $self->seterror("could not delete CA certificate file $file, cannot proceed");
+	    return undef;
+	}
 	$ii++;
     }
     
@@ -1108,6 +1343,7 @@ sub getcacerts {
 	$certfile = $cacertbase . "-$ii";
     }
     $self->{STATE}->{DATA}->{SCEP}->{CACERTS} = \@cacerts;
+
 
     # build certificate chain
     $self->{STATE}->{DATA}->{CERTCHAIN} = $self->buildcertificatechain();
@@ -1164,64 +1400,85 @@ sub sendrequest {
     $self->debug("newcertfile: $newcertfile");
     $self->debug("openssl: $openssl");
 
-    my @cmd;
-    my $tmpkeyfile = $keyfile;
-    if ($pin ne "") {
-	# temporarily create an unencrypted copy of the RSA key (sscep
-	# cannot handle encrypted RSA keys in batch mode)
-	$tmpkeyfile = $self->gettmpfile();
-	$self->debug("tmpkeyfile: $tmpkeyfile");
-	chmod 0600, $tmpkeyfile;
-	
-	@cmd = (qq("$openssl"),
-		'rsa',
-		'-in',
-		qq($keyfile),
-		'-out',
-		qq($tmpkeyfile),
-		'-passin',
-		'env:PIN',
-		);
 
-	$ENV{PIN} = $pin;
-	if (system(join(' ', @cmd)) != 0) {
-	    $self->seterror("Could not convert RSA key");
-	    delete $ENV{PIN};
-	    unlink $tmpkeyfile;
-	    return undef;
-	}
-	delete $ENV{PIN};
+    # get unencrypted new key in PEM format
+    my $newkey = $self->convertkey(
+	KEYFILE   => $keyfile,
+	KEYPASS   => $pin,
+	KEYFORMAT => 'PEM',
+	KEYTYPE   => 'OpenSSL',
+	OUTFORMAT => 'PEM',
+	OUTTYPE   => 'OpenSSL',
+	# no pin
+	);
+
+    if (! defined $newkey) {
+	$self->seterror("Could not convert new key");
+	return undef;
     }
 
+    # write new PEM encoded key to temp file
+    my $requestkeyfile = $self->gettmpfile();
+    $self->debug("requestkeyfile: $requestkeyfile");
+    chmod 0600, $requestkeyfile;
+
+    if (! $self->write_file(
+	FILENAME => $requestkeyfile,
+	CONTENT  => $newkey->{KEYDATA},
+	FORCE    => 1,
+	)) {
+	$self->seterror("Could not write unencrypted copy of new file to temp file");
+	return undef;
+    }
+
+    my @cmd;
 
     my @autoapprove = ();
     my $oldkeyfile;
     my $oldcertfile;
     if ($scepsignaturekey =~ /(old|existing)/i) {
-	# get existing private key (unencrypted, PEM format)
-	my $oldkey = $self->getkey()->{KEYDATA};
+	# get existing private key from keystore
+	my $oldkey = $self->getkey();
 	if (! defined $oldkey) {
 	    $self->seterror("Could not get old key from certificate instance");
 	    return undef;
 	}
 
+	# convert private key to unencrypted PEM format
+	my $oldkey_pem_unencrypted = $self->convertkey(
+	    %{$oldkey},
+	    OUTFORMAT => 'PEM',
+	    OUTTYPE   => 'OpenSSL',
+	    OUTPASS   => '',
+	    );
+
+	if (! defined $oldkey_pem_unencrypted) {
+	    $self->seterror("Could not convert (old) private key");
+	    return undef;
+	}
+
  	$oldkeyfile = $self->gettmpfile();
         chmod 0600, $oldkeyfile;
-	local *HANDLE;
-	if (!open HANDLE, ">$oldkeyfile") {
+
+	if (! $self->write_file(
+		  FILENAME => $oldkeyfile,
+		  CONTENT  => $oldkey_pem_unencrypted->{KEYDATA},
+		  FORCE    => 1,
+	    )) {
 	    $self->seterror("Could not write temporary key file (old key)");
-	    return undef;
+	    return;
 	}
-	print HANDLE $oldkey;
-	close HANDLE;
 
 	$oldcertfile = $self->gettmpfile();
-	if (!open HANDLE, ">$oldcertfile") {
+	if (! $self->write_file(
+		  FILENAME => $oldcertfile,
+		  CONTENT  => $self->{CERT}->{RAW}->{PEM},
+		  FORCE    => 1,
+	    )) {
 	    $self->seterror("Could not write temporary cert file (old certificate)");
-	    return undef;
+	    return;
 	}
-	print HANDLE $self->{CERT}->{RAW}->{PEM};
-	close HANDLE;
+
 
         @autoapprove = ('-K', 
 			$oldkeyfile,
@@ -1239,7 +1496,7 @@ sub sendrequest {
 	    '-r',
 	    qq($requestfile),
 	    '-k',
-	    qq($tmpkeyfile),
+	    qq($requestkeyfile),
 	    '-l',
 	    qq($newcertfile),
 	    @autoapprove,
@@ -1258,7 +1515,7 @@ sub sendrequest {
 	$rc = system(join(' ', @cmd)) / 256;
 	alarm 0;
     };
-    unlink $tmpkeyfile if ($pin ne "");
+    unlink $requestkeyfile;
     unlink $oldkeyfile if (defined $oldkeyfile);
     unlink $oldcertfile if (defined $oldcertfile);
 

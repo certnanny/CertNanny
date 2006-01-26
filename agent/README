@@ -471,23 +471,44 @@ keystore.LABEL.hook.notify.warnexpiry
 
 2.2.2.1 OpenSSL Keystore
 
-The keystore format covers certificates that are present in raw PEM
-encoded format.
+The keystore format covers certificates that are present in raw PEM or
+DER encoded format. It supports OpenSSL and PKCS #8 private keys encoded
+in PEM and DER format.
 
 keystore.LABEL.type = OpenSSL
   Mandatory, must literally be set to OpenSSL
 
 keystore.LABEL.location
-  Specifies the location of the PEM encoded certificate to monitor.
+  Specifies the location of the PEM or DER encoded certificate to monitor.
+  The software will automatically detect encoding (PEM/DER), regardless
+  of the 'format' setting. See 'format'.
   Example: /etc/apache/ssl.crt/server.crt
 
+keystore.LABEL.format
+  Certificate and key encoding. When installing the *new* certificate the
+  resulting key and certificate will be encoded in this encoding.
+  The software will autodetect if the *existing* cert/key is stored in a 
+  different format and use this data properly, but the *new* certificate/key 
+  will be written in format specified here, no matter how the original was 
+  encoded.
+  Allowed values: PEM, DER
+  Default: PEM
+  Example: DER
+
 keystore.LABEL.keyfile
-  Specifies the location of the PEM encoded RSA key for the certificate.
+  Specifies the location of the private key for the certificate.
+  The software will automatically detect encoding (PEM/DER), regardless
+  of the 'format' setting. See 'format'.
   Example: /etc/apache/ssl.key/server.key
 
-keystore.LABEL.pin
-  Specifies the RSA key pin used to decrypt the RSA key.
+keystore.LABEL.keytype
+  Specifies the private key format. Allowed values: OpenSSL, PKCS8
+  Default: OpenSSL
+  Example: PKCS8
 
+keystore.LABEL.pin
+  Specifies the private key pin used to decrypt the private key. May
+  be empty (unencrypted key).
 
 
 2.2.2.2 MQ Keystore

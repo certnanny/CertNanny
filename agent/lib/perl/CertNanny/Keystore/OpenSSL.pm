@@ -8,6 +8,8 @@
 
 package CertNanny::Keystore::OpenSSL;
 
+use base qw(Exporter CertNanny::Keystore);
+
 use strict;
 use vars qw(@ISA @EXPORT @EXPORT_OK %EXPORT_TAGS $VERSION);
 use Exporter;
@@ -19,7 +21,6 @@ use File::Copy;
 use Data::Dumper;
 
 $VERSION = 0.6;
-@ISA = qw(Exporter CertNanny::Keystore);
 
 
 # constructor parameters:
@@ -40,6 +41,46 @@ sub new
 
     # propagate PIN to class options
     $self->{PIN} = $self->{OPTIONS}->{ENTRY}->{pin};
+
+    foreach my $entry qw( keyfile location ) {
+	if (! defined $self->{OPTIONS}->{ENTRY}->{$entry} ||
+	    (! -r $self->{OPTIONS}->{ENTRY}->{$entry})) {
+	    croak("keystore.$entry $self->{OPTIONS}->{ENTRY}->{$entry} not defined, does not exist or unreadable");
+	    return;
+	}
+    }
+    
+
+
+    # desired target
+    $self->{FORMAT} = $self->{OPTIONS}->{ENTRY}->{format};
+    if (! defined $self->{FORMAT}) {
+	$self->{FORMAT} = 'PEM';
+    }
+
+    if ($self->{FORMAT} !~ m{ \A (?: DER | PEM ) \z }xms) {
+	croak("Incorrect keystore format $self->{FORMAT}");
+	return;
+    }
+
+    $self->{KEYTYPE} = $self->{OPTIONS}->{ENTRY}->{keytype};
+    if (! defined $self->{KEYTYPE}) {
+	$self->{KEYTYPE} = 'PKCS8';
+    }
+
+    if ($self->{KEYTYPE} !~ m{ \A (?: OpenSSL | PKCS8 ) \z }xms) {
+	croak("Incorrect keystore type $self->{KEYTYPE}");
+	return;
+    }
+    
+    # sanity check: DER encoded OpenSSL keys cannot be encrypted
+    if (defined $self->{PIN} &&
+	($self->{PIN} ne "") &&
+	($self->{KEYTYPE} eq 'OpenSSL') &&
+	($self->{FORMAT} eq 'DER')) {
+	croak("DER encoded OpenSSL keystores cannot be encrypted");
+	return;
+    }
 
     # get previous renewal status
     $self->retrieve_state() || return undef;
@@ -103,31 +144,27 @@ sub getkey {
 	$self->seterror("getkey(): Could not open private key file");
 	return undef;
     }
-    
-    my $pin = $self->{PIN} || $self->{OPTIONS}->{ENTRY}->{pin};
-    # strip passphrase
-    my @cmd = (qq("$openssl"),
-	       'rsa',
-	       '-in',
-	       qq("$filename"),
-	);
 
-    if (defined $pin and $pin ne "") {
-	push (@cmd, ('-passin',
-		     'env:PIN'));
-	$ENV{PIN} = $pin;
-    }
-
-    my $cmd = join(' ', @cmd);
-    my $keydata = `$cmd`;
-    delete $ENV{PIN};
-
-    if ($? != 0) {
-	$self->seterror("getkey(): Could not convert private key");
+    my $keydata = $self->read_file($filename);
+    if (! defined $keydata || ($keydata eq "")) {
+	$self->seterror("getkey(): Could not read private key");
 	return undef;
     }
+    
+    my $pin = $self->{PIN} || $self->{OPTIONS}->{ENTRY}->{pin};
+    
+    my $keyformat = 'DER';
+    if ($keydata =~ m{ -----BEGIN.*KEY----- }xms) {
+	$keyformat = 'PEM';
+    }
 
-    return ({ KEYDATA => $keydata });
+    return (
+	{ 
+	    KEYDATA => $keydata,
+	    KEYTYPE => $self->{KEYTYPE},
+	    KEYFORMAT => $keyformat,
+	    KEYPASS => $pin,
+	});
 }
 
 # create pkcs12 file
@@ -195,6 +232,7 @@ sub createpkcs12 {
 
     # openssl pkcs12 command does not support DER input format, so
     # convert it to PEM first
+    # FIXME: use SUPER::convertcert?
     if ($args{CERTFORMAT} eq "DER") {
 	$certfile = $self->gettmpfile();
 
@@ -352,6 +390,7 @@ sub generatekey {
 	delete $ENV{PIN};
 	return undef;
     }
+    chmod 0600, $outfile;
     delete $ENV{PIN};
     
     return ({ KEYFILE => $outfile });
@@ -470,12 +509,39 @@ sub installcert {
         @_,         # argument pair list
     );
     my $keyfile = $self->{STATE}->{DATA}->{RENEWAL}->{REQUEST}->{KEYFILE};
+    my $pin = $self->{PIN} || $self->{OPTIONS}->{ENTRY}->{pin} || "";
 
     #print Dumper $self;
 
     $self->info("Installing certificate: $args{CERTFILE}");
     $self->info("Installing key: $keyfile");
 
+    my $newcert = $self->convertcert(
+	CERTFILE => $args{CERTFILE},
+	CERTFORMAT => 'PEM',
+	OUTFORMAT => $self->{FORMAT},
+	);
+
+    if (! defined $newcert) {
+	$self->seterror("Could not read/convert new certificate");
+	return undef;
+    }
+
+    my $newkey = $self->convertkey(
+	KEYFILE => $keyfile,
+	KEYFORMAT => 'PEM',
+	KEYTYPE   => 'OpenSSL',
+	KEYPASS   => $pin,
+	OUTFORMAT => $self->{FORMAT},
+	OUTTYPE   => $self->{KEYTYPE},
+	OUTPASS   => $pin,
+	);
+
+    if (! defined $newkey) {
+	$self->seterror("Could not read/convert new key");
+	return undef;
+    }
+	
     # backup old certificate and key
     my $oldcert = $self->{OPTIONS}->{ENTRY}->{location};
     my $oldkey = $self->{OPTIONS}->{ENTRY}->{keyfile};
@@ -484,18 +550,25 @@ sub installcert {
     unlink $oldcert . ".backup";
     rename $oldcert, $oldcert . ".backup";
 
-    $self->info("Archiving old certificate $oldcert and old key $oldkey");
+    $self->info("Archiving old key $oldkey");
     unlink $oldkey . ".backup";
     rename $oldkey, $oldkey . ".backup";
 
-    if (!copy($keyfile, $oldkey)) {
-	$self->seterror("Could not copy keyfile");
+
+    # install key
+    if (! $self->write_file(FILENAME => $oldkey,
+			    CONTENT  => $newkey->{KEYDATA})) {
+	$self->seterror("Could not install keyfile");
 	unlink $oldkey;
 	rename $oldkey . ".backup", $oldkey;
 	return undef;
     }
-    if (!copy($args{CERTFILE}, $oldcert)) {
-	$self->seterror("Could not copy certificate");
+
+    if (! $self->write_file(FILENAME => $oldcert,
+			    CONTENT  => $newcert->{CERTDATA})) {
+	$self->seterror("Could not install certificate");
+	unlink $oldkey;
+	rename $oldkey . ".backup", $oldkey;
 	unlink $oldcert;
 	rename $oldcert . ".backup", $oldcert;
 	return undef;
