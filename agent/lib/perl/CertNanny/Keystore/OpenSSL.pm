@@ -513,20 +513,12 @@ sub installcert {
 
     #print Dumper $self;
 
-    $self->info("Installing certificate: $args{CERTFILE}");
-    $self->info("Installing key: $keyfile");
+    # data structure representing the new keystore (containing all 
+    # new file contents to write)
+    my @newkeystore = ();
 
-    my $newcert = $self->convertcert(
-	CERTFILE => $args{CERTFILE},
-	CERTFORMAT => 'PEM',
-	OUTFORMAT => $self->{FORMAT},
-	);
-
-    if (! defined $newcert) {
-	$self->seterror("Could not read/convert new certificate");
-	return undef;
-    }
-
+    ######################################################################
+    ### private key...
     my $newkey = $self->convertkey(
 	KEYFILE => $keyfile,
 	KEYFORMAT => 'PEM',
@@ -539,41 +531,79 @@ sub installcert {
 
     if (! defined $newkey) {
 	$self->seterror("Could not read/convert new key");
-	return undef;
+	return;
     }
+
+    push(@newkeystore, 
+	 {
+	     DESCRIPTION => "End entity private key",
+	     FILENAME    => $self->{OPTIONS}->{ENTRY}->{keyfile},
+	     CONTENT     => $newkey->{KEYDATA},
+	 });
+    
+    
+    ######################################################################
+    ### certificate...
+    my $newcert = $self->convertcert(
+	CERTFILE => $args{CERTFILE},
+	CERTFORMAT => 'PEM',
+	OUTFORMAT => $self->{FORMAT},
+	);
+
+    if (! defined $newcert) {
+	$self->seterror("Could not read/convert new certificate");
+	return;
+    }
+
+    push(@newkeystore, 
+	 {
+	     DESCRIPTION => "End entity certificate",
+	     FILENAME    => $self->{OPTIONS}->{ENTRY}->{location},
+	     CONTENT     => $newcert->{CERTDATA},
+	 });
+    
+
+    ######################################################################
+    ### CA certificates...
+    my $ii = 0;
+    while (exists $self->{OPTIONS}->{ENTRY}->{cacert}->{$ii}
+	   && defined $self->{STATE}->{DATA}->{CERTCHAIN}[$ii]) {
+
+	# determine CA certificate for this level
+	my $entry = $self->{STATE}->{DATA}->{CERTCHAIN}[$ii];
+	### $entry
+
+	my $destfile = $self->{OPTIONS}->{ENTRY}->{cacert}->{$ii};
+	### $destfile
+
+	my $cacert = $self->convertcert(
+	    CERTFILE => $entry->{CERTFILE},
+	    CERTFORMAT => 'PEM',
+	    OUTFORMAT => $self->{FORMAT},
+	    );
 	
-    # backup old certificate and key
-    my $oldcert = $self->{OPTIONS}->{ENTRY}->{location};
-    my $oldkey = $self->{OPTIONS}->{ENTRY}->{keyfile};
-
-    $self->info("Archiving old certificate $oldcert");
-    unlink $oldcert . ".backup";
-    rename $oldcert, $oldcert . ".backup";
-
-    $self->info("Archiving old key $oldkey");
-    unlink $oldkey . ".backup";
-    rename $oldkey, $oldkey . ".backup";
-
-
-    # install key
-    if (! $self->write_file(FILENAME => $oldkey,
-			    CONTENT  => $newkey->{KEYDATA})) {
-	$self->seterror("Could not install keyfile");
-	unlink $oldkey;
-	rename $oldkey . ".backup", $oldkey;
-	return undef;
+	if (defined $cacert) {
+	    push(@newkeystore, 
+		 {
+		     DESCRIPTION => "CA certificate level $ii",
+		     FILENAME    => $destfile,
+		     CONTENT     => $cacert->{CERTDATA},
+		 });
+	} else {
+	    $self->seterror("Could not convert CA certificate for level $ii");
+	    return;
+	}
+	$ii++;
     }
 
-    if (! $self->write_file(FILENAME => $oldcert,
-			    CONTENT  => $newcert->{CERTDATA})) {
-	$self->seterror("Could not install certificate");
-	unlink $oldkey;
-	rename $oldkey . ".backup", $oldkey;
-	unlink $oldcert;
-	rename $oldcert . ".backup", $oldcert;
-	return undef;
-    }
+    ######################################################################
+    # try to write the new keystore 
 
+    if (! $self->installfile(@newkeystore)) {
+	$self->seterror("Could not install new keystore");
+	return;
+    }
+	   
     # done
     $self->renewalstate("completed");
     return 1;

@@ -607,13 +607,13 @@ sub read_file
 
 # write file to disk
 #
-# Example: $self->write_file (FILENAME => $filename, CONTENT => $data);
+# Example: $self->write_file(FILENAME => $filename, CONTENT => $data);
 #
 # The method will return false if the file already exists unless
 # the optional argument FORCE is set. In this case the method will overwrite
 # the specified file.
 # 
-# Example: $self->write_file (FILENAME => $filename, CONTENT => $data, FORCE => 1);
+# Example: $self->write_file(FILENAME => $filename, CONTENT => $data, FORCE => 1);
 # 
 
 sub write_file
@@ -658,6 +658,191 @@ sub write_file
 
     return 1;
 }
+
+
+# File/keystore installation convenience method
+# This method is very careful about rolling back all modifications if
+# any error happened. Unless something really ugly happens, the original
+# state is always restored even if this method returns an error.
+# This includes permission problems, ownership, file system errors etc.
+# and even if multiple files are to be installed and the error occurs
+# after a portion of them have been installed successfully.
+#
+# options:
+# filespec-hashref or array containing filespec-hashrefs
+# examples:
+# $self->installfile({ FILENAME => 'foo', CONTENT => $data, DESCRIPTION => 'some file...'});
+# or
+# @files = (
+#    { FILENAME => 'foo', CONTENT => $data1, DESCRIPTION => 'some file...'},
+#    { FILENAME => 'bar', CONTENT => $data2, DESCRIPTION => 'other file...'},
+# );
+# $self->installfile(@files);
+# 
+sub installfile 
+{
+    my ($self, @args) = @_;
+
+    my $error = 0;
+
+    ###########################################################################
+    # write new files
+
+  WRITENEWFILES:
+    foreach my $entry (@args) {
+	# file to replace
+	my $filename = $entry->{FILENAME};
+
+	my $ii = 0;
+	my $tmpfile  = $filename . ".new";
+
+	# write content data to suitable temporary file
+	my $tries = 10;
+	while ($ii < $tries 
+	       && (! $self->write_file(
+			 FILENAME => $tmpfile,
+			 CONTENT  => $entry->{CONTENT}))) {
+	    # write_file() will not overwrite existing files, an error
+	    # indicates that e. g. the file already existed, so:
+	    # try next filename candidate
+	    $tmpfile = $filename . ".new$ii";
+	    $ii++;
+	}
+
+	# error: could not write one of the tempory files
+	if (($ii == $tries) || (! -e $tmpfile)) {
+	    # remember to clean up the files created up to now
+	    $error = 1;
+	    last WRITEFILES;
+	}
+
+	# the temporary file should be given the existing owner/group and
+	# mode - if possible
+	my @stats = stat($filename);
+
+	# NOTE/FIXME: we ignore problems with setting user, group or
+	# permissions here on purpose, we don't want to rollback the
+	# operation due to permission problems or because this is not
+	# supported by the target system
+	if (scalar(@stats)){
+	    #           uid        gid
+	    chown $stats[4], $stats[5], $tmpfile;
+
+	    #          mode, integer - which is OK for chmod
+	    chmod $stats[2] & 07777, $tmpfile; # mask off file type
+	}
+
+	# remember new file name for file replacement
+	$entry->{TMPFILENAME} = $tmpfile;
+    }
+
+    ###########################################################################
+    # error checking for temporary file creation
+    if ($error) {
+	# something went wrong, clean up and bail out
+	foreach my $entry (@args) {
+	    unlink $entry->{TMPFILENAME};
+	}
+	$self->seterror("installfile(): could not create new file(s)");
+	return;
+    }
+
+    ###########################################################################
+    # temporary files have been created with proper mode and permissions,
+    # now back up original files
+
+    my @original_files = ();
+    foreach my $entry (@args) {
+	my $file = $entry->{FILENAME};
+	my $backupfile = $file . ".backup";
+
+	# remove already existing backup file
+	if (-e $backupfile) {
+	    unlink $backupfile;
+	}
+
+	# check if it still persists
+	if (-e $backupfile) {
+	    $self->seterror("installfile(): could not unlink backup file $backupfile");
+
+	    # clean up and bail out
+
+	    # undo rename operations
+	    foreach my $undo (@original_files) {
+		rename $undo->{DST}, $undo->{SRC};
+	    }
+
+	    # clean up temporary files
+	    foreach my $entry (@args) {
+		unlink $entry->{TMPFILENAME};
+	    }
+	    return;
+	}
+	
+	# rename orignal files: file -> file.backup
+	if (-e $file) { 
+	    # only if the file exists
+	    if ((! rename $file, $backupfile)  # but cannot be moved away
+		|| (-e $file)) {               # or still exists after moving
+		$self->seterror("installfile(): could not rename $file to backup file $backupfile");
+		
+		# undo rename operations
+		foreach my $undo (@original_files) {
+		    rename $undo->{DST}, $undo->{SRC};
+		}
+		
+		# clean up temporary files
+		foreach my $entry (@args) {
+		    unlink $entry->{TMPFILENAME};
+		}
+		return;
+	    }
+
+	    # remember what we did here already
+	    push(@original_files, 
+		 { 
+		     SRC => $file,
+		     DST => $backupfile,
+		 });	
+	}
+    }
+
+    
+    # existing keystore files have been renamed, now rename temporary
+    # files to original file names
+    foreach my $entry (@args) {
+	my $tmpfile = $entry->{TMPFILENAME};
+	my $file = $entry->{FILENAME};
+
+	my $msg = "Installing file $file";
+	if (exists $entry->{DESCRIPTION}) {
+	    $msg .= " ($entry->{DESCRIPTION})";
+	}
+
+	$self->info($msg);
+
+	if (! rename $tmpfile, $file) {
+	    # should not happen!
+	    # ... but we have to handle this nevertheless
+
+	    $self->seterror("installfile(): could not rename $tmpfile to target file $file");
+	    # undo rename operations
+	    foreach my $undo (@original_files) {
+		unlink $undo->{SRC};
+		rename $undo->{DST}, $undo->{SRC};
+	    }
+
+	    # clean up temporary files
+	    foreach my $entry (@args) {
+		unlink $entry->{TMPFILENAME};
+	    }
+	    return;
+	}
+    }
+
+    return 1;
+}
+
 
 
 # parse DER encoded X.509v3 certificate and return certificate information 

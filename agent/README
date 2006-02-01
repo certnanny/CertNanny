@@ -3,7 +3,7 @@ CertNanny
 
 Automatic renewal for X509v3 certificates using SCEP
 
-Copyright (c) 2005 Martin Bartosch <m.bartosch@cynops.de>
+Copyright (c) 2005, 2006 Martin Bartosch <m.bartosch@cynops.de>
 
 CertNanny implements a framework for certificate renewal automation.
 
@@ -484,9 +484,29 @@ keystore.LABEL.location
   of the 'format' setting. See 'format'.
   Example: /etc/apache/ssl.crt/server.crt
 
+keystore.LABEL.cacert.0
+keystore.LABEL.cacert.1
+keystore.LABEL.cacert.2
+...
+  Specifies the file name of the CA certificates forming the complete
+  certificate chain for the new end entity certificate.
+  This setting is only evaluated when installing the new keystore. The
+  files specified here will be overwritten (NO backup is created).
+  The first configured ca certificate file (.0) will contain the topmost
+  (Root) Certificate, subsequent entries will contain increasingly deeper
+  levels of the CA certificate hierarchy.
+  If the CA certificate chain contains more certificates than specified
+  here only the specified levels will be written to files.
+  If the CA certificate chain contains less certificates than specified
+  here the additionally referenced files will not be created.
+  Example: 
+    keystore.LABEL.cacert.0 = /etc/apache/ssl.crt/rootca.crt
+    keystore.LABEL.cacert.1 = /etc/apache/ssl.crt/level2ca.crt
+
 keystore.LABEL.format
   Certificate and key encoding. When installing the *new* certificate the
-  resulting key and certificate will be encoded in this encoding.
+  resulting key and certificates (including CA certifcates) will be 
+  encoded in this format.
   The software will autodetect if the *existing* cert/key is stored in a 
   different format and use this data properly, but the *new* certificate/key 
   will be written in format specified here, no matter how the original was 
