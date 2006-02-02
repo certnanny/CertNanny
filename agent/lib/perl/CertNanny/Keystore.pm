@@ -79,7 +79,6 @@ sub new
     
     croak "No tmp directory specified" 
 	unless defined $self->{OPTIONS}->{tmp_dir};
-
     croak "No openssl binary configured or found" 
 	unless (defined $self->{OPTIONS}->{openssl_shell} and
 		-x $self->{OPTIONS}->{openssl_shell});
@@ -342,7 +341,9 @@ sub convertkey {
     if (exists $options{KEYPASS} && ($options{KEYPASS} ne "")) {
 	$ENV{PASSIN} = $options{KEYPASS};
     }
-    push(@cmd, '-passin', 'env:PASSIN');
+    if ($ENV{PASSIN} ne "") {
+        push(@cmd, '-passin', 'env:PASSIN');
+    }
 
     $ENV{PASSOUT} = "";
     if (exists $options{OUTPASS} && ($options{OUTPASS} ne "")) {
@@ -352,7 +353,9 @@ sub convertkey {
 	    push(@cmd, '-des3');
 	}
     }
-    push(@cmd, '-passout', 'env:PASSOUT');
+    if ($ENV{PASSOUT} ne "") {
+        push(@cmd, '-passout', 'env:PASSOUT');
+    }
     
     my $cmd = join(' ', @cmd);
 
@@ -361,7 +364,8 @@ sub convertkey {
 
     ### PASSIN: $ENV{PASSOUT}
     ### PASSOUT: $ENV{PASSOUT}
-    $output->{KEYDATA} = `$cmd 2>/dev/null`;
+    #$output->{KEYDATA} = `$cmd 2>/dev/null`;
+    $output->{KEYDATA} = `$cmd`;
     ### keydata: $output->{KEYDATA}
 
     delete $ENV{PASSIN};
@@ -930,7 +934,7 @@ sub getcertinfo
 
     my @input = ();
     if (defined $options{CERTFILE}) {
-	@input = ('-in', qq($options{CERTFILE}));
+	@input = ('-in', qq("$options{CERTFILE}"));
     }
 
     # export certificate
@@ -1492,12 +1496,12 @@ sub getcacerts {
 
     $self->info("Requesting CA certificates");
     
-    my @cmd = (qq($sscep),
+    my @cmd = (qq("$sscep"),
 	       'getca',
 	       '-u',
 	       qq($scepurl),
 	       '-c',
-	       qq($cacertbase));
+	       qq("$cacertbase"));
     
     $self->debug("Exec: " . join(' ', @cmd));
     if (system(join(' ', @cmd)) != 0) {
@@ -1666,24 +1670,24 @@ sub sendrequest {
 
 
         @autoapprove = ('-K', 
-			$oldkeyfile,
+			qq("$oldkeyfile"),
 			'-O',
-			$oldcertfile,
+			qq("$oldcertfile"),
 	    );
     }
 
-    @cmd = (qq($sscep),
+    @cmd = (qq("$sscep"),
 	    'enroll',
 	    '-u',
 	    qq($scepurl),
 	    '-c',
-	    qq($scepracert),
+	    qq("$scepracert"),
 	    '-r',
-	    qq($requestfile),
+	    qq("$requestfile"),
 	    '-k',
-	    qq($requestkeyfile),
+	    qq("$requestkeyfile"),
 	    '-l',
-	    qq($newcertfile),
+	    qq("$newcertfile"),
 	    @autoapprove,
 	    '-t',
 	    '5',
