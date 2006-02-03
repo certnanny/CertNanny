@@ -141,14 +141,6 @@ sub new
     
 
 
-    # perform configuration sanity checks:
-    if (($self->{ROOTCACERTFORMAT} eq 'DER')
-	&& defined $self->{OPTIONS}->{ENTRY}->{rootcacertbundle}) {
-	croak("DER encoded Root CA bundles are not supported. Fix .format and/or .rootcacertformat and/or .rootcabundle config settings");
-	return;
-    }
-
-
     # the rest should remain untouched
 
     # get previous renewal status
