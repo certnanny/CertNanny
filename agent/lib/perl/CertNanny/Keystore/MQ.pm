@@ -31,9 +31,6 @@ $VERSION = 0.6;
 
 
 
-# constructor parameters:
-# location - base name of keystore (required)
-# type - keystore type (default: auto)
 sub new 
 {
     my $proto = shift;
@@ -717,7 +714,6 @@ sub installcert {
 	}
     }
 
-    $self->renewalstate("completed");
     return 1;
 }
 

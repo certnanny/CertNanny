@@ -23,9 +23,6 @@ use Data::Dumper;
 $VERSION = 0.6;
 
 
-# constructor parameters:
-# location - base name of keystore (required)
-# type - keystore type (default: auto)
 sub new 
 {
     my $proto = shift;
@@ -52,16 +49,28 @@ sub new
     
 
 
-    # desired target
-    $self->{FORMAT} = $self->{OPTIONS}->{ENTRY}->{format};
-    if (! defined $self->{FORMAT}) {
-	$self->{FORMAT} = 'PEM';
+    # desired target formats
+    foreach my $format qw( FORMAT KEYFORMAT CACERTFORMAT ROOTCACERTFORMAT ) {
+	# assign format if explicitly defined in config
+	if (defined $self->{OPTIONS}->{ENTRY}->{ lc($format) }) {
+	    $self->{ uc($format) } = $self->{OPTIONS}->{ENTRY}->{ lc($format) };
+	}
+
+	# assign default otherwise
+	if (! defined $self->{ uc($format) }) {
+	    $self->{ uc($format) } 
+	      = uc($format) eq 'FORMAT' 
+		  ? 'PEM'              # default for .format
+		  : $self->{FORMAT};   # default for the rest
+	}
+
+	if ($self->{ uc($format) } !~ m{ \A (?: DER | PEM ) \z }xms) {
+	    croak("Incorrect ." 
+		  . lc($format) . " specification '" . $self->{ uc($format) } . "'");
+	    return;
+	}
     }
 
-    if ($self->{FORMAT} !~ m{ \A (?: DER | PEM ) \z }xms) {
-	croak("Incorrect keystore format $self->{FORMAT}");
-	return;
-    }
 
     $self->{KEYTYPE} = $self->{OPTIONS}->{ENTRY}->{keytype};
     if (! defined $self->{KEYTYPE}) {
@@ -77,8 +86,16 @@ sub new
     if (defined $self->{PIN} &&
 	($self->{PIN} ne "") &&
 	($self->{KEYTYPE} eq 'OpenSSL') &&
-	($self->{FORMAT} eq 'DER')) {
+	($self->{KEYFORMAT} eq 'DER')) {
 	croak("DER encoded OpenSSL keystores cannot be encrypted");
+	return;
+    }
+
+
+    # sanity check: Root CA bundle in DER format does not make sense
+    if (($self->{ROOTCACERTFORMAT} eq 'DER')
+	&& defined $self->{OPTIONS}->{ENTRY}->{rootcacertbundle}) {
+	croak("DER encoded Root CA bundles are not supported. Fix .format and/or .rootcacertformat and/or .rootcabundle config settings");
 	return;
     }
 
@@ -513,6 +530,7 @@ sub installcert {
 
     #print Dumper $self;
 
+
     # data structure representing the new keystore (containing all 
     # new file contents to write)
     my @newkeystore = ();
@@ -524,7 +542,7 @@ sub installcert {
 	KEYFORMAT => 'PEM',
 	KEYTYPE   => 'OpenSSL',
 	KEYPASS   => $pin,
-	OUTFORMAT => $self->{FORMAT},
+	OUTFORMAT => $self->{KEYFORMAT},
 	OUTTYPE   => $self->{KEYTYPE},
 	OUTPASS   => $pin,
 	);
@@ -566,6 +584,10 @@ sub installcert {
     ######################################################################
     ### CA certificates...
     my $ii = 0;
+    if (! exists $self->{OPTIONS}->{ENTRY}->{cacert}->{$ii}) {
+	# cacert.0 does not exist, start with .1
+	$ii = 1;
+    }
     while (exists $self->{OPTIONS}->{ENTRY}->{cacert}->{$ii}
 	   && defined $self->{STATE}->{DATA}->{CERTCHAIN}[$ii]) {
 
@@ -579,7 +601,7 @@ sub installcert {
 	my $cacert = $self->convertcert(
 	    CERTFILE => $entry->{CERTFILE},
 	    CERTFORMAT => 'PEM',
-	    OUTFORMAT => $self->{FORMAT},
+	    OUTFORMAT => $self->{CACERTFORMAT},
 	    );
 	
 	if (defined $cacert) {
@@ -597,6 +619,99 @@ sub installcert {
     }
 
     ######################################################################
+    # try to write root certificates
+    
+    if (exists $self->{OPTIONS}->{ENTRY}->{rootcacertbundle}) {
+	my $fh = new IO::File(">" . $self->{OPTIONS}->{ENTRY}->{rootcacertbundle});
+	if (! $fh)
+	{
+	    $self->seterror("installcert(): Could not create Root CA certificate bundle file");
+	    return;
+	}
+
+	foreach my $entry (@{$self->{STATE}->{DATA}->{ROOTCACERTS}}) {
+	    my $cert = $self->convertcert(OUTFORMAT => 'PEM',
+					  CERTFILE => $entry->{CERTFILE},
+					  CERTFORMAT => 'PEM',
+		);
+	    
+	    if (! defined $cert)
+	    {
+		$self->seterror("installcert(): Could not convert root certificate $entry->{CERTFILE}");
+		return;
+	    }
+
+	    my $data = $cert->{CERTDATA};
+	    chomp $data;
+	    print $fh $data;
+	    print $fh "\n";
+	}
+
+	$fh->close();
+    }
+
+
+    if (exists $self->{OPTIONS}->{ENTRY}->{rootcacertdir}) {
+	# write root certs to specified directory, possibly with the 
+	# template name used here.
+
+	my $path = $self->{OPTIONS}->{ENTRY}->{rootcacertdir};
+	my $rootcacertformat = $self->{ROOTCACERTFORMAT};
+
+	# prepare default template
+	my ($volume, $dir, $template) = ('', $path, 'root-%i.' . lc($rootcacertformat));
+
+	# overwrite template if explicitly defined
+	if (! -d $path) {
+	    ($volume, $dir, $template) 
+		= File::Spec->splitpath($path);
+	}
+
+	# reconstruct target directory
+	$dir = File::Spec->catpath($volume, $dir);
+
+	# sanity check
+	if (! -d $dir || ! -w $dir) {
+	    $self->seterror("installcert(): Root CA certificate target directory $dir does not exist or is not writable");
+	    return;
+	}
+
+	my $ii = 1;
+	foreach my $entry (@{$self->{STATE}->{DATA}->{ROOTCACERTS}}) {
+	    my $cert = $self->convertcert(OUTFORMAT => 'PEM',
+					  CERTFILE => $entry->{CERTFILE},
+					  CERTFORMAT => $rootcacertformat,
+		);
+	    
+	    if (! defined $cert)
+	    {
+		$self->seterror("installcert(): Could not convert root certificate $entry->{CERTFILE}");
+		return;
+	    }
+
+	    my $filename = $template;
+
+	    # replace tags
+	    $filename =~ s{%i}{$ii}xmsg;
+
+	    $filename = File::Spec->catfile(
+		$dir,
+		$filename);
+	    
+	    if (! $self->write_file(
+		      FILENAME => $filename,
+		      CONTENT  => $cert->{CERTDATA},
+		      FORCE    => 1,
+		)) {
+		$self->seterror("installcert(): Could not write root certificate $filename");
+		return;
+	    }
+
+	    $ii++;
+	}
+    }
+    
+    ######################################################################
     # try to write the new keystore 
 
     if (! $self->installfile(@newkeystore)) {
@@ -604,8 +719,6 @@ sub installcert {
 	return;
     }
 	   
-    # done
-    $self->renewalstate("completed");
     return 1;
 }
 

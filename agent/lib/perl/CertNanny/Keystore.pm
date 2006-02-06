@@ -1755,6 +1755,9 @@ sub sendrequest {
 			       '__NEWCERT_NOTAFTER__' => $newcert->{INFO}->{NotAfter},
 			       '__NEWCERT_NOTBEFORE__' => $newcert->{INFO}->{NotBefore},
 		);
+
+	    # done
+	    $self->renewalstate("completed");
 	    
 	    return $rc;
 	}
