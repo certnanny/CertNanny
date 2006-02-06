@@ -37,7 +37,7 @@ sub new
     bless $self, $class;
 
     $self->{CONFIG} = CertNanny::Config->new($args{CONFIG});
-    return undef unless defined $self->{CONFIG};
+    return unless defined $self->{CONFIG};
 
     # set default library path
     my @dirs = File::Spec->splitdir($FindBin::Bin);

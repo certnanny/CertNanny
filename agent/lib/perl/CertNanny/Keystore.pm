@@ -92,12 +92,12 @@ sub new
     my $type = $args{ENTRY}->{type};
     if (! defined $type || ($type eq "none")) {
 	print STDERR "Skipping keystore (no keystore type defined)\n";
-	return undef;
+	return;
     }
 
     if (! $self->load_keystore_handler($type)) {
 	print STDERR "ERROR: Could not load keystore handler '$type'\n";
-	return undef;
+	return;
     }
 
     # attach keystore handler
@@ -106,7 +106,7 @@ sub new
     eval "\$self->{INSTANCE} = new CertNanny::Keystore::$type((\%args, \%{\$self->{OPTIONS}}))";
     if ($@) {
 	print STDERR $@;
-	return undef;
+	return;
     }
 
     croak "Could not initialize keystore handler '$type'. Aborted." 
@@ -128,12 +128,12 @@ sub new
     else
     {
 	print STDERR "ERROR: Could not parse instance certificate\n";
-	return undef;
+	return;
     }
     $self->{INSTANCE}->setcert($self->{CERT});
 
     # get previous renewal status
-    #$self->retrieve_state() or return undef;
+    #$self->retrieve_state() or return;
 
     # check if we can write to the file
     #$self->store_state() || croak "Could not write state file $self->{STATE}->{FILE}";
@@ -185,7 +185,7 @@ sub convertcert {
     foreach my $key qw( CERTFORMAT OUTFORMAT ) {
 	if ($options{$key} !~ m{ \A (?: DER | PEM ) \z }xms) {
 	    $self->seterror("convertcert(): Incorrect $key: $options{$key}");
-	    return undef;
+	    return;
 	}
     }
 
@@ -201,14 +201,13 @@ sub convertcert {
     
     if (exists $options{CERTDATA}) {
 	$infile = $self->gettmpfile();
-	my $fh = new IO::File(">$infile");
-	if (! $fh)
-	{
-	    $self->seterror("convertcert(): Could not create temporary file");
-	    return undef;
+	if (! $self->write_file(FILENAME => $infile,
+				CONTENT  => $options{CERTDATA},
+	    )) {
+	    $self->seterror("convertcert(): Could not write temporary file");
+	    return;
 	}
-	print $fh $options{CERTDATA};
-	$fh->close();
+
 	push(@cmd, qq("$infile"));
     } else {
 	push(@cmd, qq("$options{CERTFILE}"));
@@ -228,7 +227,7 @@ sub convertcert {
 
     if ($? != 0) {
 	$self->seterror("convertcert(): Could not convert certificate");
-	return undef;
+	return;
     }
     
     return $output;
@@ -324,14 +323,13 @@ sub convertkey {
     push(@cmd, '-in');
     if (exists $options{KEYDATA}) {
 	$infile = $self->gettmpfile();
-	my $fh = new IO::File(">$infile");
-	if (! $fh)
-	{
-	    $self->seterror("convertkey(): Could not create temporary file");
-	    return undef;
+	if (! $self->write_file(FILENAME => $infile,
+				CONTENT  => $options{KEYDATA},
+	    )) {
+	    $self->seterror("convertkey(): Could not write temporary file");
+	    return;
 	}
-	print $fh $options{KEYDATA};
-	$fh->close();
+
 	push(@cmd, qq("$infile"));
     } else {
 	push(@cmd, qq("$options{KEYFILE}"));
@@ -494,7 +492,7 @@ sub log
     my $self = shift;
     my $arg = shift;
     confess "Not a hash ref" unless (ref($arg) eq "HASH");
-    return undef unless (defined $arg->{MSG});
+    return unless (defined $arg->{MSG});
     my $prio = lc($arg->{PRIO}) || "info";
 
     my %level = ( 'debug'  => 4,
@@ -919,12 +917,12 @@ sub getcertinfo
     if (! (defined $options{CERTFILE} or defined $options{CERTDATA}))
     {
 	$self->seterror("getcertinfo(): No input data specified");
-	return undef;
+	return;
     }
     if ((defined $options{CERTFILE} and defined $options{CERTDATA}))
     {
 	$self->seterror("getcertinfo(): Ambigous input data specified");
-	return undef;
+	return;
     }
     
     my $outfile = $self->gettmpfile();
@@ -965,7 +963,7 @@ sub getcertinfo
     {
     	$self->seterror("getcertinfo(): open error");
 	unlink $outfile;
-	return undef;
+	return;
 
     }
 
@@ -979,7 +977,7 @@ sub getcertinfo
     {
     	$self->seterror("getcertinfo(): Error ASN.1 decoding certificate");
 	unlink $outfile;
-	return undef;
+	return;
     }
 
     my $fh = new IO::File("<$outfile");
@@ -987,7 +985,7 @@ sub getcertinfo
     {
     	$self->seterror("getcertinfo(): Error analysing ASN.1 decoded certificate");
 	unlink $outfile;
-    	return undef;
+    	return;
     }
 
     my $state = "";
@@ -1074,7 +1072,7 @@ sub getcertinfo
 	if (! exists $certinfo->{$var})
 	{
 	    $self->seterror("getcertinfo(): Could not determine field '$var' from X.509 certificate");
-	    return undef;
+	    return;
 	}
     }
 
@@ -1124,7 +1122,7 @@ sub getcertinfo
 	if (! defined $dmon)
 	{
 	    $self->seterror("getcertinfo(): could not parse month '$mon' in date '$certinfo->{$var}' returned by OpenSSL");
-	    return undef;
+	    return;
 	}
 	
 	$certinfo->{$var} = sprintf("%04d%02d%02d%02d%02d%02d",
@@ -1160,7 +1158,7 @@ sub checkvalidity {
     my $days = shift || 0;
     
     my $notAfter = isodatetoepoch($self->{CERT}->{INFO}->{NotAfter});
-    return undef unless defined $notAfter;
+    return unless defined $notAfter;
 
     my $cutoff = time + $days * 24 * 3600;
 
@@ -1173,7 +1171,7 @@ sub checkvalidity {
 			   );
 	return 0;
     }
-    return undef;
+    return;
 }
 
 
@@ -1196,7 +1194,7 @@ sub renew {
 	    if (! defined $self->{STATE}->{DATA}->{RENEWAL}->{REQUEST}) {
 		$self->log({ MSG => "Could not create certificate request",
 			     PRIO => 'error' });
-		return undef;
+		return;
 	    }	    
 	    $self->renewalstate("sendrequest");
 	} 
@@ -1208,7 +1206,7 @@ sub renew {
 	    if (! $self->sendrequest()) {
 		$self->log({ MSG => "Could not send request",
 			     PRIO => 'error' });
-		return undef;
+		return;
 	    }
 	}
 	elsif ($self->renewalstate() eq "completed") 
@@ -1231,7 +1229,7 @@ sub renew {
 	{
 	    $self->log({ MSG => "State unknown: " . $self->renewalstate(),
 			 PRIO => 'error' });
-	    return undef;
+	    return;
 	}
 
     }
@@ -1250,7 +1248,7 @@ sub renew {
 # CERTDATA => string containg the cert data
 # CERTFORMAT => 'PEM' or 'DER'
 sub getcert {
-    return undef;
+    return;
 }
 
 # get private key for main certificate from keystore
@@ -1264,15 +1262,15 @@ sub getcert {
 # KEYTYPE => format (e. g. 'PKCS8' or 'OpenSSL'
 # KEYPASS => key pass phrase (only if protected by pass phrase)
 sub getkey {
-    return undef;
+    return;
 }
 
 sub createrequest {
-    return undef;
+    return;
 }
 
 sub installcert {
-    return undef;
+    return;
 }
 
 # get all root certificates from the configuration
@@ -1342,7 +1340,7 @@ sub buildcertificatechain {
 
     if (!defined $rootindex) {
 	$self->seterror("No matching root certificate was configured");
-	return undef;
+	return;
     }
 
     # remove root certs from candidate list
@@ -1418,7 +1416,7 @@ sub executehook {
     if ($hook =~ /::/) {
 	# execute Perl method
 	$self->info("Perl method hook not yet supported");
-	return undef;
+	return;
     } 
     else {
 	# assume it's an executable
@@ -1471,13 +1469,13 @@ sub getcacerts {
     my $cacertdir = $self->{OPTIONS}->{ENTRY}->{scepcertdir};
     if (! defined $cacertdir) {
 	$self->seterror("scepcertdir not specified for keystore");
-	return undef;
+	return;
     }
     my $cacertbase = File::Spec->catfile($cacertdir, 'cacert');
     my $scepurl = $self->{OPTIONS}->{ENTRY}->{scepurl};
     if (! defined $scepurl) {
 	$self->seterror("scepurl not specified for keystore");
-	return undef;
+	return;
     }
 
     # delete existing ca certs
@@ -1488,7 +1486,7 @@ sub getcacerts {
 	unlink $file;
 	if (-e $file) {
 	    $self->seterror("could not delete CA certificate file $file, cannot proceed");
-	    return undef;
+	    return;
 	}
 	$ii++;
     }
@@ -1506,7 +1504,7 @@ sub getcacerts {
     $self->debug("Exec: " . join(' ', @cmd));
     if (system(join(' ', @cmd)) != 0) {
 	$self->seterror("Could not retrieve CA certs");
-	return undef;
+	return;
     }
     
     $scepracert = $cacertbase . "-0";
@@ -1539,7 +1537,7 @@ sub getcacerts {
 
     if (! defined $self->{STATE}->{DATA}->{CERTCHAIN}) {
 	$self->seterror("Could not build certificate chain, probably trusted root certificate was not configured");
-	return undef;
+	return;
     }
 
     if (-r $scepracert) {
@@ -1547,7 +1545,7 @@ sub getcacerts {
 	return $scepracert;
     }
 
-    return undef;
+    return;
 }
 
 sub sendrequest {
@@ -1558,7 +1556,7 @@ sub sendrequest {
 
     if (! $self->getcacerts()) {
 	$self->seterror("Could not get CA certs");
-	return undef;
+	return;
     }
 
     my $requestfile = $self->{STATE}->{DATA}->{RENEWAL}->{REQUEST}->{REQUESTFILE};
@@ -1603,7 +1601,7 @@ sub sendrequest {
 
     if (! defined $newkey) {
 	$self->seterror("Could not convert new key");
-	return undef;
+	return;
     }
 
     # write new PEM encoded key to temp file
@@ -1617,7 +1615,7 @@ sub sendrequest {
 	FORCE    => 1,
 	)) {
 	$self->seterror("Could not write unencrypted copy of new file to temp file");
-	return undef;
+	return;
     }
 
     my @cmd;
@@ -1630,7 +1628,7 @@ sub sendrequest {
 	my $oldkey = $self->getkey();
 	if (! defined $oldkey) {
 	    $self->seterror("Could not get old key from certificate instance");
-	    return undef;
+	    return;
 	}
 
 	# convert private key to unencrypted PEM format
@@ -1643,7 +1641,7 @@ sub sendrequest {
 
 	if (! defined $oldkey_pem_unencrypted) {
 	    $self->seterror("Could not convert (old) private key");
-	    return undef;
+	    return;
 	}
 
  	$oldkeyfile = $self->gettmpfile();
@@ -1713,7 +1711,7 @@ sub sendrequest {
 	# timed out
 	die unless $@ eq "alarm\n";   # propagate unexpected errors
 	$self->info("Timed out.");
-	return undef;
+	return;
     }
 
 
@@ -1725,7 +1723,7 @@ sub sendrequest {
 
     if ($rc != 0) {
 	$self->seterror("Could not run SCEP enrollment");
-	return undef;
+	return;
     }
 
     if (-r $newcertfile) {
@@ -1761,7 +1759,7 @@ sub sendrequest {
 	    
 	    return $rc;
 	}
-	return undef;
+	return;
     }
     
     return 1;

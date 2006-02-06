@@ -51,7 +51,7 @@ sub isodatetoepoch
 {
     my $isodate = shift;
 
-    return undef unless defined $isodate;
+    return unless defined $isodate;
 
     if (my ($year, $mon, $mday, $hours, $min, $sec) = ($isodate =~ /^(\d{4})(\d\d)(\d\d)(\d\d)(\d\d)(\d\d)$/))
     {
@@ -59,7 +59,7 @@ sub isodatetoepoch
 	$year -= 1900;
 	return timegm($sec, $min, $hours, $mday, $mon, $year);
     }
-    return undef;
+    return;
 }
 
 # convert Unix Epoch to ISO Date

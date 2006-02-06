@@ -62,7 +62,7 @@ sub new
     
     $self->{CONFIGFILE} = $configfile;
     
-    $self->parse() || return undef;
+    $self->parse() || return;
 
     return ($self);
 }
@@ -203,7 +203,7 @@ sub parse
 
     my $handle = new IO::File "<" . $self->{CONFIGFILE};
 
-    return undef if (!defined $handle);
+    return if (!defined $handle);
 
     $self->{CFGMTIME} = (stat($self->{CONFIGFILE}))[9];
 
@@ -306,7 +306,7 @@ sub get
 	 return lc($value) if ($mangle eq "LC");
 	 return ucfirst($value) if ($mangle eq "UCFIRST");
 
-	 return undef; # don't know how to handle this mangle option
+	 return; # don't know how to handle this mangle option
      }
 }
 
@@ -320,7 +320,7 @@ sub set
     my $var = shift;
     my $value = shift;
     
-    return undef if (! defined $var);
+    return if (! defined $var);
     my $ref = get_ref($self, $var, 'ref');
 
     $$ref = $value;

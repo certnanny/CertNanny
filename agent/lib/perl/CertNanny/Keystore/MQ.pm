@@ -22,7 +22,6 @@ use CertNanny::Keystore;
 use CertNanny::Keystore::OpenSSL;
 
 use Data::Dumper;
-use IO::File;
 use File::Copy;
 use File::Basename;
 use Cwd;
@@ -70,7 +69,7 @@ sub new
 	($self->{OPTIONS}->{keygenmode} =~ /^(external)$/);
 
     # get previous renewal status
-    $self->retrieve_state() or return undef;
+    $self->retrieve_state() or return;
 
     # check if we can write to the file
     $self->store_state() || croak "Could not write state file $self->{STATE}->{FILE}";
@@ -111,7 +110,7 @@ sub getIBMJavaEnvironment
     my $javacmd = File::Spec->catfile($ENV{JAVA_HOME}, 'bin', 'java');
     if (! -x $javacmd) {
 	$self->seterror("getIBMJavaEnvironment(): could not determine Java executable (JAVA_HOME not set?)");
-	return undef;
+	return;
     }
     $self->{OPTIONS}->{JAVA} = $javacmd;
     
@@ -126,7 +125,7 @@ sub getIBMJavaEnvironment
 
     if (($? != 0) or (! defined $classpath) or ($classpath eq "")) {
 	$self->seterror("getIBMJavaEnvironment(): could not determine GSK classpath");
-	return undef;
+	return;
     }
     # remove any options left over
     $classpath =~ s/-?-\w+//g;
@@ -147,16 +146,12 @@ sub unstash
     my $self = shift;
     my $stashfile = shift;
 
-    my $fh = new IO::File("<$stashfile");
-    if (! $fh)
+    my $content = $self->read_file($stashfile);
+    if (! defined $content)
     {
     	$self->seterror("unstash(): Could not open input file $stashfile");
-    	return undef;
+    	return;
     }
-
-    local $/;
-    my $content = <$fh>;
-    $fh->close();
 
     # =8->
     my $result = pack("C*", map { $_ ^ 0xf5 } unpack("C*", $content)); 
@@ -174,7 +169,7 @@ sub getcertlabel {
 
     my $filename = $self->{OPTIONS}->{ENTRY}->{location};
     
-    return undef unless (-r "$filename.kdb");
+    return unless (-r "$filename.kdb");
 
     my $gsk6cmd = $self->{OPTIONS}->{gsk6cmd};
     croak "Could not get gsk6cmd location" unless defined $gsk6cmd;
@@ -196,7 +191,7 @@ sub getcertlabel {
     if (!open HANDLE, join(" ", @cmd) . "|")
     {
 	$self->seterror("getcert(): could not run gsk6cmd");
-	return undef;
+	return;
     }
 
     my $label;
@@ -218,7 +213,7 @@ sub getcertlabel {
 
     if (! defined $label) {
 	$self->seterror("getcert(): could not get label");
-	return undef;
+	return;
     }
 
     # cache information
@@ -235,13 +230,13 @@ sub getkey {
     # initialize Java and GSKit environment
     if (! $self->getIBMJavaEnvironment()) {
 	$self->seterror("Could not determine IBM Java environment");
-	return undef;
+	return;
     }
 
     my $openssl = $self->{OPTIONS}->{CONFIG}->get('cmd.openssl', 'FILE');
     if (! defined $openssl) {
 	$self->seterror("No openssl shell specified");
-	return undef;
+	return;
     }
 
     my $keystore = $self->{OPTIONS}->{ENTRY}->{location} . ".kdb";
@@ -249,7 +244,7 @@ sub getkey {
     my $label = $self->getcertlabel();
     if (! defined $label) {
 	$self->seterror("Could not get certificate label");
-	return undef;
+	return;
     }
 
     my $p8file = $self->gettmpfile();
@@ -260,7 +255,7 @@ sub getkey {
 					     'ExtractKey.jar');
     if (! -r $extractkey_jar) {
 	$self->seterror("getkey(): could not locate ExtractKey.jar file");
-	return undef;
+	return;
     }
 
     my $classpath = $self->{OPTIONS}->{GSKIT_CLASSPATH} . ":" . $extractkey_jar;
@@ -291,7 +286,7 @@ sub getkey {
     {
 	$self->seterror("getkey(): could not extract private key");
 	unlink $p8file;
-	return undef;
+	return;
     }
 
     my $keydata = $self->read_file($p8file);
@@ -299,7 +294,7 @@ sub getkey {
 
     if ((! defined $keydata) or ($keydata eq "")) {
 	$self->seterror("getkey(): Could not convert private key");
-	return undef;
+	return;
     }
 
     return (
@@ -322,14 +317,14 @@ sub getcert {
 
     my $filename = $self->{OPTIONS}->{ENTRY}->{location};
     
-    return undef unless (-r "$filename.kdb");
+    return unless (-r "$filename.kdb");
 
     my $gsk6cmd = $self->{OPTIONS}->{gsk6cmd};
 
     my $label = $self->getcertlabel();
     if (! defined $label) {
 	$self->seterror("getcert(): could not get label");
-	return undef;
+	return;
     }
 
     my $certfile = $self->gettmpfile();
@@ -356,22 +351,17 @@ sub getcert {
     {
 	$self->seterror("getcert(): could not extract certificate");
 	unlink $certfile;
-	return undef;
+	return;
     }
 
     # read certificate from file and remove temp file
-    my $fh = new IO::File("<$certfile");
-    if (! $fh)
+    my $content = $self->read_file($certfile);
+    unlink $certfile;
+    if (! defined $content)
     {
     	$self->seterror("getcert(): Could not open input file $certfile");
-    	return undef;
+    	return;
     }
-
-    local $/;
-    my $content = <$fh>;
-    $fh->close();
-
-    unlink $certfile;
 
     $self->{CERTINFO}->{LABEL} = $label;
     $self->{CERTINFO}->{CERTDATA} = $content;
@@ -426,7 +416,7 @@ sub createrequest {
 
 # 	if (system(join(' ', @cmd)) != 0) {
 # 	    $self->seterror("Request creation failed");
-# 	    return undef;
+# 	    return;
 # 	}
 #    }
 
@@ -479,7 +469,7 @@ sub installcert {
 	
 	if (! defined $pkcs12file) {
 	    $self->seterror("Could not create prototype PKCS#12 from received certificate");
-	    return undef;
+	    return;
 	}
 	$self->info("Created PKCS#12 file $pkcs12file");
 
@@ -502,7 +492,7 @@ sub installcert {
 	
 	if (system(join(' ', @cmd)) != 0) {
 	    $self->seterror("Keystore creation failed");
-	    return undef;
+	    return;
 	}
 
 	$self->info("New MQ Keystore $newkeystoredb created.");
@@ -526,7 +516,7 @@ sub installcert {
 	local *HANDLE;
 	if (! open HANDLE, join(' ', @cmd) . " |") {
 	    $self->seterror("Could not retrieve certificate list in MQ keystore");
-	    return undef;
+	    return;
 	}
 	while (<HANDLE>) {
 	    chomp;
@@ -558,7 +548,7 @@ sub installcert {
 	    
 	    if (system(join(' ', @cmd)) != 0) {
 		$self->seterror("Could not delete certificate from keystore");
-		return undef;
+		return;
 	    }
 	}
 
@@ -589,19 +579,17 @@ sub installcert {
 	    if (! defined $cacert)
 	    {
 		$self->seterror("installcert(): Could not convert certificate $entry->{CERTFILE}");
-		return undef;
+		return;
 	    }
 
 	    my $cacertfile = $self->gettmpfile();
-	    my $fh = new IO::File(">$cacertfile");
-	    if (! $fh)
-	    {
-		$self->seterror("installcert(): Could not create temporary file");
-		return undef;
+	    if (! $self->write_file(FILENAME => $cacertfile,
+				    CONTENT  => $cacert->{CERTDATA},
+		)) {
+		$self->seterror("installcert(): Could not write temporary CA file");
+		return;
 	    }
-	    print $fh $cacert->{CERTDATA};
-	    $fh->close();
-	    
+
 
 	    @cmd = (qq("$gsk6cmd"),
 		    '-cert',
@@ -624,7 +612,7 @@ sub installcert {
 	    if (system(join(' ', @cmd)) != 0) {
 		unlink $cacertfile;
 		$self->seterror("Could not add certificate to keystore");
-		return undef;
+		return;
 	    }
 	    unlink $cacertfile;
 
@@ -640,7 +628,7 @@ sub installcert {
 	my $lastdir = getcwd();
 	if (! chdir($dirname)) {
 	    $self->seterror("Could not import PKCS#12 file to keystore (chdir to $dirname failed)");
-	    return undef;
+	    return;
 	}
 
 	@cmd = (qq("$gsk6cmd"),
@@ -664,7 +652,7 @@ sub installcert {
 	if (system(join(' ', @cmd)) != 0) {
 	    $self->seterror("Could not import PKCS#12 file to keystore");
 	    chdir($lastdir);
-	    return undef;
+	    return;
 	}
 	chdir($lastdir);
 
@@ -690,29 +678,44 @@ sub installcert {
 #  		   '1024');
 		   
 
-	return undef;
+	return;
     }
 
     # now replace the old keystore with the new one
-
-    if (-r $newkeystoredb) {
-	$self->info("Installing MQ keystore");
-
-	my $oldlocation = $self->{OPTIONS}->{ENTRY}->{location};
-	foreach my $ext (qw(.crl .rdb .kdb .sth)) {
-	    # backup old keystore
-	    my $mode = (stat($oldlocation . $ext))[2];
-	    rename $oldlocation . $ext, $oldlocation . $ext . ".backup";
-
-	    if (!copy($newkeystorebase . $ext, $oldlocation . $ext)) {
-		$self->seterror("Could not copy keystore file " . $newkeystorebase . $ext);
-		# FIXME: undo
-		return undef;
-	    }
-	    unlink $newkeystorebase . $ext;
-	    chmod $mode, $oldlocation . $ext;
-	}
+    if (! -r $newkeystoredb) {
+	$self->seterror("Could not access new prototype keystore file $newkeystoredb");
+	return;
     }
+
+    $self->info("Installing MQ keystore");
+    my $oldlocation = $self->{OPTIONS}->{ENTRY}->{location};
+	
+    my @newkeystore = ();
+    foreach my $ext (qw(.crl .rdb .kdb .sth)) {
+	
+	my $data = $self->read_file($newkeystorebase . $ext);
+	if (! defined $data) {
+	    $self->seterror("Could read new keystore file " . $newkeystorebase . $ext);
+	    return;
+	}
+	
+	# schedule for installation
+	push(@newkeystore,
+	     {
+		 DESCRIPTION => "End entity $ext file",
+		 FILENAME    => $oldlocation . $ext,
+		 CONTENT     => $data,
+	     });
+    }
+
+    ######################################################################
+    # try to write the new keystore 
+
+    if (! $self->installfile(@newkeystore)) {
+	$self->seterror("Could not install new keystore");
+	return;
+    }
+    
 
     return 1;
 }

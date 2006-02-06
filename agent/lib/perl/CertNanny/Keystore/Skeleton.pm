@@ -144,7 +144,7 @@ sub new
     # the rest should remain untouched
 
     # get previous renewal status
-    $self->retrieve_state() || return undef;
+    $self->retrieve_state() || return;
 
     # check if we can write to the file
     $self->store_state() || croak "Could not write state file $self->{STATE}->{FILE}";
@@ -181,7 +181,7 @@ sub getcert {
     # use this to signal an error
     if (0) {
 	$self->seterror("getcert(): some unspecified error happened");
-	return undef;
+	return;
     }
 
     my $instancecert;

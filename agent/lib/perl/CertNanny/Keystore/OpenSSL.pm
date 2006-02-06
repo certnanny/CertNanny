@@ -100,7 +100,7 @@ sub new
     }
 
     # get previous renewal status
-    $self->retrieve_state() || return undef;
+    $self->retrieve_state() || return;
 
     # check if we can write to the file
     $self->store_state() || croak "Could not write state file $self->{STATE}->{FILE}";
@@ -125,25 +125,18 @@ sub getcert {
     my $self = shift;
     my $filename = $self->{OPTIONS}->{ENTRY}->{location};
 
-    my $fh = new IO::File("<$filename");
-    if (! $fh)
-    {
-    	$self->seterror("getcert(): Could not open input file $filename");
-    	return undef;
+    my $certdata = $self->read_file($filename);
+    if (! defined $certdata) {
+    	$self->seterror("getcert(): Could not read instance certificate file $filename");
+	return;
     }
-    my $format = "DER";
-
-    while (<$fh>) {
-	if (/^-----.*CERTIFICATE.*-----/) {
-	    $format = "PEM";
-	    last;
-	}
+    
+    my $format = 'DER';
+    if ($certdata =~ m{ -----.*CERTIFICATE.*----- }xms) {
+	$format = 'PEM';
     }
-    $fh->close();
 
-    $self->debug("OpenSSL keystore loglevel: " . $self->loglevel());
-
-    return ({ CERTFILE => $filename,
+    return ({ CERTDATA => $certdata,
 	      CERTFORMAT => $format });
 }
 
@@ -154,18 +147,13 @@ sub getkey {
     my $openssl = $self->{OPTIONS}->{CONFIG}->get('cmd.openssl', 'FILE');
     if (! defined $openssl) {
 	$self->seterror("No openssl shell specified");
-	return undef;
-    }
-
-    if (! -r $filename) {
-	$self->seterror("getkey(): Could not open private key file");
-	return undef;
+	return;
     }
 
     my $keydata = $self->read_file($filename);
     if (! defined $keydata || ($keydata eq "")) {
 	$self->seterror("getkey(): Could not read private key");
-	return undef;
+	return;
     }
     
     my $pin = $self->{PIN} || $self->{OPTIONS}->{ENTRY}->{pin};
@@ -213,34 +201,34 @@ sub createpkcs12 {
     my $openssl = $self->{OPTIONS}->{CONFIG}->get('cmd.openssl', 'FILE');
     if (! defined $openssl) {
 	$self->seterror("No openssl shell specified");
-	return undef;
+	return;
     }
 
     if (! defined $args{FILENAME}) {
 	$self->seterror("createpks12(): No output file name specified");
-	return undef;
+	return;
     }
 
     if (! defined $args{CERTFILE}) {
 	$self->seterror("createpks12(): No certificate file specified");
-	return undef;
+	return;
     }
 
     if (! defined $args{KEYFILE}) {
 	$self->seterror("createpks12(): No key file specified");
-	return undef;
+	return;
     }
 
     $self->debug("Certformat: $args{CERTFORMAT}");
 
     if (! defined $args{CERTFORMAT} or $args{CERTFORMAT} !~ /^(PEM|DER)$/) {
 	$self->seterror("createpks12(): Illegal certificate format specified");
-	return undef;
+	return;
     }
 
     if (! defined $args{EXPORTPIN}) {
 	$self->seterror("createpks12(): No export PIN specified");
-	return undef;
+	return;
     }
 
     my @cmd;
@@ -270,7 +258,7 @@ sub createpkcs12 {
 	
 	if (system(join(' ', @cmd)) != 0) {
 	    $self->seterror("Certificate format conversion failed");
-	    return undef;
+	    return;
 	}
     }
 
@@ -302,7 +290,7 @@ sub createpkcs12 {
 	if (! $fh)
 	{
 	    $self->seterror("createpkcs12(): Could not create temporary CA chain file");
-	    return undef;
+	    return;
 	}
 	
 	# add this temp file
@@ -315,16 +303,18 @@ sub createpkcs12 {
 	    my $CN = $RDN[0];
 	    $CN =~ s/^CN=//;
 	    $self->debug("Adding CA certificate '$CN' in $file");
-	    my $certfh = new IO::File("<$file");
-	    if ($certfh) {
-		local $/;
-		my $content = <$certfh>;
-		$certfh->close();
 
-		print $fh $content;
-		push(@cachain, '-caname');
-		push(@cachain, qq("$CN"));
+	    my $content = $self->read_file($file);
+	    if (! defined $content) {
+		$self->seterror("createpkcs12(): Could not read CA chain entry");
+		$fh->close;
+		unlink $cachainfile if (defined $cachainfile);
+		return;
 	    }
+
+	    print $fh $content;
+	    push(@cachain, '-caname');
+	    push(@cachain, qq("$CN"));
 	}
 	$fh->close;
     }
@@ -354,7 +344,7 @@ sub createpkcs12 {
 	delete $ENV{EXPORTPIN};
 	unlink $certfile if ($args{CERTFORMAT} eq "DER");
 	unlink $cachainfile if (defined $cachainfile);
-	return undef;
+	return;
     }
 
     delete $ENV{PIN};
@@ -378,7 +368,7 @@ sub generatekey {
     my $openssl = $self->{OPTIONS}->{CONFIG}->get('cmd.openssl', 'FILE');
     if (! defined $openssl) {
 	$self->seterror("No openssl shell specified");
-	return undef;
+	return;
     }
 
     my $bits = '1024';
@@ -405,7 +395,7 @@ sub generatekey {
     if (system(join(' ', @cmd)) != 0) {
 	$self->seterror("RSA key generation failed");
 	delete $ENV{PIN};
-	return undef;
+	return;
     }
     chmod 0600, $outfile;
     delete $ENV{PIN};
@@ -422,7 +412,7 @@ sub createrequest {
     
     if (! defined $result) {
 	$self->seterror("Key generation failed");
-	return undef;
+	return;
     }    
 
     my $requestfile = $self->{OPTIONS}->{ENTRYNAME} . ".csr";
@@ -435,7 +425,7 @@ sub createrequest {
     my $openssl = $self->{OPTIONS}->{CONFIG}->get('cmd.openssl', 'FILE');
     if (! defined $openssl) {
 	$self->seterror("No openssl shell specified");
-	return undef;
+	return;
     }
 
     my $DN = $self->{CERT}->{INFO}->{SubjectName};
@@ -461,7 +451,7 @@ sub createrequest {
     if (! $fh)
     {
     	$self->seterror("createrequest(): Could not create temporary OpenSSL config file");
-    	return undef;
+    	return;
     }
     print $fh "[ req ]\n";
     print $fh "prompt = no\n";
@@ -512,7 +502,7 @@ sub createrequest {
 	$self->seterror("Request creation failed");
 	delete $ENV{PIN};
 	unlink $tmpconfigfile;
-	return undef;
+	return;
     }
     delete $ENV{PIN};
     unlink $tmpconfigfile;
