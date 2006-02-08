@@ -668,9 +668,9 @@ sub installcert {
 
 	my $ii = 1;
 	foreach my $entry (@{$self->{STATE}->{DATA}->{ROOTCACERTS}}) {
-	    my $cert = $self->convertcert(OUTFORMAT => 'PEM',
+	    my $cert = $self->convertcert(CERTFORMAT => 'PEM',
 					  CERTFILE => $entry->{CERTFILE},
-					  CERTFORMAT => $rootcacertformat,
+					  OUTFORMAT => $rootcacertformat,
 		);
 	    
 	    if (! defined $cert)
