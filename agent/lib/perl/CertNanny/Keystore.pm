@@ -302,6 +302,18 @@ sub convertkey {
     {
 	# must be PKCS#8, see above
 	push(@cmd, 'pkcs8');
+
+	if (! exists $options{KEYPASS}
+	    || ($options{KEYPASS} eq "")) {
+	    push(@cmd, '-nocrypt');
+
+	    if ($options{OUTPASS} ne "") {
+		# if -nocrypt is specified on the command line, the output
+		# is always unencrypted, even if -passout is specified.
+		$self->seterror("convertkey(): PKCS8 conversion from unencrypted to encrypted key is not supported");
+		return;
+	    }
+	}
     }
     
     if ($options{OUTTYPE} eq 'PKCS8') {
