@@ -1,3 +1,7 @@
+2006-02-10  Martin Bartosch  <m.bartosch@cynops.de>
+
+	* certnanny: released version 0.7
+
 2006-02-01  Martin Bartosch  <m.bartosch@cynops.de>
 
 	* certnanny: added installfile() method for "atomic" keystore 

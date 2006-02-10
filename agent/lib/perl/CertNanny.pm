@@ -22,7 +22,7 @@ use CertNanny::Config;
 use CertNanny::Keystore;
 use Data::Dumper;
 
-$VERSION = 0.6;
+$VERSION = 0.7;
 
 
 sub new 

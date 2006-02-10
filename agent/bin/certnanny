@@ -110,11 +110,12 @@ run a SCEP renewal on them.
 =head1 README
 
 
+
 CertNanny
 
 Automatic renewal for X509v3 certificates using SCEP
 
-Copyright (c) 2005 Martin Bartosch <m.bartosch@cynops.de>
+Copyright (c) 2005, 2006 Martin Bartosch <m.bartosch@cynops.de>
 
 CertNanny implements a framework for certificate renewal automation.
 
@@ -339,12 +340,12 @@ and the sscep program for communicating with the PKI systems.
   - Linux
   - Solaris
   - AIX
-  - Mac OS X
+  - Darwin (Mac OS X)
+  - NonStop/Tandem via (OSS)
 
   * Planned:
   - Windows
   - z/OS
-  - Tandem
 
 - Multi-keystore support: modular design allows to extend the system
   for supporting the certificate keystore of a number of applications
@@ -353,6 +354,7 @@ and the sscep program for communicating with the PKI systems.
   - OpenSSL (PEM encoded certificate and key in separate files, suitable
     e. g. for Apache/mod_ssl web servers)
   - MQ Keystore (IBM GSKit)
+  - PKCS #8
 
   * Planned:
   - Windows Certificate Store
@@ -582,23 +584,145 @@ keystore.LABEL.hook.notify.warnexpiry
 
 2.2.2.1 OpenSSL Keystore
 
-The keystore format covers certificates that are present in raw PEM
-encoded format.
+The keystore format covers certificates that are present in raw PEM or
+DER encoded format. It supports OpenSSL and PKCS #8 private keys encoded
+in PEM and DER format.
 
 keystore.LABEL.type = OpenSSL
   Mandatory, must literally be set to OpenSSL
 
+keystore.LABEL.format
+  Certificate and key encoding. When installing the *new* certificate the
+  resulting key and certificates (including CA certificates) will be 
+  encoded in this format.
+  May be overridden specifically for key, CA certificates or Root certificates
+  by using the .keyformat, .cacertformat or .rootcacertformat options.
+  The software will autodetect if the *existing* cert/key is stored in a 
+  different format and use this data properly, but the *new* certificate/key 
+  will be written in format specified here, no matter how the original was 
+  encoded.
+  Allowed values: PEM, DER
+  Default: PEM
+  Example: DER
+
 keystore.LABEL.location
-  Specifies the location of the PEM encoded certificate to monitor.
+  Specifies the file name (location) of the PEM or DER encoded certificate 
+  to monitor.
+  When reading the certificate the software will automatically detect 
+  encoding (PEM/DER), regardless of the 'format' setting. See 'format'.
   Example: /etc/apache/ssl.crt/server.crt
 
 keystore.LABEL.keyfile
-  Specifies the location of the PEM encoded RSA key for the certificate.
+  Specifies the location of the private key for the certificate.
+  The software will automatically detect encoding (PEM/DER), regardless
+  of the 'format' setting. See 'format'.
   Example: /etc/apache/ssl.key/server.key
 
-keystore.LABEL.pin
-  Specifies the RSA key pin used to decrypt the RSA key.
+keystore.LABEL.keyformat
+  This setting is only evaluated when installing the new keystore.
+  Overrides the .format setting when installing the key specified with
+  .keyfile
+  Allowed values: PEM, DER
+  Default: value specified with .format
+  Example: keystore.LABEL.format = DER
+           keystore.LABEL.keyformat = PEM
 
+keystore.LABEL.keytype
+  Specifies the private key format. Allowed values: OpenSSL, PKCS8
+  Default: OpenSSL
+  Example: PKCS8
+
+keystore.LABEL.pin
+  Specifies the private key pin used to decrypt the private key. May
+  be empty (unencrypted key).
+
+keystore.LABEL.cacert.0
+keystore.LABEL.cacert.1
+keystore.LABEL.cacert.2
+...
+  This setting is only evaluated when installing the new keystore.
+  Specifies the file name of the CA certificates forming the complete
+  certificate chain for the new end entity certificate.
+  Existing files will be backed up to the original filename contacenated
+  with '.backup'. Existing backups will be overwritten.
+
+  The .0 certificate will contain the topmost (Root) Certificate, 
+  subsequent entries (.1, .2 and so on) will contain increasingly deeper 
+  levels of the CA certificate hierarchy.
+
+  The enumeration may start with .0 or with .1 (in case you don't wish
+  to save the root certificate to a file). Processing stops if the
+  next expected integer index is not used.
+  
+  If the CA certificate chain contains more certificates than specified
+  here only the specified levels will be written to files.
+  If the CA certificate chain contains less certificates than specified
+  here the additionally referenced files will not be created.
+
+  Example: 
+    keystore.LABEL.cacert.0 = /etc/apache/ssl.crt/rootca.crt
+    keystore.LABEL.cacert.1 = /etc/apache/ssl.crt/level2ca.crt
+
+keystore.LABEL.cacertformat
+  This setting is only evaluated when installing the new keystore.
+  Overrides the .format setting when installing the CA certificates specified 
+  with .cacert.n
+  Allowed values: PEM, DER
+  Default: fall back to value specified with .format
+  Example: keystore.LABEL.format = DER
+           keystore.LABEL.cacertformat = PEM
+
+
+keystore.LABEL.rootcacertbundle
+  This setting is only evaluated when installing the new keystore.
+  Specifies a target file containing a concatenation of all Root 
+  certificates specified with keystore.LABEL.rootcacert.x in the 
+  configuration file.
+  The file will be overwritten and newly created during installation of
+  the new keystore.
+  May only be specified if .rootcacertformat (or .format) is set to PEM.
+  Default: none
+  Example: keystore.LABEL.rootcacertformat = PEM
+           keystore.LABEL.rootcacertbundle = /etc/apache/ssl.crt/ca-bundle.crt
+
+keystore.LABEL.rootcacertdir
+  This setting is only evaluated when installing the new keystore.
+  Directory (or file template) for storing Root CA certificates specified 
+  in the config file.
+
+  If an existing directory is specified, all Root CA certificates specified 
+  in the configuration file will be written to this directory. The filenames
+  will be rootca-N.pem or rootca-N.der, depending on the certificate format
+  selected with .format or .rootcacertformat.
+  N is replaced with an integer number, yielding root-1.pem, root-2.pem etc.
+  Existing files with the same names will be overwritten.
+
+  If the specified path is NOT an existing directory, the last path component
+  of the specified path is interpreted as a template name for the Root
+  certificates. The path components leading to this template name are
+  interpreted as the directory specification.
+  If this directory exists (and is writable) the Root certificates
+  will be written to the file system using the specified
+  filename template. The filename template MUST include a '%i' that is
+  replaced with the index number of the Root certificate written. (If
+  no %i is included in the template name, only the last configured Root
+  certificate will be written to this filename).
+  The certificate file format is determined by .format or .rootcacertformat.
+  Existing files with the resulting names will be overwritten.
+    
+  Default: none
+  Example: keystore.LABEL.rootcacertdir = /etc/apache/ssl.crt/
+  Example: keystore.LABEL.rootcacertdir = /etc/apache/ssl.crt/trustedroot_%i.crt
+
+keystore.LABEL.rootcacertformat
+  This setting is only evaluated when installing the new keystore.
+  Overrides the .format setting when installing the Root CA certificates 
+  specified with .rootcacertbundle or .rootcacertdir
+  Note that a Root CA certificate bundle can only be created in PEM format.
+  Allowed values: PEM, DER
+  Default: fall back to value specified with .format
+  Example: keystore.LABEL.format = DER
+           keystore.LABEL.rootcacertformat = PEM
 
 
 2.2.2.2 MQ Keystore
@@ -774,6 +898,8 @@ A central monitoring script in the PKI should do the following:
 PKI and LDAP operating staff are expected to remove the rogue
 certificate within a period less than the minimum "quarantine" time
 configured on the end entity systems.
+
+
 
 
 

@@ -23,7 +23,7 @@ use Time::Local;
 use vars qw(@ISA @EXPORT @EXPORT_OK %EXPORT_TAGS $VERSION);
 use Exporter;
 
-$VERSION = 0.6;
+$VERSION = 0.7;
 
 @EXPORT      = qw(timestamp isodatetoepoch epochtoisodate addisodate printableisodate);       # Symbols to autoexport (:DEFAULT tag)
 

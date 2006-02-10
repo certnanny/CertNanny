@@ -228,12 +228,12 @@ and the sscep program for communicating with the PKI systems.
   - Linux
   - Solaris
   - AIX
-  - Mac OS X
+  - Darwin (Mac OS X)
+  - NonStop/Tandem via (OSS)
 
   * Planned:
   - Windows
   - z/OS
-  - Tandem
 
 - Multi-keystore support: modular design allows to extend the system
   for supporting the certificate keystore of a number of applications
@@ -242,6 +242,7 @@ and the sscep program for communicating with the PKI systems.
   - OpenSSL (PEM encoded certificate and key in separate files, suitable
     e. g. for Apache/mod_ssl web servers)
   - MQ Keystore (IBM GSKit)
+  - PKCS #8
 
   * Planned:
   - Windows Certificate Store

@@ -27,7 +27,7 @@ use strict;
 use vars qw( $VERSION );
 use Exporter;
 
-$VERSION = 0.6;
+$VERSION = 0.7;
 
 
 # constructor parameters:

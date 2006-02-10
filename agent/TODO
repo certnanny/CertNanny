@@ -3,22 +3,14 @@ Current limitations and roadmap
 
 Keystores:
 
-* OpenSSL keystore backend
-- only PEM format in two distinct files is currently supported
-  - TODO: allow certificate and key (PEM format) in one file for mod_ssl
-  - TODO: allow DER encoded certificates (partly done)
-  - TODO: support PKCS#8 keys
-
 * create Java Keystore backend
 * create Windows certificate store backend
 * create PKCS#12 keystore backend (Oracle)
-
+* Lotus Notex Keyring
 
 Platforms:
 
-* support Win32
 * support z/OS via USS and RACF
-* support Tandem (HP NonStop) via OSS
 
 
 SCEP servers:
