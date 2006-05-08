@@ -73,9 +73,7 @@ sub new
 
 
     $self->{KEYTYPE} = $self->{OPTIONS}->{ENTRY}->{keytype};
-    if (! defined $self->{KEYTYPE}) {
-	$self->{KEYTYPE} = 'PKCS8';
-    }
+    $self->{KEYTYPE} ||= 'OpenSSL';
 
     if ($self->{KEYTYPE} !~ m{ \A (?: OpenSSL | PKCS8 ) \z }xms) {
 	croak("Incorrect keystore type $self->{KEYTYPE}");
