@@ -1,3 +1,30 @@
+2006-05-05  Joerg Schneider <js@joergschneider.com>
+
+	* certnanny: added support for OpenSSL 0.9.8
+
+	* certnanny: fixed a bug that the warnexpiry hook would be called when
+	  a certificate is valid for less than autorenew_days days. Now the
+	  warnexpiry hook is _only_ called when a certificate is valid for less
+	  than warnexpiry_days.
+
+	* certnanny: OpenSSL keystore: fixed a wrong default value for keytype
+	  (PKCS8) introduced in 0.7. Correct default value: OpenSSL
+
+	* certnanny: improved log format and made all (non-fatal error)
+	  messages honor the loglevel. Introduced loglevel 5 (debug scep).
+
+	* certnanny: added new option scepchecksubjectname, which activates a
+	  subject name check (-C) supported by newer sscep versions
+	
+	* certnanny: --help print version number
+
+	* certnanny: README and manual page create with pod2text/pod2man from
+	  make
+
+2006-04-20  Joerg Schneider <js@joergschneider.com>
+
+	* certnanny: added Java keystore support
+
 2006-02-10  Martin Bartosch  <m.bartosch@cynops.de>
 
 	* certnanny: released version 0.7
