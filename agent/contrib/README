@@ -12,7 +12,9 @@ will NOT work.
 
 To build an sscep binary that supports automatic approval, either use
 the sscep-ng.tar.gz sources or patch your downloaded sscep sources
-using sscep.patch.gz.
+using sscep-ng2.patch.gz and sscep-non-unix.patch.gz. 
+
+To create RPMs use sscep.spec.
 
 
 * ExtractKey
