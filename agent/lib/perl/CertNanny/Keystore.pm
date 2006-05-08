@@ -76,6 +76,7 @@ sub new
 	$args{CONFIG}->get('cmd.openssl', 'FILE');
     $self->{OPTIONS}->{sscep_cmd} =
 	$args{CONFIG}->get('cmd.sscep', 'FILE');
+    $self->{OPTIONS}->{ENTRYNAME} = $args{ENTRYNAME};
     
     croak "No tmp directory specified" 
 	unless defined $self->{OPTIONS}->{tmp_dir};
@@ -303,11 +304,11 @@ sub convertkey {
 	# must be PKCS#8, see above
 	push(@cmd, 'pkcs8');
 
-	if (! exists $options{KEYPASS}
+	if (! defined $options{KEYPASS}
 	    || ($options{KEYPASS} eq "")) {
 	    push(@cmd, '-nocrypt');
 
-	    if ($options{OUTPASS} ne "") {
+	    if (defined($options{OUTPASS}) && $options{OUTPASS} ne "") {
 		# if -nocrypt is specified on the command line, the output
 		# is always unencrypted, even if -passout is specified.
 		$self->seterror("convertkey(): PKCS8 conversion from unencrypted to encrypted key is not supported");
@@ -333,7 +334,7 @@ sub convertkey {
     
     my $infile;
     push(@cmd, '-in');
-    if (exists $options{KEYDATA}) {
+    if (defined $options{KEYDATA}) {
 	$infile = $self->gettmpfile();
 	if (! $self->write_file(FILENAME => $infile,
 				CONTENT  => $options{KEYDATA},
@@ -348,7 +349,7 @@ sub convertkey {
     }
 
     $ENV{PASSIN} = "";
-    if (exists $options{KEYPASS} && ($options{KEYPASS} ne "")) {
+    if (defined($options{KEYPASS}) && ($options{KEYPASS} ne "")) {
 	$ENV{PASSIN} = $options{KEYPASS};
     }
     if ($ENV{PASSIN} ne "") {
@@ -356,7 +357,7 @@ sub convertkey {
     }
 
     $ENV{PASSOUT} = "";
-    if (exists $options{OUTPASS} && ($options{OUTPASS} ne "")) {
+    if (defined $options{OUTPASS} && ($options{OUTPASS} ne "")) {
 	$ENV{PASSOUT} = $options{OUTPASS};
 	if (($options{KEYTYPE} eq 'OpenSSL')
 	    && ($options{OUTTYPE} eq 'OpenSSL')) {
@@ -505,6 +506,7 @@ sub log
     my $arg = shift;
     confess "Not a hash ref" unless (ref($arg) eq "HASH");
     return unless (defined $arg->{MSG});
+    my $entryname = $self->{OPTIONS}->{ENTRYNAME};
     my $prio = lc($arg->{PRIO}) || "info";
 
     my %level = ( 'debug'  => 4,
@@ -518,7 +520,7 @@ sub log
     if ($level{$prio} <= $self->loglevel()) {
 
 	# fallback to STDERR
-	print STDERR "LOG: [$prio] $arg->{MSG}\n";
+	print STDERR "LOG: [$prio] $entryname: $arg->{MSG}\n";
 	
 	# call hook
 	#$self->executehook($self->{INSTANCE}->{OPTIONS}->{ENTRY}->{hook}->{log},
@@ -882,7 +884,7 @@ sub installfile
 # Certificate => <certifcate> Format: Base64 encoded (PEM)
 # BasicConstraints => <cert basic constraints> Text (free style)
 # KeyUsage => <cert key usage> Format: Text (free style)
-# CertificateFingerprint => <cert MD5 fingerprint> Format: xx:xx:xx... (hex, 
+# CertificateFingerprint => <cert SHA1 fingerprint> Format: xx:xx:xx... (hex, 
 #   upper case)
 #
 # optional:
@@ -913,7 +915,7 @@ sub getcertinfo
 		   'issuer' => 'IssuerName',
 		   'notBefore' => 'NotBefore',
 		   'notAfter' => 'NotAfter',
-		   'MD5 Fingerprint' => 'CertificateFingerprint',
+		   'SHA1 Fingerprint' => 'CertificateFingerprint',
 		   'PUBLIC KEY' => 'PublicKey',
 		   'CERTIFICATE' => 'Certificate',
 		   'ISSUERALTNAME' => 'IssuerAlternativeName',
@@ -961,7 +963,7 @@ sub getcertinfo
 	       '-startdate',
 	       '-enddate',
 	       '-modulus',
-	       '-fingerprint',
+	       '-fingerprint','-sha1',
 	       '-pubkey',
 	       '-purpose',
 	       '>',
@@ -1059,7 +1061,7 @@ sub getcertinfo
 	    next;
 	}
 	
- 	if (/(Version:|subject=|issuer=|serial=|notBefore=|notAfter=|MD5 Fingerprint=)\s*(.*)/)
+ 	if (/(Version:|subject=|issuer=|serial=|notBefore=|notAfter=|SHA1 Fingerprint=)\s*(.*)/)
  	{
 	    my $key = $1;
  	    my $value = $2;
@@ -1174,16 +1176,7 @@ sub checkvalidity {
 
     my $cutoff = time + $days * 24 * 3600;
 
-    return 1 if ($cutoff < $notAfter);
-    if ($cutoff >= $notAfter) {
-	$self->executehook($self->{INSTANCE}->{OPTIONS}->{ENTRY}->{hook}->{warnexpiry},
-			   '__NOTAFTER__' => $self->{CERT}->{INFO}->{NotAfter},
-			   '__NOTBEFORE__' => $self->{CERT}->{INFO}->{NotBefore},
-			   '__STATE__' => $self->{STATE}->{DATA}->{RENEWAL}->{STATUS},
-			   );
-	return 0;
-    }
-    return;
+    return ($cutoff < $notAfter);
 }
 
 
@@ -1448,15 +1441,16 @@ sub executehook {
     }
 }
 
-# call external hook for notification event
-sub notify {
+# call warnexpiry hook for notification event
+sub warnexpiry {
     my $self = shift;
     my $notification = shift;
-    my %args = ( 
-        @_,         # argument pair list
-    );
-    
-    return $self->executehook($self->{OPTIONS}->{ENTRY}->{hook}->{notify}->{$notification}, %args);
+    return
+	$self->executehook($self->{INSTANCE}->{OPTIONS}->{ENTRY}->{hook}->{warnexpiry},
+			   '__NOTAFTER__' => $self->{CERT}->{INFO}->{NotAfter},
+			   '__NOTBEFORE__' => $self->{CERT}->{INFO}->{NotBefore},
+			   '__STATE__' => $self->{STATE}->{DATA}->{RENEWAL}->{STATUS},
+			   );
 }
 
 
@@ -1577,6 +1571,8 @@ sub sendrequest {
     my $sscep = $self->{OPTIONS}->{CONFIG}->get('cmd.sscep');
     my $scepurl = $self->{OPTIONS}->{ENTRY}->{scepurl};
     my $scepsignaturekey = $self->{OPTIONS}->{ENTRY}->{scepsignaturekey};
+    my $scepchecksubjectname = 
+    	$self->{OPTIONS}->{ENTRY}->{scepchecksubjectname} || 'no';
     my $scepracert = $self->{STATE}->{DATA}->{SCEP}->{RACERT};
 
     if (! exists $self->{STATE}->{DATA}->{RENEWAL}->{REQUEST}->{CERTFILE}) {
@@ -1595,6 +1591,7 @@ sub sendrequest {
     $self->debug("sscep: $sscep");
     $self->debug("scepurl: $scepurl");
     $self->debug("scepsignaturekey: $scepsignaturekey");
+    $self->debug("scepchecksubjectname: $scepchecksubjectname");
     $self->debug("scepracert: $scepracert");
     $self->debug("newcertfile: $newcertfile");
     $self->debug("openssl: $openssl");
@@ -1685,7 +1682,10 @@ sub sendrequest {
 			qq("$oldcertfile"),
 	    );
     }
-
+    my @checksubjectname = ();
+    @checksubjectname = ('-C') if $scepchecksubjectname =~ /yes/i;
+    my @verbose = ();
+    @verbose = ('-v') if $self->loglevel() >= 5;
     @cmd = (qq("$sscep"),
 	    'enroll',
 	    '-u',
@@ -1699,6 +1699,8 @@ sub sendrequest {
 	    '-l',
 	    qq("$newcertfile"),
 	    @autoapprove,
+	    @checksubjectname,
+	    @verbose,
 	    '-t',
 	    '5',
 	    '-n',
@@ -1713,12 +1715,12 @@ sub sendrequest {
 	alarm 120;
 	$rc = system(join(' ', @cmd)) / 256;
 	alarm 0;
+	$self->info("Return code: $rc");
     };
     unlink $requestkeyfile;
     unlink $oldkeyfile if (defined $oldkeyfile);
     unlink $oldcertfile if (defined $oldcertfile);
 
-    $self->info("Return code: $rc");
     if ($@) {
 	# timed out
 	die unless $@ eq "alarm\n";   # propagate unexpected errors
