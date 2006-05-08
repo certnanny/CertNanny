@@ -1,14 +1,15 @@
 This document describes how to install the program.
 
 Please read the README file for an introduction to this software and
-for configuration documentation.
+for configuration documentation. To build the README run `make' in the
+CertNanny source directory.
 
 
 Prerequisites
 
 In order to run this software you will need 
 - Perl 5.6.1 or higher
-- OpenSSL 0.9.7 (does NOT work with 0.9.7d!)
+- OpenSSL 0.9.7 (does NOT work with 0.9.7d!) or 0.9.8
 - sscep Release 20040325 (http://www.klake.org/~jt/sscep/)
   sscep patches to these sources are included in this distribution,
   see the contrib/ directory.
@@ -40,10 +41,10 @@ In order to run this software you will need
   If this behaviour is observed it is recommended to use the latest
   OpenSSL 0.9.7 version available.
 
-  CertNanny has not yet been tested with OpenSSL 0.9.8.
-
 
 Program installation
+- run make create documentation files:
+  make
 - copy the bin/certnanny binary to a location of your choice, e. g.
   /usr/local/bin/ or ~/bin/
 - copy the lib directory to a library directory where Perl can
