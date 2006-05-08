@@ -57,6 +57,12 @@ Q: sscep refuses to accept the generated certificate
 A: It has been observed that OpenSSL 0.9.7a can cause problems. Check
    again with the latest OpenSSL 0.9.7 version.
 
+Q: CertNanny fails during renewal with "PRNG not seeded" or 
+   "unable to write 'random state'" error message.
+A: You need to define the OpenSSL RANDFILE environment variable/config 
+   setting with a writable file. See http://www.openssl.org/support/faq.cgi#USER1 
+   for more details.
+
 Q: Can I reset the renewal state of a certain keystore?
 A: The renewal state (including the new key and request) is stored
    in 'statedir'.
