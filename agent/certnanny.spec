@@ -9,10 +9,12 @@ License:      GPL
 Group:        Productivity/Security
 Autoreqprov:  on
 Summary:      Certificate renewal agent
-Version:      0.6
+Version:      0.8
 Release:      1
 Source:       %{name}-%{version}.tar.gz
+URL:          http://www.cynops.de/oss/CertNanny/
 BuildRoot:    %{_tmppath}/%{name}-build
+Requires:     openssl, sscep
 
 %description
 CertNanny is a client-side program that allows fully automatic
@@ -26,11 +28,15 @@ and replaces the old keystore.
 
 
 %prep
-%setup -n %{name}
+%setup -n %{name}-%{version}
+
+%build
+make
 
 %install
 mkdir -p $RPM_BUILD_ROOT
 install -D -m 755 bin/certnanny $RPM_BUILD_ROOT/usr/bin/certnanny
+install -D -m 644 certnanny.1 $RPM_BUILD_ROOT/usr/man/man1/certnanny.1
 install -D -m 644 lib/java/ExtractKey.jar $RPM_BUILD_ROOT/usr/lib/certnanny/java/ExtractKey.jar
 install -D -m 644 etc/certnanny.cfg $RPM_BUILD_ROOT/etc/certnanny.cfg
 mkdir -p $RPM_BUILD_ROOT/usr/lib/perl5/site_perl/
@@ -46,12 +52,16 @@ rm -rf $RPM_BUILD_ROOT
 %config /etc/certnanny.cfg
 
 /usr/bin/certnanny
+/usr/man/man1/certnanny.1
 /usr/lib/certnanny/java/ExtractKey.jar
 /usr/lib/perl5/site_perl/CertNanny.pm
 /usr/lib/perl5/site_perl/CertNanny
 %dir /var/lib/certnanny/state
 
 %changelog
+* Tue May 17 2006 Joerg Schneider <js@joergschneider.com>
+Release 0.8
+
 * Thu Dec 23 2005 Martin Bartosch <m.bartosch@cynops.de>
 Initial public release
 
