@@ -81,10 +81,12 @@ sub iterate_entries
 {
     my $self = shift;
     my $action = shift;
+    
+    my $loglevel = $self->{CONFIG}->get('loglevel') || 3;
 
     my $rc = 1;
     foreach my $entry (keys %{$self->{ITEMS}}) {
-	print "Checking $entry\n";
+	print "LOG: [info] Checking keystore $entry\n" if ($loglevel >= 3);
 	my $keystore = 
 	    CertNanny::Keystore->new(CONFIG => $self->{CONFIG},
 				     ENTRY =>  $self->{ITEMS}->{$entry},
@@ -95,7 +97,7 @@ sub iterate_entries
 	}
 	else 
 	{
-	    print "ERROR: Could not instantiate keystore $entry\n";
+	    print "LOG: [error] Could not instantiate keystore $entry\n" if ($loglevel >= 1);
 	}
     }
 
@@ -129,12 +131,12 @@ sub do_check
     
     my $rc = $keystore->checkvalidity($autorenew);
     if (! $rc) {
-	print "INFO: Certificate is to be scheduled for automatic renewal ($autorenew days prior to expiry)\n";
+	$keystore->log({MSG => "Certificate is to be scheduled for automatic renewal ($autorenew days prior to expiry)"});
     }
     $rc = $keystore->checkvalidity($warnexpiry);
     if (! $rc) {
-	print "WARNING: Certificate is valid for less than $warnexpiry days\n";
-	$keystore->notify("warnexpiry");
+	$keystore->log({MSG => "Certificate is valid for less than $warnexpiry days",PRIO => 'notice'});
+	$keystore->warnexpiry();
     }
     return 1;
 }
@@ -153,13 +155,14 @@ sub do_renew
     my $rc = $keystore->checkvalidity($autorenew);
     if (! $rc) {
 	# schedule automatic renewal
-	print "Scheduling renewal\n";
+	$keystore->log({MSG => "Scheduling renewal"});
 	$keystore->{INSTANCE}->renew();
     }
 
     $rc = $keystore->checkvalidity($warnexpiry);
     if (! $rc) {
-	print "WARNING: Certificate is valid for less than $warnexpiry days\n";
+	$keystore->log({MSG => "Certificate is valid for less than $warnexpiry days",PRIO => 'notice'});
+	$keystore->warnexpiry();
     }
 }
 
