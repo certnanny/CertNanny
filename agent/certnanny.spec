@@ -36,7 +36,7 @@ make
 %install
 mkdir -p $RPM_BUILD_ROOT
 install -D -m 755 bin/certnanny $RPM_BUILD_ROOT/usr/bin/certnanny
-install -D -m 644 certnanny.1 $RPM_BUILD_ROOT/usr/man/man1/certnanny.1
+install -D -m 644 certnanny.1.gz $RPM_BUILD_ROOT/usr/share/man/man1/certnanny.1.gz
 install -D -m 644 lib/java/ExtractKey.jar $RPM_BUILD_ROOT/usr/lib/certnanny/java/ExtractKey.jar
 install -D -m 644 etc/certnanny.cfg $RPM_BUILD_ROOT/etc/certnanny.cfg
 mkdir -p $RPM_BUILD_ROOT/usr/lib/perl5/site_perl/
@@ -52,7 +52,7 @@ rm -rf $RPM_BUILD_ROOT
 %config /etc/certnanny.cfg
 
 /usr/bin/certnanny
-/usr/man/man1/certnanny.1
+/usr/share/man/man1/certnanny.1.gz
 /usr/lib/certnanny/java/ExtractKey.jar
 /usr/lib/perl5/site_perl/CertNanny.pm
 /usr/lib/perl5/site_perl/CertNanny
