@@ -266,6 +266,9 @@ Renewal URL (SCEP URL)
 The CertNanny script should be invoked in 'renew' mode at least 
 once a day, e. g. via cron.
 
+On Win32 platforms the CertNanny script must be installed as a
+Windows service via the cernanny-service.pl.
+
 The CertNanny script may be invoked in 'check' mode that will only 
 check if the configured keystores are valid for more than a configured 
 amount of time (may be used for monitorin integration).
@@ -425,6 +428,8 @@ certificate chain and adds it to the resulting key store.
 The script itself is written in Perl. It uses OpenSSL for crypto operation 
 and the sscep program for communicating with the PKI systems.
 
+On Win32 platforms you also need CAPICOM and Win32 Deamon.
+
 
 =head3 1.2.7 Features and status
 
@@ -440,9 +445,9 @@ Multi-platform support
   - AIX
   - Darwin (Mac OS X)
   - NonStop/Tandem via (OSS)
+  - Windows
 
   * Planned:
-  - Windows
   - z/OS
 
 =item *
@@ -456,9 +461,9 @@ supporting the certificate keystore of a number of applications
   - MQ Keystore (IBM GSKit)
   - PKCS #8
   - Java Keystore
+  - Windows Certificate Store
 
   * Planned:
-  - Windows Certificate Store
   - RACF (z/OS; USS access to RACF via REXX)
   - Java Keystore with nCipher HSM module support
   - OpenSSL keystore with nCipher HSM module support
@@ -495,6 +500,14 @@ openssl
 =item *
 
 sscep
+
+=item *
+
+CAPICOM (only for Win32)
+
+=item *
+
+Win32 Daemon (only for Win32)
 
 =back
 
@@ -656,6 +669,18 @@ of distinct keystores.
 =head3 2.2.1 Common keystore configuration settings
 
 =over
+
+=item platform.windows.servicename
+
+Choose a name for the service. Default name is Certnanny.
+
+=item logfile
+
+Name and destination of the Certnanny logfile.
+
+=item renewal.timeframe
+
+Time-frame (in seconds) when the renewal process should be startet.
 
 =item keystore.LABEL.autorenew_days
 
@@ -1145,6 +1170,62 @@ contain only one private key (pertaining to the configured alias).
 
 Keytool expects the pin as a command line argument, hence it is visible 
 in the process list for a short time.
+
+=back
+
+=head4 2.2.2.4 Windows keystore
+
+Windows keystore description
+
+=over
+
+=item keystore.LABEL.location
+
+Mandatory, specifies the filename of the Windows keystore
+
+Example: 
+    CN=foo.example.com,O=foo Inc,DC=db,DC=com
+
+=item keystore.LABEL.type
+
+Mandatory, must literally be set to Windows
+
+=item keystore.LABEL.issuerregex
+
+Issuer name as regular expression.
+
+=item keystore.LABEL.storelocation
+
+Mandatory, specifies the name of the certificate store location: memory, machine, user  
+
+=back
+
+Limitations:
+
+=over
+
+=item
+
+The key must be exportable.
+
+=item 
+
+If there are two or more identical certificates in  the certificate store, the renewal process
+will not work and one of the  certificates has to be removed manually.
+
+=item
+
+Additionally to Certnanny, Win32 Daemon and CAPICOM are needed for automatic 
+certificate renewal.
+
+Win32 Daemon enables Perl scripts to run as true Windows service.
+Install Win 32 Daemon: perl ppm.pl install http://www.roth.net/perl/packages/win32-daemon.ppd
+Certnanny was tested with daemon_5006
+
+The CAPICOM COM client provides services that enable application developers to add security based on cryptography to applications. 
+CAPCIOM can be found on the microsoft homepage:
+http://www.microsoft.com/downloads/details.aspx?FamilyID=860ee43a-a843-462f-abb5-ff88ea5896f6&DisplayLang=en
+Certnanny was tested with CAPICOM 2.1.0.1
 
 =back
 

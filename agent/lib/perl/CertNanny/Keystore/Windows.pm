@@ -277,7 +277,10 @@ sub getkey {
 # and requests, you might choose to do all this yourself here:
 sub createrequest {
     my $self = shift;
-
+     
+    $self->importrequest();
+    return;
+    
     # NOTE: you might want to use OpenSSL request generation, see suggestion
     # above.
   
@@ -305,13 +308,11 @@ sub createrequest {
     my $location = $self->{OPTIONS}->{ENTRY}->{location};
     #array
     my @tmpcn;
-    #der String $location wird an den , welche kein \ vor sich haben aufgeteilt und in das array gespeichert
-    ##Erzeugt Fehler, wenn in dem common name die Zeichenkombination \, bzw codiert \\\,
-    #vorhanden ist bzw mehrere \ vorhanden sind
+    
     @tmpcn=split(/(?<!\\),\s*/,$location);
-    #die Reihenfolge des arrays wird herumgedreht
+    #change the order of the array
     @tmpcn = reverse(@tmpcn);
-    #das herumgedrehte array wird durch , getrennt wieder in $location geschrieben
+    #replace the , and write the string to $location
     $location = join(',',@tmpcn);
     #########################################################################
     #createFileRequest has no return value
@@ -361,6 +362,7 @@ sub createrequest {
 # A true return code indicates that the keystore was installed properly.
 sub installcert {
     my $self = shift;
+    
     my %args = ( 
 		 @_,         # argument pair list
 		 );
@@ -399,8 +401,10 @@ sub installcert {
     } 
       
     #install certificate in cert mgr
+    print "ENROLL: $enroll\n";
+    print "P7BFILENAME: $p7bfilename\n";
+
     $enroll->acceptFilePKCS7($p7bfilename);
-    
 #     # in order to access the certificate chain as returned by SCEP, use
 #     foreach my $entry (@{$self->{STATE}->{DATA}->{CERTCHAIN}}) {
 # 	my $cacertfile = $entry->{CERTFILE};
@@ -419,13 +423,52 @@ sub installcert {
     #   }
     
     # only on success:
-    #
-    if(-e "$self->{OPTIONS}->{ENTRY}->{statedir}/".$p7bfilename)
+     
+    if(-e $p7bfilename)
     {
-       unlink("$self->{OPTIONS}->{ENTRY}->{statedir}/".$p7bfilename);
+       unlink($p7bfilename);
     }
-    
+
+    my $val = $self->deleteoldcerts();
+
+    if($val == 0)
+    {
+       $self->importrequest();
+    }
+       
     return 1;
+}
+
+sub deleteoldcerts{
+    my $self = shift;
+    my $store =$self->{STORE};
+    my $certs = $store->Certificates;
+       
+    my $thumbprint = $self->{CERT}->{INFO}->{CertificateFingerprint};
+    $thumbprint =~ s/://g;
+    my $certstoremove;
+    eval {
+	    
+	    #$thumbprint = "Test";
+
+    $certstoremove = $certs->Find(CAPICOM_CERTIFICATE_FIND_SHA1_HASH,$thumbprint);
+    };
+    if ($@) {
+       #Fehlerausgabe	
+       print "Fehler: $@\n";
+       return 0;
+    }	
+    my $count = $certstoremove->Count;
+
+    print "Count: $count\n";
+    #print Dumper($certstoremove);
+    
+    for(my $i=1;$i<=$count; $i++)
+    {
+       $store->Remove($certstoremove->Item($i));
+    }
+    return 1;
+   
 }
 
 #This method searches through the certificate store to find the matching certificate.
@@ -440,25 +483,28 @@ sub getcertobject{
    
     my $location = $self->{OPTIONS}->{ENTRY}->{location};
   
-    my $issuer = $self->{OPTIONS}->{ENTRY}->{issuer};
+    my $issuerregex = $self->{OPTIONS}->{ENTRY}->{issuerregex};
     
     my $certs=$store->Certificates;
     my $certcount = $certs->Count();
     my $i=1;
     my $count=0;
     my $cert;
-    my $certname;
+    my $subjectname;
+    my $issuername;
     #go through all certificates in the store
-    while($i<=$certcount){
-	    
+    while ($i<=$certcount) {
        
-       $certname=$certs->Item($i)->SubjectName;
-       #Erzeugt Fehler, wenn in dem common name die Zeichenkombination \, bzw codiert \\\,
-       #vorhanden ist
+       $subjectname=$certs->Item($i)->SubjectName;
+       $issuername=$certs->Item($i)->IssuerName;
+       
        #Because the subject names in the certificates from the certificate store are formated in a different way
        #the subject names from the config file. The blanks after the seperating "," need to be deleted. 
-       $certname =~ s/(?<!\\)((\\\\)*),\s*/$1,/g;
-       if($certname eq $location){
+       $subjectname =~ s/(?<!\\)((\\\\)*),\s*/$1,/g;
+       $issuername =~ s/(?<!\\)((\\\\)*),\s*/$1,/g;
+      
+       if ($subjectname eq $location && (!$issuername || $issuername =~ m/^$issuerregex$/)) { 
+       #if($subjectname eq $location && $issuername =~ m/^$issuerregex$/){
          $count++;
 	 $cert=$certs->Item($i);
        }
@@ -496,7 +542,6 @@ sub openstore{
    
     #Open() has no return value
     $store->Open ($store_location, $store_name, $store_mode);
-    print "($store_location, $store_name, $store_mode\n";
      
     return $store;    
 }
@@ -519,7 +564,7 @@ sub getkeydata{
     
     #save the certificate in the .p12 file as pfx
     eval { 
-       $cert->Save($filename,undef,CAPICOM_CERTIFICATE_SAVE_AS_PFX); #(Dateiname, pw, als was speichern)anpassen
+       $cert->Save($filename,"",CAPICOM_CERTIFICATE_SAVE_AS_PFX); #(Dateiname, pw, als was speichern)anpassen
     };
     if($EVAL_ERROR) {
 	    $self->seterror();
@@ -547,10 +592,10 @@ sub getkeydata{
     close(OPENSSL);
 
     #delete the created .p12 file
-    if(-e "$self->{OPTIONS}->{ENTRY}->{statedir}/".$filename)
-    {
-       unlink("$self->{OPTIONS}->{ENTRY}->{statedir}/".$filename);
-    }
+    #if(-e $filename)
+    #{
+    #   unlink($filename);
+    #}
 
     if($?!=0)
     {
@@ -559,4 +604,27 @@ sub getkeydata{
     }
     return $keydata;
 }
+
+sub importrequest{
+    my $self = shift;
+
+    my $storename = "REQUEST";
+    my $storelocation = $self->{OPTIONS}->{ENTRY}->{storelocation}; 
+    my $requeststore = $self->openstore($storename, $storelocation);
+    
+    my $filename = $self->{OPTIONS}->{ENTRYNAME} . ".pfx";
+    $filename =  
+	File::Spec->catfile($self->{OPTIONS}->{ENTRY}->{statedir},
+			    $filename);
+
+    print "Storename: $storename\n";
+    print "Storelocation: $storelocation\n";
+    print "Requeststore: $requeststore\n";
+    print "Filename: $filename\n";
+    
+    $requeststore->Load($filename,"",CAPICOM_KEY_STORAGE_EXPORTABLE);
+        
+    $requeststore->Close();
+}
+
 1;
