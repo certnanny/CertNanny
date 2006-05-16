@@ -14,6 +14,10 @@ In order to run this software you will need
   sscep patches to these sources are included in this distribution,
   see the contrib/ directory.
 
+On Win32 platforms you will also need
+- Win32 Daemon 5006
+- CAPICOM 2.1.0.1
+
 
 3rd party tool installation
 
@@ -78,7 +82,6 @@ export PERL5LIB="<path>"
 
 Replace <path> with the installation directory from above where
 CertNanny.pm can be found.
-
 
 Rerun the program and verify that it outputs a usage note.
 

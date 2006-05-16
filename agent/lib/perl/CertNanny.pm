@@ -38,7 +38,15 @@ sub new
 
     $self->{CONFIG} = CertNanny::Config->new($args{CONFIG});
     return unless defined $self->{CONFIG};
-
+    if($self->{CONFIG}->get("logfile", "FILE"))
+    {
+       #TODO Fehlerbehandlung
+       #write alle messages into a file 
+       my $file = $self->{CONFIG}->get("logfile", "FILE");
+       open STDOUT, "> $file";
+       open STDERR, ">&STDOUT";
+       $|=1;
+    }
     # set default library path
     my @dirs = File::Spec->splitdir($FindBin::Bin);
     pop @dirs;
@@ -75,6 +83,12 @@ sub AUTOLOAD
     if ($attr =~ /(?:info|check|renew)/) {
 	return $self->iterate_entries("do_$attr");
     }
+}
+
+sub get_config_value
+{
+    my $self = shift;
+    return $self->{CONFIG}->get(@_);
 }
 
 sub iterate_entries
