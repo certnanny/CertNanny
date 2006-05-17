@@ -278,9 +278,6 @@ sub getkey {
 sub createrequest {
     my $self = shift;
      
-    $self->importrequest();
-    return;
-    
     # NOTE: you might want to use OpenSSL request generation, see suggestion
     # above.
   
@@ -291,7 +288,7 @@ sub createrequest {
     $enroll->{GenKeyFlags}=CRYPT_EXPORTABLE;
     $enroll->{RequestStoreFlags}=$certlocation{lc($storelocation)};
     
-    print "STOREFLAGS: $enroll->{CAStoreFlags}\n";
+    #print "STOREFLAGS: $enroll->{CAStoreFlags}\n";
     my $requestfile = $self->{OPTIONS}->{ENTRYNAME} . ".csr";
        
     #If the .csr file already exists, the file will be deleted to avoid 
@@ -308,7 +305,7 @@ sub createrequest {
     my $location = $self->{OPTIONS}->{ENTRY}->{location};
     #array
     my @tmpcn;
-    
+    #split the string after all , and write the new strings in an array
     @tmpcn=split(/(?<!\\),\s*/,$location);
     #change the order of the array
     @tmpcn = reverse(@tmpcn);
@@ -316,7 +313,6 @@ sub createrequest {
     $location = join(',',@tmpcn);
     #########################################################################
     #createFileRequest has no return value
-    
     $enroll->createFileRequest(XECR_PKCS10_V1_5,$location,"",$requestfile);
 
     # step 2: generate certificate request for existing DN (and SubjectAltName)
@@ -401,9 +397,6 @@ sub installcert {
     } 
       
     #install certificate in cert mgr
-    print "ENROLL: $enroll\n";
-    print "P7BFILENAME: $p7bfilename\n";
-
     $enroll->acceptFilePKCS7($p7bfilename);
 #     # in order to access the certificate chain as returned by SCEP, use
 #     foreach my $entry (@{$self->{STATE}->{DATA}->{CERTCHAIN}}) {
@@ -429,9 +422,9 @@ sub installcert {
        unlink($p7bfilename);
     }
 
-    my $val = $self->deleteoldcerts();
+    my $count = $self->deleteoldcerts();
 
-    if($val == 0)
+    if($count == 0)
     {
        $self->importrequest();
     }
@@ -448,10 +441,8 @@ sub deleteoldcerts{
     $thumbprint =~ s/://g;
     my $certstoremove;
     eval {
-	    
-	    #$thumbprint = "Test";
 
-    $certstoremove = $certs->Find(CAPICOM_CERTIFICATE_FIND_SHA1_HASH,$thumbprint);
+         $certstoremove = $certs->Find(CAPICOM_CERTIFICATE_FIND_SHA1_HASH,$thumbprint);
     };
     if ($@) {
        #Fehlerausgabe	
@@ -459,9 +450,6 @@ sub deleteoldcerts{
        return 0;
     }	
     my $count = $certstoremove->Count;
-
-    print "Count: $count\n";
-    #print Dumper($certstoremove);
     
     for(my $i=1;$i<=$count; $i++)
     {
@@ -483,7 +471,7 @@ sub getcertobject{
    
     my $location = $self->{OPTIONS}->{ENTRY}->{location};
   
-    my $issuerregex = $self->{OPTIONS}->{ENTRY}->{issuerregex};
+    #my $issuerregex = $self->{OPTIONS}->{ENTRY}->{issuerregex};
     
     my $certs=$store->Certificates;
     my $certcount = $certs->Count();
@@ -491,20 +479,20 @@ sub getcertobject{
     my $count=0;
     my $cert;
     my $subjectname;
-    my $issuername;
+    #my $issuername;
     #go through all certificates in the store
     while ($i<=$certcount) {
        
        $subjectname=$certs->Item($i)->SubjectName;
-       $issuername=$certs->Item($i)->IssuerName;
+       #$issuername=$certs->Item($i)->IssuerName;
        
        #Because the subject names in the certificates from the certificate store are formated in a different way
        #the subject names from the config file. The blanks after the seperating "," need to be deleted. 
        $subjectname =~ s/(?<!\\)((\\\\)*),\s*/$1,/g;
-       $issuername =~ s/(?<!\\)((\\\\)*),\s*/$1,/g;
+       #$issuername =~ s/(?<!\\)((\\\\)*),\s*/$1,/g;
       
-       if ($subjectname eq $location && (!$issuername || $issuername =~ m/^$issuerregex$/)) { 
-       #if($subjectname eq $location && $issuername =~ m/^$issuerregex$/){
+       #if ($subjectname eq $location && (!$issuername || $issuername =~ m/^$issuerregex$/)) { 
+       if($subjectname eq $location){
          $count++;
 	 $cert=$certs->Item($i);
        }
@@ -616,11 +604,6 @@ sub importrequest{
     $filename =  
 	File::Spec->catfile($self->{OPTIONS}->{ENTRY}->{statedir},
 			    $filename);
-
-    print "Storename: $storename\n";
-    print "Storelocation: $storelocation\n";
-    print "Requeststore: $requeststore\n";
-    print "Filename: $filename\n";
     
     $requeststore->Load($filename,"",CAPICOM_KEY_STORAGE_EXPORTABLE);
         

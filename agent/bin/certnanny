@@ -678,9 +678,11 @@ Choose a name for the service. Default name is Certnanny.
 
 Name and destination of the Certnanny logfile.
 
-=item renewal.timeframe
+=item platform.windows.serviceinterval
 
-Time-frame (in seconds) when the renewal process should be startet.
+Interval (in seconds) in which the renewal process should be startet. Only necessary on Win32 platforms.
+
+Default: 84600 (once per day)
 
 =item keystore.LABEL.autorenew_days
 
