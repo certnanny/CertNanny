@@ -59,7 +59,7 @@ rm -rf $RPM_BUILD_ROOT
 %dir /var/lib/certnanny/state
 
 %changelog
-* Tue May 17 2006 Joerg Schneider <js@joergschneider.com>
+* Wed Jun 07 2006 Joerg Schneider <js@joergschneider.com>
 Release 0.8
 
 * Thu Dec 23 2005 Martin Bartosch <m.bartosch@cynops.de>
