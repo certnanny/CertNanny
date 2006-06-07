@@ -672,15 +672,19 @@ of distinct keystores.
 
 =item platform.windows.servicename
 
-Choose a name for the service. Default name is Certnanny.
+Name of the Windows service to be installed by cernanny-service.pl. 
+
+Default: Certnanny
 
 =item logfile
 
-Name and destination of the Certnanny logfile.
+Path name of the Certnanny logfile. The file will be overwritten on each invokation of CertNanny.
+
+Default: stderr
 
 =item platform.windows.serviceinterval
 
-Interval (in seconds) in which the renewal process should be startet. Only necessary on Win32 platforms.
+Time interval (in seconds) between renewal checks done by the Win32 service. Only necessary on Win32 platforms, on other platforms use cron or similar.
 
 Default: 84600 (once per day)
 
@@ -1183,22 +1187,30 @@ Windows keystore description
 
 =item keystore.LABEL.location
 
-Mandatory, specifies the filename of the Windows keystore
+Mandatory, specifies the Distinguished Name of a certificate in the Windows keystore, which shall be monitored/renewed. Only one certificate with the specified DN may be present in the store.
 
 Example: 
-    CN=dbgerws2411.de.db.com,O=Deutsche Bank AG,DC=db,DC=com
+    CN=www.example.com,O=Example Ltd.,DC=example,DC=com
 
 =item keystore.LABEL.type
 
-Mandatory, must literally be set to Windows
+Mandatory, must literally be set to Windows.
 
 =item keystore.LABEL.issuerregex
 
-Issuer name as regular expression.
+Issuer Distingushed Name as (Perl) regular expression.
+
+=item keystore.LABEL.storename
+
+Optional, specifies the name of the certificate store, e.g. MY. This setting should generally not be changed.
+
+Default: MY
 
 =item keystore.LABEL.storelocation
 
-Mandatory, specifies the name of the certificate store location: memory, machine, user  
+Optional, specifies the name of the certificate store location: memory, machine, user  
+
+Default: machine
 
 =back
 
@@ -1208,26 +1220,12 @@ Limitations:
 
 =item
 
-The key must be exportable.
+The key must be exportable and strong private key protection may not be enabled.
 
 =item 
 
-If there are two or more identical certificates in  the certificate store, the renewal process
+If there are two or more identical certificates in the certificate store, the renewal process
 will not work and one of the  certificates has to be removed manually.
-
-=item
-
-Additionally to Certnanny, Win32 Daemon and CAPICOM are needed for automatic 
-certificate renewal.
-
-Win32 Daemon enables Perl scripts to run as true Windows service.
-Install Win 32 Daemon: perl ppm.pl install http://www.roth.net/perl/packages/win32-daemon.ppd
-Certnanny was tested with daemon_5006
-
-The CAPICOM COM client provides services that enable application developers to add security based on cryptography to applications. 
-CAPCIOM can be found on the microsoft homepage:
-http://www.microsoft.com/downloads/details.aspx?FamilyID=860ee43a-a843-462f-abb5-ff88ea5896f6&DisplayLang=en
-Certnanny was tested with CAPICOM 2.1.0.1
 
 =back
 

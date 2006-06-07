@@ -15,8 +15,8 @@ In order to run this software you will need
   see the contrib/ directory.
 
 On Win32 platforms you will also need
-- Win32 Daemon 5006
-- CAPICOM 2.1.0.1
+- Win32 Daemon 5006 (perl ppm.pl install http://www.roth.net/perl/packages/win32-daemon.ppd)
+- CAPICOM 2.1.0.1 (http://www.microsoft.com/downloads/details.aspx?FamilyID=860ee43a-a843-462f-abb5-ff88ea5896f6&DisplayLang=en)
 
 
 3rd party tool installation
