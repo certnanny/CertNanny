@@ -1,3 +1,7 @@
+2006-06-07  Joerg Schneider <js@joergschneider.com>
+
+	* certnanny: release version 0.8
+
 2006-05-17  Thomas Thiele <thomas.thiele@db.com>
 
 	* certnanny: Windows Certifcate Store support
