@@ -618,7 +618,7 @@ TODO
 
 Loglevel (optional)
 
-Values: 0: fatal, 1: error, 2: notice, 3: info, 4: debug, 5: scep verbose
+Values: 0: fatal, 1: error, 2: notice, 3: info, 4: debug, 5: scep verbose, 6: scep debug
 
 Example: 3
 

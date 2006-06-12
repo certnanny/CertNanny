@@ -1685,7 +1685,8 @@ sub sendrequest {
     my @checksubjectname = ();
     @checksubjectname = ('-C') if $scepchecksubjectname =~ /yes/i;
     my @verbose = ();
-    @verbose = ('-v') if $self->loglevel() >= 5;
+    push @verbose, '-v' if $self->loglevel() >= 5;
+    push @verbose, '-d' if $self->loglevel() >= 6;
     @cmd = (qq("$sscep"),
 	    'enroll',
 	    '-u',
