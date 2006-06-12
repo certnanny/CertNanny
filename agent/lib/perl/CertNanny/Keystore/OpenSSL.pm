@@ -471,8 +471,10 @@ sub createrequest {
     }
     
     if (exists $self->{CERT}->{INFO}->{SubjectAlternativeName}) {
+	my $san = $self->{CERT}->{INFO}->{SubjectAlternativeName};
+	$san =~ s{ IP\ Address: }{IP:}xmsg;
 	print $fh "[ v3_ext ]\n";
-	print $fh "subjectAltName = " . $self->{CERT}->{INFO}->{SubjectAlternativeName} . "\n";
+	print $fh "subjectAltName = $san\n";
     }
     
     $fh->close();
