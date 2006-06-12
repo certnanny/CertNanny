@@ -1332,15 +1332,6 @@ Only RSA keys are supported
 New certificate chain inserted into the keystore is currently not
 cryptographically verified
 
-=item
-
-No automatic authentication of new CSR sent to CA yet (sign with old
-key)
-
-=item
-
-Only re-key is supported, not certificate renewal based on the old key
-
 =back
 
 =head1 B Ideas for enhancement
