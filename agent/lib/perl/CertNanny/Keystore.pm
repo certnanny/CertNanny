@@ -9,7 +9,7 @@
 package CertNanny::Keystore;
 use base qw(Exporter);
 
-#use Smart::Comments;
+# use Smart::Comments;
 
 use File::Glob qw(:globally :nocase);
 use File::Spec;
@@ -27,7 +27,7 @@ use strict;
 use vars qw( $VERSION );
 use Exporter;
 
-$VERSION = 0.7;
+$VERSION = 0.9;
 
 
 # constructor parameters:
@@ -1226,8 +1226,9 @@ sub renew {
 	    foreach my $entry qw( CERTFILE KEYFILE REQUESTFILE ) {
 		unlink $self->{STATE}->{DATA}->{RENEWAL}->{REQUEST}->{$entry};
 	    }
-	    # FIXME: delete state file
 
+	    # delete state file
+	    unlink $self->{OPTIONS}->{ENTRY}->{statefile};
 	    last;
 	}
 	else
@@ -1307,6 +1308,7 @@ sub getrootcerts {
     return \@result;
 }
 
+
 # build a certificate chain for this CA instance. the certificate chain
 # will NOT be verified cryptographically.
 # return:
@@ -1315,9 +1317,63 @@ sub getrootcerts {
 # undef on error (e. g. root certificate could not be found)
 sub buildcertificatechain {
     my $self = shift;
-    
+
+    # local helper function that accepts two cert entries.
+    # returns undef if the elements are unrelated
+    # returns true if the first argument is the issuer of the second arg
+    my $is_issuer = sub {
+	### is_issuer...
+	my $parent = shift;
+	my $child  = shift;
+	if (! defined $parent || ! defined $child) {
+	    print STDERR "ERROR: is_issuer: missing parameters\n";
+	    return;
+	}
+
+	if (ref $parent ne 'HASH' || ref $child ne 'HASH') {
+	    print STDERR "ERROR: is_issuer: illegal parameters\n";
+	    return;
+	}
+
+	my $child_issuer;
+	my $child_akeyid;
+	my $parent_subject;
+	my $parent_skeyid;
+
+	foreach my $field (qw( INFO CERTINFO )) {
+	    $child_issuer   ||= $child->{$field}->{IssuerName};
+	    $child_akeyid   ||= $child->{$field}->{AuthorityKeyIdentifier};
+	    $parent_subject ||= $parent->{$field}->{SubjectName};
+	    $parent_skeyid  ||= $parent->{$field}->{SubjectKeyIdentifier};
+	}
+	### $child_issuer
+	### $child_akeyid
+	### $parent_subject
+	### $parent_skeyid
+
+	if (defined $child_akeyid) {
+	    ### keyid chaining...
+	    if (defined $parent_skeyid &&
+		'keyid:' . $parent_skeyid eq $child_akeyid) {
+		### MATCHED via keyid...
+		return 1;
+	    }
+	} else {
+	    ### DN chaining...
+	    if ($child_issuer eq $parent_subject) {
+		### MATCHED via DN...
+		return 1;
+	    }
+	}
+
+	### no match...
+	return;
+    };
+
+
+    # list of trusted root certificates
     my @trustedroots = @{$self->{STATE}->{DATA}->{ROOTCACERTS}};
-    my @cacerts = @{$self->{STATE}->{DATA}->{SCEP}->{CACERTS}};
+    ### @trustedroots
 
     my %rootcertfingerprint;
     foreach my $entry (@trustedroots) {
@@ -1325,74 +1381,82 @@ sub buildcertificatechain {
 	$rootcertfingerprint{$fingerprint}++;
     }
 
-    # output structure
-    my @chain;
+    # remove root certs from certificate list
+    my @cacerts = grep(! exists $rootcertfingerprint{ $_->{CERTINFO}->{CertificateFingerprint} }, 
+		       @{$self->{STATE}->{DATA}->{SCEP}->{CACERTS}});
+    
+    # @cacerts now contains the certificates delivered by SCEP minus
+    # the configured root certificates.
+    # NOTE: it may still contain root certificates NOT specified in
+    # the config file!
+    ### @cacerts
 
-    my $ii = 0;
-    my $rootindex;
-    # determine root
-    foreach my $entry (@cacerts) {
-	my $fingerprint = $entry->{CERTINFO}->{CertificateFingerprint};
+    # output structure, for building the chain start with the end entity cert
+    my @chain = ( $self->{CERT} );
 
-	if (exists $rootcertfingerprint{$fingerprint}) {
-	    $self->debug("Root certificate identified: $fingerprint");
-	    push (@chain, $entry);
-	    $rootindex = $ii;
-	    last;
+  BUILDCHAIN:
+    while (1) {
+	### check if the first cert in the chain is a root certificate...
+	if (&$is_issuer($chain[0], 
+			$chain[0])) {
+	    ### found root certificate...
+	    last BUILDCHAIN;
 	}
-	$ii++;
+
+	my $cert;
+	my $issuer_found = 0;
+      FINDISSUER:
+	foreach my $entry (@cacerts, @trustedroots) {
+	    # work around a bug in Perl (?): when using $cert instead of 
+	    # $entry in the foreach loop the value of $cert was lost 
+	    # after leaving the loop!?
+	    $cert = $entry;
+	    if (! defined $entry) {
+		### undefined entry 1 - should not happen...
+	    }
+	    ### scanning ca entry...
+	    ### $entry->{CERTINFO}->{SubjectName}
+	    ### $chain[0]
+
+	    $issuer_found = &$is_issuer($entry, $chain[0]);
+	    if (! defined $entry) {
+		### undefined entry 2 - should not happen...
+	    }
+
+	    last FINDISSUER if ($issuer_found);
+	}
+
+	if (! $issuer_found) {
+	    $self->seterror("No matching issuer certificate was found");
+	    return;
+	}
+	if (! defined $cert) {
+	    ### undefined entry 3 - should not happen...
+	}
+
+	### prepend to chain...
+	### $cert
+	unshift @chain, $cert;
     }
 
-    if (!defined $rootindex) {
-	$self->seterror("No matching root certificate was configured");
+    # remove end entity certificate
+    pop @chain;
+
+    ### @chain
+
+    # verify that the first certificate in the chain is a trusted root
+    if (scalar @chain == 0) {
+	$self->seterror("No certificate chain could be built");
 	return;
     }
 
-    # remove root certs from candidate list
-    @cacerts = grep(! exists $rootcertfingerprint{ $_->{CERTINFO}->{CertificateFingerprint} }, 
-		    @cacerts);
-
-    # build chain downwards from root certificate (unfortunate: would
-    # be easier bottom-up)
-    while ($#cacerts >= 0) {
-	# get last element
-	my $top = $chain[$#chain];
-	my $parentsubjectname = $top->{CERTINFO}->{SubjectName};
-	my $parentsubjectkeyid = $top->{CERTINFO}->{SubjectKeyIdentifier};
-	
-	my $noaction = 1;
-	for ($ii = 0; $ii <= $#cacerts; $ii++) {
-	    my $entry = $cacerts[$ii];
-
-	    my $issuername = $entry->{CERTINFO}->{IssuerName};
-	    my $authoritykeyid = $entry->{CERTINFO}->{AuthorityKeyIdentifier};
-	    my $subjectkeyid = $entry->{CERTINFO}->{SubjectKeyIdentifier};
-
-	    if (defined $authoritykeyid and $authoritykeyid =~ /^keyid:(.*)/) {
-		if (($1 eq $parentsubjectkeyid) and
-		    ($1 ne $authoritykeyid)) {
-		    push (@chain, $entry);
-
-		    # remove this cert from cert list
-		    splice(@cacerts, $ii, 1);
-		    $noaction = 0;
-		    last;
-		}
-	    }
-	    # FIXME: note: we only handle authoritykeyid chaining!
-	    if ($issuername eq $parentsubjectname) {
-		push (@chain, $entry);
-
-		# remove this cert from cert list
-		splice(@cacerts, $ii, 1);
-		$noaction = 0;
-		last;
-	    }
-	}
-	if ($noaction) {
- 	    $self->info("Not all certificates belong to the chain, may be incomplete\n");
-	    last;
-	}
+    my $fingerprint = $chain[0]->{CERTINFO}->{CertificateFingerprint};
+    if (! exists $rootcertfingerprint{ $fingerprint }) {
+	$self->seterror("Root certificate is not trusted");
+	$self->log({ MSG => "Untrusted root certificate DN: " . 
+			 $chain[0]->{CERTINFO}->{SubjectName},
+		     PRIO => 'info' });
+	return;
     }
     
     return \@chain;
@@ -1469,7 +1533,7 @@ sub getcacerts {
 
     my $scepracert = $self->{STATE}->{DATA}->{SCEP}->{RACERT};    
 
-    return $scepracert if (defined $scepracert and -r $scepracert);
+    # return $scepracert if (defined $scepracert and -r $scepracert);
 
     my $sscep = $self->{OPTIONS}->{CONFIG}->get('cmd.sscep');
     my $cacertdir = $self->{OPTIONS}->{ENTRY}->{scepcertdir};
