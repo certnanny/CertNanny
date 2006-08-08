@@ -1336,33 +1336,7 @@ cryptographically verified
 
 =head1 B Ideas for enhancement
 
-=head2 B.1 Automatic authorization of the new request against PKI
-
-The renewal request itself is created from the existing certificate in
-the configured keystore. It is sent to the PKI via SCEP. The new request
-ends up as incoming in the RA system. In order to have the certificate
-issued it must be approved by an RA operator.
-
-To allow for automatic approval, the request may also be automatically
-approved by the following procedure:
-
-=over
-
-=item
-
-Request authorization for the new request. PKI system returns a
-challenge (random number)
-
-=item
-
-Create signature on the challenge with the existing (old) certificate
-and send it back to the PKI
-
-=back
-
-If the signature is found to be valid, automatically approve the
-request and schedule it for (automatic) issuance.
-
+=head2 B.1 Automatic approval (already implemented)
 
 =head2 B.2 Implicit load balancing on PKI and LDAP
 
