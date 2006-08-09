@@ -1309,18 +1309,20 @@ sub getrootcerts {
 }
 
 
-# build a certificate chain for this CA instance. the certificate chain
-# will NOT be verified cryptographically.
+# build a certificate chain for the specified certificate. the certificate 
+# chain will NOT be verified cryptographically.
 # return:
 # arrayref containing ca certificate information, starting at the
 # root ca
 # undef on error (e. g. root certificate could not be found)
 sub buildcertificatechain {
     my $self = shift;
+    my $cert = shift;
 
     # local helper function that accepts two cert entries.
     # returns undef if the elements are unrelated
     # returns true if the first argument is the issuer of the second arg
+    #   (1: authority key identifier chaining, 2: DN chaining)
     my $is_issuer = sub {
 	### is_issuer...
 	my $parent = shift;
@@ -1362,7 +1364,7 @@ sub buildcertificatechain {
 	    ### DN chaining...
 	    if ($child_issuer eq $parent_subject) {
 		### MATCHED via DN...
-		return 1;
+		return 2;
 	    }
 	}
 
@@ -1392,8 +1394,9 @@ sub buildcertificatechain {
     ### @cacerts
 
     # output structure, for building the chain start with the end entity cert
-    my @chain = ( $self->{CERT} );
+    my @chain = ( $cert );
 
+    $self->info("Building certificate chain");
   BUILDCHAIN:
     while (1) {
 	### check if the first cert in the chain is a root certificate...
@@ -1405,6 +1408,10 @@ sub buildcertificatechain {
 
 	my $cert;
 	my $issuer_found = 0;
+
+	my $subject = $chain[0]->{CERTINFO}->{SubjectName} || $chain[0]->{INFO}->{SubjectName};
+	$self->info("Subject: $subject");
+
       FINDISSUER:
 	foreach my $entry (@cacerts, @trustedroots) {
 	    # work around a bug in Perl (?): when using $cert instead of 
@@ -1421,6 +1428,17 @@ sub buildcertificatechain {
 	    $issuer_found = &$is_issuer($entry, $chain[0]);
 	    if (! defined $entry) {
 		### undefined entry 2 - should not happen...
+	    }
+
+	    $subject = $entry->{CERTINFO}->{SubjectName} || $entry->{INFO}->{SubjectName};
+	    if ($issuer_found) {
+		if ($issuer_found == 1) {
+		    $self->info("  Issuer identified via AuthKeyID match: $subject");
+		} else {
+		    $self->info("  Issuer identified via DN match: $subject");
+		}
+	    } else {
+		$self->debug("  Unrelated: $subject");
 	    }
 
 	    last FINDISSUER if ($issuer_found);
@@ -1446,18 +1464,18 @@ sub buildcertificatechain {
 
     # verify that the first certificate in the chain is a trusted root
     if (scalar @chain == 0) {
-	$self->seterror("No certificate chain could be built");
+	$self->seterror("Certificate chain could not be built");
 	return;
     }
 
     my $fingerprint = $chain[0]->{CERTINFO}->{CertificateFingerprint};
     if (! exists $rootcertfingerprint{ $fingerprint }) {
 	$self->seterror("Root certificate is not trusted");
-	$self->log({ MSG => "Untrusted root certificate DN: " . 
-			 $chain[0]->{CERTINFO}->{SubjectName},
-		     PRIO => 'info' });
+	$self->info("Untrusted root certificate DN: " . 
+		    $chain[0]->{CERTINFO}->{SubjectName});
 	return;
     }
+    $self->info("Root certificate is marked as trusted in configuration");
     
     return \@chain;
 }
@@ -1601,14 +1619,6 @@ sub getcacerts {
     }
     $self->{STATE}->{DATA}->{SCEP}->{CACERTS} = \@cacerts;
 
-
-    # build certificate chain
-    $self->{STATE}->{DATA}->{CERTCHAIN} = $self->buildcertificatechain();
-
-    if (! defined $self->{STATE}->{DATA}->{CERTCHAIN}) {
-	$self->seterror("Could not build certificate chain, probably trusted root certificate was not configured");
-	return;
-    }
 
     if (-r $scepracert) {
 	$self->{STATE}->{DATA}->{SCEP}->{RACERT} = $scepracert;
@@ -1813,6 +1823,16 @@ sub sendrequest {
 	my $newcert;
 	$newcert->{INFO} = $self->getcertinfo(CERTFILE => $newcertfile,
 					      CERTFORMAT => 'PEM');
+
+
+	# build new certificate chain
+	$self->{STATE}->{DATA}->{CERTCHAIN} = 
+	    $self->buildcertificatechain($newcert);
+	
+	if (! defined $self->{STATE}->{DATA}->{CERTCHAIN}) {
+	    $self->seterror("Could not build certificate chain, probably trusted root certificate was not configured");
+	    return;
+	}
 
 
 	$self->executehook($self->{OPTIONS}->{ENTRY}->{hook}->{renewal}->{install}->{pre},
