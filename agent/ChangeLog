@@ -1,3 +1,8 @@
+2006-08-09  Martin Bartosch  <m.bartosch@cynops.de>
+
+	* certnanny: fixed incorrect chaining semantics (only causes problems
+	if issuing CA rollover happened)
+
 2006-08-02  Martin Bartosch  <m.bartosch@cynops.de>
 
 	* certnanny: completely rewrote CA certificate chaining function
