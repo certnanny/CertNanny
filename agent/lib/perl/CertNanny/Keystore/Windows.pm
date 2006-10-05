@@ -18,29 +18,23 @@ use strict;
 use vars qw($VERSION);
 use Exporter;
 use Carp;
-
-# useful modules
-#use IO::File;
-#use File::Spec;
-#use File::Copy;
-#use File::Basename;
 use English;
 use Data::Dumper;
 use Win32::OLE;
 use Win32::OLE::Variant;
 use Win32::OLE::Const;
+
 # CAPICOM constant definitions
-use constant Win32::OLE::Const->Load('CAPICOM');
-use constant {
-	XECR_PKCS10_V1_5 => 0x4,
-	CRYPT_EXPORTABLE => 0x00000001,
-};
+my $const = Win32::OLE::Const->Load('CAPICOM');
+$const->{XECR_PKCS10_V1_5} = 0x4;
+$const->{CRYPT_EXPORTABLE} = 0x00000001;
+
 my %capicomlocation = (
-	memory => CAPICOM_MEMORY_STORE,
-	machine => CAPICOM_LOCAL_MACHINE_STORE,
-	user => CAPICOM_CURRENT_USER_STORE,
-	ad => CAPICOM_ACTIVE_DIRECTORY_USER_STORE,
-	sc => CAPICOM_SMART_CARD_USER_STORE,
+	memory => $const->{CAPICOM_MEMORY_STORE},
+	machine => $const->{CAPICOM_LOCAL_MACHINE_STORE},
+	user => $const->{CAPICOM_CURRENT_USER_STORE},
+	ad => $const->{CAPICOM_ACTIVE_DIRECTORY_USER_STORE},
+	sc => $const->{CAPICOM_SMART_CARD_USER_STORE},
 );
 
 my %certlocation = (
@@ -189,7 +183,13 @@ sub new
 sub DESTROY {
     my $self = shift;
     # check for an overridden destructor...
-    $self->{STORE}->Close() if($self->{STORE});
+    if ($self->{STORE}) {
+	eval { $self->{STORE}->Close() };
+	if ($@) {
+	    chomp($@);
+	    $self->debug("Ignoring store close error: [$@]\n");
+        }
+    }
     $self->SUPER::DESTROY if $self->can("SUPER::DESTROY");
 }
 
@@ -207,9 +207,22 @@ sub getcert {
     
     # you might want to access keystore configuration here
          
-    my $cert=$self->getcertobject( $self->{STORE}) or return;
+    my $cert;
+
+    eval { $cert = $self->getcertobject( $self->{STORE} ) };
+
+    if ($@) {
+	chomp($@);
+	my $storelocation = $self->{OPTIONS}->{ENTRY}->{storelocation};
+	my $storename = $self->{OPTIONS}->{ENTRY}->{storename};
+	$self->seterror("store $storelocation/$storename: $@");
+	return;
+    }
    
-    my $certdata = "-----BEGIN CERTIFICATE-----\n" . $cert->Export(CAPICOM_ENCODE_BASE64) . "-----END CERTIFICATE-----\n";
+    my $certdata = 
+    	"-----BEGIN CERTIFICATE-----\n" . 
+    	$cert->Export($const->{CAPICOM_ENCODE_BASE64}) . 
+	"-----END CERTIFICATE-----\n";
     
     my $instancecert;
 
@@ -238,11 +251,17 @@ sub getcert {
 sub getkey {
     my $self = shift;
 
-    my $keydata =$self->getkeydata($self->{STORE});
-    if(!defined $keydata)
+    my $keydata;
+    eval { $keydata = $self->getkeydata($self->{STORE}) };
+    if ($@)
     {
+	chomp($@);
+	my $storelocation = $self->{OPTIONS}->{ENTRY}->{location};
+	my $storename = $self->{OPTIONS}->{ENTRY}->{storename};
+	$self->seterror("store $storelocation/$storename: $@");
         return;
     }    
+
     my $key;
 
     #everything in front of the first five - in the private key will be deleted
@@ -263,18 +282,6 @@ sub getkey {
 
 
 # This method should generate a new private key and certificate request.
-# You may want to inherit this class from CertNanny::Keystore::OpenSSL if
-# you wish to generate the private key and PKCS#10 request 'outside' of
-# your keystore and import this information later.
-# In this case use the following code:
-# sub createrequest
-# {
-#   return $self->SUPER::createrequest() 
-#     if $self->can("SUPER::createrequest");
-# }
-#
-# If you are able to directly operate on your keystore to generate keys
-# and requests, you might choose to do all this yourself here:
 sub createrequest {
     my $self = shift;
      
@@ -285,17 +292,17 @@ sub createrequest {
       
     my $storelocation = $self->{OPTIONS}->{ENTRY}->{storelocation};
     my $enroll = Win32::OLE->new ('CEnroll.CEnroll') or die;
-    $enroll->{GenKeyFlags}=CRYPT_EXPORTABLE;
-    $enroll->{RequestStoreFlags}=$certlocation{lc($storelocation)};
+    $enroll->{GenKeyFlags} = $const->{CRYPT_EXPORTABLE};
+    $enroll->{RequestStoreFlags} = $certlocation{lc($storelocation)};
     
     #print "STOREFLAGS: $enroll->{CAStoreFlags}\n";
     my $requestfile = $self->{OPTIONS}->{ENTRYNAME} . ".csr";
        
     #If the .csr file already exists, the file will be deleted to avoid 
     #messages on the screen
-    if(-e "$self->{OPTIONS}->{ENTRY}->{statedir}/".$requestfile)
+    if(-e "$self->{OPTIONS}->{ENTRY}->{statedir}/".$requestfile) # FIXME catfile bzw. $requestfile (s.u.) verwenden
     {
-       unlink("$self->{OPTIONS}->{ENTRY}->{statedir}/".$requestfile);
+       unlink("$self->{OPTIONS}->{ENTRY}->{statedir}/".$requestfile); # FIXME catfile
     }
    
     $requestfile =  
@@ -313,7 +320,8 @@ sub createrequest {
     $location = join(',',@tmpcn);
     #########################################################################
     #createFileRequest has no return value
-    $enroll->createFileRequest(XECR_PKCS10_V1_5,$location,"",$requestfile);
+    $enroll->createFileRequest($const->{XECR_PKCS10_V1_5},$location,"",
+	    	$requestfile);
 
     # step 2: generate certificate request for existing DN (and SubjectAltName)
     # Distinguished Name:
@@ -328,9 +336,20 @@ sub createrequest {
     
     my $requeststore = $self->openstore($storename, $storelocation);
     
-    my $keydata = $self->getkeydata($requeststore);
+    my $keydata;
+    eval { $keydata = $self->getkeydata($requeststore) };
+    if ($@)
+    {
+	chomp($@);
+	$self->seterror("store $storelocation/$storename: $@");
+        return;
+    }    
   
-    $requeststore->Close();
+    eval { $requeststore->Close() };
+    if ($@) {
+	chomp($@);
+	$self->debug("Ignoring store close error: [$@]");
+    }
     
     my $keyfile = $self->{OPTIONS}->{ENTRYNAME} . ".key";
     $keyfile =  
@@ -397,23 +416,13 @@ sub installcert {
     } 
       
     #install certificate in cert mgr
-    $enroll->acceptFilePKCS7($p7bfilename);
-#     # in order to access the certificate chain as returned by SCEP, use
-#     foreach my $entry (@{$self->{STATE}->{DATA}->{CERTCHAIN}}) {
-# 	my $cacertfile = $entry->{CERTFILE};
-# 	# ...
-#     }
+    eval { $enroll->acceptFilePKCS7($p7bfilename) };
 
-#     # in order to access the root certificates configured for CertNanny, use
-#     foreach my $entry (@{$self->{STATE}->{DATA}->{ROOTCACERTS}}) {
-# 	my $rootcert = $entry->{CERTFILE};
-# 	...
-#     }
-
-    #if (1) {   # if any error happened
-#	$self->seterror("Could not install new keystore");
-#	return;
-    #   }
+    if ($@) {
+	chomp($@);
+	$self->seterror("Could not install new keystore ($@)");
+	return;
+    }
     
     # only on success:
      
@@ -432,7 +441,7 @@ sub installcert {
     return 1;
 }
 
-sub deleteoldcerts{
+sub deleteoldcerts {
     my $self = shift;
     my $store =$self->{STORE};
     my $certs = $store->Certificates;
@@ -442,12 +451,16 @@ sub deleteoldcerts{
     my $certstoremove;
     eval {
 
-         $certstoremove = $certs->Find(CAPICOM_CERTIFICATE_FIND_SHA1_HASH,$thumbprint);
+         $certstoremove = 
+	 	$certs->Find($const->{CAPICOM_CERTIFICATE_FIND_SHA1_HASH},
+			$thumbprint);
     };
     if ($@) {
-       #Fehlerausgabe	
-       print "Fehler: $@\n";
-       return 0;
+	chomp($@);
+	my $storelocation = $self->{OPTIONS}->{ENTRY}->{storelocation};
+	my $storename = $self->{OPTIONS}->{ENTRY}->{storename};
+	$self->seterror("deleteoldcerts: can't find certificate/request with has $thumbprint in $storelocation/$storename: $@");
+	return 0;
     }	
     my $count = $certstoremove->Count;
     
@@ -464,8 +477,7 @@ sub deleteoldcerts{
 #certificate in the store to the location in the config file. If 0 or more than 1 certificate
 #was found the method stops with an error.
 #If only one certificate was found, this one will be returned.
-sub getcertobject{
-  
+sub getcertobject {
     my $self = shift;
     my $store = shift;
    
@@ -473,18 +485,16 @@ sub getcertobject{
   
     #my $issuerregex = $self->{OPTIONS}->{ENTRY}->{issuerregex};
     
-    my $certs=$store->Certificates;
-    my $certcount = $certs->Count();
-    my $i=1;
-    my $count=0;
+    my $certs = $store->Certificates;
+    my $count = 0;
     my $cert;
-    my $subjectname;
-    #my $issuername;
+    my $matchedcert;
+
     #go through all certificates in the store
-    while ($i<=$certcount) {
-       
-       $subjectname=$certs->Item($i)->SubjectName;
-       #$issuername=$certs->Item($i)->IssuerName;
+    my $enum = Win32::OLE::Enum->new($certs);
+    while (defined( $cert = $enum->Next)) {
+       my $subjectname=$cert->SubjectName;
+       #my $issuername=$cert->IssuerName;
        
        #Because the subject names in the certificates from the certificate store are formated in a different way
        #the subject names from the config file. The blanks after the seperating "," need to be deleted. 
@@ -492,29 +502,24 @@ sub getcertobject{
        #$issuername =~ s/(?<!\\)((\\\\)*),\s*/$1,/g;
       
        #if ($subjectname eq $location && (!$issuername || $issuername =~ m/^$issuerregex$/)) { 
-       if($subjectname eq $location){
+       if($subjectname eq $location) {
          $count++;
-	 $cert=$certs->Item($i);
+	 $matchedcert = $cert;
        }
-       $i++;       
     }
-        
-    # use this to signal an error
-    if ($count == 0) {
-	$self->seterror("getcert(): certificate not found");
-	return;
-    }
-    # use this to signal an error
-    if ($count > 1) {
-	$self->seterror("getcert(): more than one certificate found");
-	return;
-    } 
+    $enum->Reset;
+
+    die "certificate/request not found ($location)\n"
+	if ($count == 0);
+
+    die "found multiple certificates/requests ($location)\n"
+	if ($count > 1);
     
-    return $cert;
+    return $matchedcert;
 }	
 
 #Opens a certificate store with maximum allowed rights.
-sub openstore{
+sub openstore {
 
     my $self = shift;
     my $store_name = shift;
@@ -523,19 +528,19 @@ sub openstore{
     #my $store_name = $self->{OPTIONS}->{ENTRY}->{storename} || 'MY';
     my $store_location = $capicomlocation{lc($store_location_string)};
    
-    my $store_mode = CAPICOM_STORE_OPEN_MAXIMUM_ALLOWED;
+    my $store_mode = $const->{CAPICOM_STORE_OPEN_MAXIMUM_ALLOWED};
   
     #ist Capicom installiert?
     my $store = Win32::OLE->new ('CAPICOM.Store');
    
     #Open() has no return value
     $store->Open ($store_location, $store_name, $store_mode);
-     
+    
     return $store;    
 }
 
 #
-sub getkeydata{
+sub getkeydata {
 
     my $self = shift;
     my $store = shift;
@@ -548,33 +553,28 @@ sub getkeydata{
 	File::Spec->catfile($self->{OPTIONS}->{ENTRY}->{statedir},
 			    $filename);
 
-    Win32::OLE->Option ('Warn' => 3);
+    Win32::OLE->Option ('Warn' => 3); # FIXME global setting changed locally
     
     #save the certificate in the .p12 file as pfx
     eval { 
-       $cert->Save($filename,"",CAPICOM_CERTIFICATE_SAVE_AS_PFX); #(Dateiname, pw, als was speichern)anpassen
+       $cert->Save($filename,"",$const->{CAPICOM_CERTIFICATE_SAVE_AS_PFX});
     };
-    if($EVAL_ERROR) {
-	    $self->seterror();
-	    return;
+    if ($@) {
+	unlink $filename;
+	chomp($@);
+	die "PKCS#12 export: $@\n";
     }
    
     my $openssl = $self->{OPTIONS}->{CONFIG}->get('cmd.openssl', 'FILE');
-    #if OpenSSL is not installed   
-    if (! defined $openssl) {
-	$self->seterror("No openssl shell specified");
-	return;
-    }
    
     #create pkcs12 file via OpenSSL
-    if(!open(OPENSSL,  "\"$openssl\" pkcs12 -in \"$filename\" -nocerts -passin pass: -nodes |")){
+    if (!open(OPENSSL,  "\"$openssl\" pkcs12 -in \"$filename\" -nocerts -passin pass: -nodes |")) {
    
-    $self->seterror("\"filename\" could not be opened ($!)");
-	return;
+	die("\"filename\" could not be opened ($!)\n");
     }    
-    local $/=undef;
     
     #the OpenSSL output is saved in $keyfile
+    local $/;
     my $keydata = <OPENSSL>;
     
     close(OPENSSL);
@@ -585,15 +585,13 @@ sub getkeydata{
     #   unlink($filename);
     #}
 
-    if($?!=0)
-    {
-      $self->seterror("pkcs12 could not be converted.");
-	return;
-    }
+    die("pkcs12 could not be converted.\n")
+	if ($? != 0);
+
     return $keydata;
 }
 
-sub importrequest{
+sub importrequest {
     my $self = shift;
 
     my $storename = "REQUEST";
@@ -605,9 +603,13 @@ sub importrequest{
 	File::Spec->catfile($self->{OPTIONS}->{ENTRY}->{statedir},
 			    $filename);
     
-    $requeststore->Load($filename,"",CAPICOM_KEY_STORAGE_EXPORTABLE);
+    $requeststore->Load($filename,"",$const->{CAPICOM_KEY_STORAGE_EXPORTABLE});
         
-    $requeststore->Close();
+    eval { $requeststore->Close() };
+    if ($@) {
+	chomp($@);
+	$self->debug("Ignoring store close error: [$@]\n");
+    }
 }
 
 1;
