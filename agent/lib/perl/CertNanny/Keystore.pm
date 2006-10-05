@@ -1787,9 +1787,9 @@ sub sendrequest {
     my $rc;
     eval {
 	local $SIG{ALRM} = sub { die "alarm\n" }; # NB: \n required
-	alarm 120;
+	eval { alarm 120 }; # eval not supported in perl 5.7.1 on win32
 	$rc = system(join(' ', @cmd)) / 256;
-	alarm 0;
+	eval { alarm 0 }; # eval not supported in perl 5.7.1 on win32
 	$self->info("Return code: $rc");
     };
     unlink $requestkeyfile;
