@@ -28,6 +28,8 @@ use Win32::OLE::Const;
 my $const = Win32::OLE::Const->Load('CAPICOM');
 $const->{XECR_PKCS10_V1_5} = 0x4;
 $const->{CRYPT_EXPORTABLE} = 0x00000001;
+$const->{AT_KEYEXCHANGE} = 1;
+$const->{AT_SIGNATURE} = 2;
 
 my %capicomlocation = (
 	memory => $const->{CAPICOM_MEMORY_STORE},
@@ -292,9 +294,42 @@ sub createrequest {
       
     my $storelocation = $self->{OPTIONS}->{ENTRY}->{storelocation};
     my $enroll = Win32::OLE->new ('CEnroll.CEnroll') or die;
-    $enroll->{GenKeyFlags} = $const->{CRYPT_EXPORTABLE};
+    if (!$enroll) {
+	    $self->seterror("CEnroll.CEnroll is not installed");
+	    return;
+    }
+    my $cert;
+    eval { $cert = $self->getcertobject( $self->{STORE} ) };
+    if ($@) {
+	chomp($@);
+	my $storelocation = $self->{OPTIONS}->{ENTRY}->{storelocation};
+	my $storename = $self->{OPTIONS}->{ENTRY}->{storename};
+	$self->seterror("store $storelocation/$storename: $@");
+	return;
+    }
+    my $privkey = $cert->{PrivateKey};
+    if (!$privkey) {
+	    $self->seterror("cannot access PrivateKey");
+	    return;
+    }
+    $enroll->{ProviderName} = $privkey->{ProviderName};
     $enroll->{RequestStoreFlags} = $certlocation{lc($storelocation)};
-    
+    $enroll->{KeySpec} = $privkey->{KeySpec};
+    my $keysize = $cert->{PublicKey}->{Length};
+    $enroll->{GenKeyFlags} = $const->{CRYPT_EXPORTABLE} | ($keysize << 16);
+    my $extensions = $cert->{Extensions};
+    if ($extensions) {
+	$extensions = Win32::OLE::Enum->new($extensions);
+	my $sanoid = '2.5.29.17'; # subjectAltName
+	while (defined (my $ext = $extensions->Next)) {
+		next if ($ext->{OID}->{Value} ne $sanoid);
+		$self->debug("adding subjectAltName extension");
+		$enroll->addExtensionToRequest($ext->{IsCritical},$sanoid,
+					       $ext->{EncodedData}->{Value});
+		last;
+	}
+    }
+
     #print "STOREFLAGS: $enroll->{CAStoreFlags}\n";
     my $requestfile = $self->{OPTIONS}->{ENTRYNAME} . ".csr";
        
@@ -322,14 +357,6 @@ sub createrequest {
     #createFileRequest has no return value
     $enroll->createFileRequest($const->{XECR_PKCS10_V1_5},$location,"",
 	    	$requestfile);
-
-    # step 2: generate certificate request for existing DN (and SubjectAltName)
-    # Distinguished Name:
-    my $DN  = $self->{CERT}->{INFO}->{SubjectName};
-
-    # SubjectAltName: format is 'DNS:foo.example.com DNS:bar.example.com'
-    my $SAN = $self->{CERT}->{INFO}->{SubjectAlternativeName}; # may be undef
-
     # generate a PKCS#10 PEM encoded request file
     #keyfile aus request holen, dazu muss location nicht mehr von MY sondern von request geholt werden
     my $storename = "REQUEST";
@@ -385,8 +412,23 @@ sub installcert {
     # please see examples in other keystores on ideas how to do this
     my $enroll = Win32::OLE->new ('CEnroll.CEnroll') or die;
     my $storelocation = $self->{OPTIONS}->{ENTRY}->{storelocation};
+    my $cert;
+    eval { $cert = $self->getcertobject( $self->{STORE} ) };
+    if ($@) {
+	chomp($@);
+	my $storelocation = $self->{OPTIONS}->{ENTRY}->{storelocation};
+	my $storename = $self->{OPTIONS}->{ENTRY}->{storename};
+	$self->seterror("store $storelocation/$storename: $@");
+	return;
+    }
+    my $privkey = $cert->{PrivateKey};
+    if (!$privkey) {
+	    $self->seterror("cannot access PrivateKey");
+	    return;
+    }
     $enroll->{RequestStoreFlags}=$certlocation{lc($storelocation)};
-
+    $enroll->{ProviderName} = $privkey->{ProviderName};
+    $enroll->{KeySpec} = $privkey->{KeySpec};
     my $openssl = $self->{OPTIONS}->{CONFIG}->get('cmd.openssl', 'FILE');
        
     if (! defined $openssl) {
@@ -482,6 +524,7 @@ sub getcertobject {
     my $store = shift;
    
     my $location = $self->{OPTIONS}->{ENTRY}->{location};
+    $location =~ s/(?<!\\)((\\\\)*),\s*/$1,/g;
   
     #my $issuerregex = $self->{OPTIONS}->{ENTRY}->{issuerregex};
     
