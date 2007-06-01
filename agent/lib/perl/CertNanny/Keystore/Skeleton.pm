@@ -12,7 +12,7 @@ use base qw(Exporter CertNanny::Keystore);
 # You may wish to base your class on the OpenSSL keystore instead if
 # you deal with PKCS#8 or PKCS#12 in your implementation or if you would
 # like to use the key and request generation of the OpenSSL keystore.
-#use base qw(Exporter CertNanny::OpenSSL);
+#use base qw(Exporter CertNanny::Keystore::OpenSSL);
 
 use strict;
 use vars qw($VERSION);
@@ -26,7 +26,7 @@ use Carp;
 #use File::Basename;
 
 
-$VERSION = 0.7;
+$VERSION = 0.10;
 
 
 ###########################################################################

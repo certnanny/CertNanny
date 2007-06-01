@@ -26,7 +26,7 @@ use File::Copy;
 use File::Basename;
 use Cwd;
 
-$VERSION = 0.7;
+$VERSION = 0.10;
 
 
 

@@ -462,6 +462,7 @@ supporting the certificate keystore of a number of applications
   - PKCS #8
   - Java Keystore
   - Windows Certificate Store
+  - PKCS#12
 
   * Planned:
   - RACF (z/OS; USS access to RACF via REXX)
@@ -1228,6 +1229,33 @@ If there are two or more identical certificates in the certificate store, the re
 will not work and one of the  certificates has to be removed manually.
 
 =back
+
+
+=head4 2.2.2.5 PKCS#12 keystore
+
+This keystore type is a raw PKCS#12 file that is e. g. used by Oracle.
+The generated keystore will retain the existing FriendlyName as present
+in the old keystore.
+
+=over
+
+=item keystore.LABEL.location
+
+Mandatory, specifies the filename of the PKCS#12 file.
+
+Example: 
+    /path/to/my.p12
+
+=item keystore.LABEL.type
+
+Mandatory, must literally be set to PKCS12.
+
+=item keystore.LABEL.pin
+
+PKCS#12 PIN
+
+=back
+
 
 =head2 2.3 Advanced configuration features
 

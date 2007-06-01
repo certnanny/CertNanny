@@ -16,7 +16,7 @@ use Exporter;
 use Carp;
 use Data::Dumper;
 
-$VERSION = 0.7;
+$VERSION = 0.10;
 
 # constructor
 sub new
