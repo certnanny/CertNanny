@@ -27,7 +27,7 @@ use strict;
 use vars qw( $VERSION );
 use Exporter;
 
-$VERSION = 0.9;
+$VERSION = 0.10;
 
 
 # constructor parameters:
@@ -1279,7 +1279,8 @@ sub installcert {
     return;
 }
 
-# get all root certificates from the configuration
+# get all root certificates from the configuration that are currently
+# valid
 # return:
 # arrayref of hashes containing:
 #   CERTINFO => hash as returned by getcertinfo()
@@ -1289,6 +1290,7 @@ sub getrootcerts {
     my $self = shift;
     my @result = ();
 
+  ROOTCERT:
     foreach my $index (keys %{$self->{OPTIONS}->{ENTRY}->{rootcacert}}) {
 	next if ($index eq "INHERIT");
 
@@ -1297,12 +1299,21 @@ sub getrootcerts {
 	my $certformat = 'PEM';
 	my $certinfo = $self->getcertinfo(CERTFILE => $certfile,
 					  CERTFORMAT => $certformat);
-	if (defined $certinfo) {
-	    push (@result, { CERTINFO => $certinfo,
-			     CERTFILE => $certfile,
-			     CERTFORMAT => $certformat,
-			 });
+
+	next ROOTCERT if (! defined $certinfo);
+	my $notbefore = CertNanny::Util::isodatetoepoch($certinfo->{NotBefore});
+	my $notafter  = CertNanny::Util::isodatetoepoch($certinfo->{NotAfter});
+	my $now = time;
+	
+	if (($now < $notbefore) || ($now > $notafter)) {
+	    $self->info("Skipping root certificate " . $certinfo->{SubjectName});
+	    next ROOTCERT;
 	}
+	
+	push (@result, { CERTINFO => $certinfo,
+			 CERTFILE => $certfile,
+			 CERTFORMAT => $certformat,
+	      });
     }
     
     return \@result;

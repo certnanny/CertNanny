@@ -20,7 +20,7 @@ use File::Spec;
 use File::Copy;
 use Data::Dumper;
 
-$VERSION = 0.7;
+$VERSION = 0.10;
 
 
 sub new 
