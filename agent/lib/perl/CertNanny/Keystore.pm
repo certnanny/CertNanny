@@ -11,10 +11,10 @@ use base qw(Exporter);
 
 # use Smart::Comments;
 
+use IO::File;
 use File::Glob qw(:globally :nocase);
 use File::Spec;
 
-use IO::File;
 use File::Copy;
 use File::Temp;
 use File::Basename;
@@ -426,12 +426,12 @@ sub retrieve_state
     
     if (-r $file) {
 	$self->{STATE}->{DATA} = undef;
-
-	local *HANDLE;
-	if (!open HANDLE, "<$file") {
+	
+	my $fh;
+	if (! open $fh, '<', $file) {
 	    croak "Could not read state file $file";
 	}
-	eval do { local $/; <HANDLE> };
+	eval do { local $/; <$fh> };
 
 	if (! defined $self->{STATE}->{DATA}) {
 	    croak "Could not read state from file $file";
@@ -454,12 +454,12 @@ sub store_state
 
 	$dump->Purity(1);
 
-	local *HANDLE;
-	if (! open HANDLE, ">$file") {
+	my $fh;
+	if (! open $fh, '>', $file) {
 	    croak "Could not write state to file $file";
 	}
-	print HANDLE $dump->Dump;
-	close HANDLE;
+	print $fh $dump->Dump;
+	close $fh;
     }
     
     return 1;
@@ -608,13 +608,14 @@ sub read_file
     }
 
     my $result = do {
-	open my $HANDLE, "<", $filename;
-	if (! $HANDLE) {
+	open my $fh, '<', $filename;
+	if (! $fh) {
 	    $self->seterror("read_file(): file open failed");
 	    return;
 	}
+	binmode $fh;
 	local $/;
-	<$HANDLE>;
+	<$fh>;
     };
 
     return $result;
@@ -663,14 +664,15 @@ sub write_file
 	$mode |= O_EXCL | O_CREAT;
     }
 
-    my $HANDLE;
-    if (not sysopen($HANDLE, $filename, $mode))
+    my $fh;
+    if (not sysopen($fh, $filename, $mode))
     {
 	$self->seterror("write_file(): file open failed");
 	return;
     }
-    print {$HANDLE} $content;
-    close $HANDLE;
+    binmode $fh;
+    print {$fh} $content;
+    close $fh;
 
     return 1;
 }
@@ -972,8 +974,8 @@ sub getcertinfo
     $self->log({ MSG => "Execute: " . join(" ", @cmd),
 		 PRIO => 'debug' });
 
-    local *HANDLE;
-    if (!open HANDLE, "|" . join(' ', @cmd))
+    my $fh;
+    if (!open $fh, "|" . join(' ', @cmd))
     {
     	$self->seterror("getcertinfo(): open error");
 	unlink $outfile;
@@ -981,11 +983,12 @@ sub getcertinfo
 
     }
 
+    binmode $fh;
     if (defined $options{CERTDATA}) {
-	print HANDLE $options{CERTDATA};
+	print $fh $options{CERTDATA};
     }
 
-    close HANDLE;
+    close $fh;
     
     if ($? != 0)
     {
@@ -994,7 +997,7 @@ sub getcertinfo
 	return;
     }
 
-    my $fh = new IO::File("<$outfile");
+    open $fh, '<', $outfile;
     if (! $fh)
     {
     	$self->seterror("getcertinfo(): Error analysing ASN.1 decoded certificate");
@@ -1074,7 +1077,7 @@ sub getcertinfo
  	    $certinfo->{$key} = $value;
  	}
     }
-    $fh->close();
+    close $fh;
     unlink $outfile;
 
     # compose key usage text field
