@@ -609,6 +609,13 @@ Example: /tmp
 
 TODO
 
+=item cmd.gsklib
+
+Location of the GSKit lib directory (optional, only required for GSKit
+keystores on the Windows platform).
+
+Example: c:\Program Files\IBM\gsk7\lib
+
 =back
 
 =head3 2.1.3 Other settings

@@ -25,6 +25,7 @@ use Data::Dumper;
 use File::Copy;
 use File::Basename;
 use Cwd;
+use English;
 
 $VERSION = 0.10;
 
@@ -51,9 +52,26 @@ sub new
     $self->{OPTIONS}->{gsk6cmd} =
 	$args{CONFIG}->get('cmd.gsk6cmd', 'FILE');
 
+    # on certain platforms we need cannot find the location of the 
+    #   GSKit library directory ourselves, in this case it must be configured.
+    $self->{OPTIONS}->{gsklibdir} =
+	$args{CONFIG}->get('path.gsklib', 'FILE');
+    if ($self->{OPTIONS}->{gsklibdir} eq '') {
+	$self->{OPTIONS}->{gsklibdir} = undef;
+    }
+
+
     croak "No tmp_dir specified" unless (defined $self->{OPTIONS}->{tmp_dir});
     croak "gsk6cmd not found" unless (defined $self->{OPTIONS}->{gsk6cmd} and
 				      -x $self->{OPTIONS}->{gsk6cmd});
+
+
+    $self->{OPTIONS}->{JAVA} = $args{CONFIG}->get('cmd.java', 'FILE');
+    if (defined $ENV{JAVA_HOME}) {
+	$self->{OPTIONS}->{JAVA} ||= 
+	    File::Spec->catfile($ENV{JAVA_HOME}, 'bin', 'java');
+    }
+    
 
     # set key generation operation mode:
     # internal: create RSA key and request with MQ keystore
@@ -104,39 +122,76 @@ sub getIBMJavaEnvironment
 {
     my $self = shift;
 
-    return 1 if ((exists $self->{OPTIONS}->{JAVA}) and 
-		 (exists $self->{OPTIONS}->{GSKIT_CLASSPATH}));
-
-    my $javacmd = File::Spec->catfile($ENV{JAVA_HOME}, 'bin', 'java');
-    if (! -x $javacmd) {
-	$self->seterror("getIBMJavaEnvironment(): could not determine Java executable (JAVA_HOME not set?)");
-	return;
+    if (defined $self->{OPTIONS}->{JAVA} 
+	&& $self->{OPTIONS}->{JAVA} ne ''
+	&& defined $self->{OPTIONS}->{GSKIT_CLASSPATH} 
+	&& $self->{OPTIONS}->{GSKIT_CLASSPATH} ne '') {
+	return 1;
     }
-    $self->{OPTIONS}->{JAVA} = $javacmd;
-    
-    # determine classpath for IBM classes
-    my $gsk6cmd = $self->{OPTIONS}->{gsk6cmd};
 
-    my $cmd = ". $gsk6cmd >/dev/null 2>&1 ; echo \$JAVA_FLAGS";
-    $self->log({ MSG => "Execute: $cmd",
-		 PRIO => 'debug' });
-    my $classpath = `$cmd`;
-    chomp $classpath;
+    if ($OSNAME =~ m{ MSWin }xms) {
+	# determine classpath for IBM classes
+	my $gsk6cmd = $self->{OPTIONS}->{gsk6cmd};
 
-    if (($? != 0) or (! defined $classpath) or ($classpath eq "")) {
+	my $cmd = qq("$gsk6cmd") . " -version";
+
+	$self->log({ MSG => "Execute: $cmd",
+		     PRIO => 'debug' });
+	open my $fh, $cmd . '|';
+	if (! $fh) {
+	    $self->seterror("getIBMJavaEnvironment(): could not run gskit command line executable");
+	    return;
+	}
+	
+	my $java;
+	my $classpath;
+      LINE:
+	while (my $line = <$fh>) {
+	    if ($line =~ m{ \A \s* "(.*)" \s* -classpath \s* "(.*?)" }xms) {
+		$self->{OPTIONS}->{JAVA} = $1;
+		$self->{OPTIONS}->{GSKIT_CLASSPATH} = $2;
+		close $fh;
+		return 1;
+	    }
+	}
+	close $fh;
 	$self->seterror("getIBMJavaEnvironment(): could not determine GSK classpath");
 	return;
+    } else {
+	# assume we have a Unix-like system
+	my $javacmd = File::Spec->catfile($ENV{JAVA_HOME}, 'bin', 'java');
+	if (! -x $javacmd) {
+	    $self->seterror("getIBMJavaEnvironment(): could not determine Java executable (JAVA_HOME not set?)");
+	    return;
+	}
+	$self->{OPTIONS}->{JAVA} = $javacmd;
+	
+	# determine classpath for IBM classes
+	my $gsk6cmd = $self->{OPTIONS}->{gsk6cmd};
+	
+	my $cmd = ". $gsk6cmd >/dev/null 2>&1 ; echo \$JAVA_FLAGS";
+	$self->log({ MSG => "Execute: $cmd",
+		     PRIO => 'debug' });
+	my $classpath = `$cmd`;
+	chomp $classpath;
+	
+	if (($? != 0) or (! defined $classpath) or ($classpath eq "")) {
+	    $self->seterror("getIBMJavaEnvironment(): could not determine GSK classpath");
+	    return;
+	}
+	# remove any options left over
+	$classpath =~ s/-?-\w+//g;
+	$classpath =~ s/^\s*//g;
+	$classpath =~ s/\s*$//g;
+	
+	$self->debug("gsk6cmd classpath: $classpath");
+	
+	$self->{OPTIONS}->{GSKIT_CLASSPATH} = $classpath;
+	
+	return 1;
     }
-    # remove any options left over
-    $classpath =~ s/-?-\w+//g;
-    $classpath =~ s/^\s*//g;
-    $classpath =~ s/\s*$//g;
 
-    $self->debug("gsk6cmd classpath: $classpath");
-
-    $self->{OPTIONS}->{GSKIT_CLASSPATH} = $classpath;
-
-    return 1;
+    return;
 }
 
 
@@ -187,17 +242,18 @@ sub getcertlabel {
     $self->log({ MSG => "Execute: " . join(" ", hidepin(@cmd)),
 		 PRIO => 'debug' });
 
-    local *HANDLE;
-    if (!open HANDLE, join(" ", @cmd) . "|")
+    my $fh;
+    if (!open $fh, join(" ", @cmd) . "|")
     {
 	$self->seterror("getcert(): could not run gsk6cmd");
 	return;
     }
+    binmode $fh;
 
     my $label;
     my $match = $self->{OPTIONS}->{ENTRY}->{labelmatch} || "ibmwebspheremq.*";
 
-    while (<HANDLE>) {
+    while (<$fh>) {
 	chomp;
 	next if /Certificates in database/;
 	s/^\s*//;
@@ -209,7 +265,7 @@ sub getcertlabel {
 	    last;
 	}
     }
-    close HANDLE;
+    close $fh;
 
     if (! defined $label) {
 	$self->seterror("getcert(): could not get label");
@@ -257,13 +313,25 @@ sub getkey {
 	$self->seterror("getkey(): could not locate ExtractKey.jar file");
 	return;
     }
+    
+    my $separator = ':';
+    if ($OSNAME =~ m{ MSWin }xms) {
+	$separator = ';';
+    }
 
-    my $classpath = $self->{OPTIONS}->{GSKIT_CLASSPATH} . ":" . $extractkey_jar;
+    my $classpath = $self->{OPTIONS}->{GSKIT_CLASSPATH} . $separator . $extractkey_jar;
+
+    my @gsklibdir;
+    if (defined $self->{OPTIONS}->{gsklibdir}) {
+	@gsklibdir = ('-Djava.library.path=' . qq("$self->{OPTIONS}->{gsklibdir}"));
+	$ENV{PATH} .= $separator . $self->{OPTIONS}->{gsklibdir};
+    }
     my @cmd;
     @cmd = (qq("$self->{OPTIONS}->{JAVA}"),
 	    '-classpath',
 	    qq("$classpath"),
 	    'de.cynops.java.crypto.keystore.ExtractKey',
+	    @gsklibdir,
 	    '-keystore',
 	    qq("$keystore"),
 	    '-storepass',
@@ -513,20 +581,23 @@ sub installcert {
 	
 	my @calabels;
 
-	local *HANDLE;
-	if (! open HANDLE, join(' ', @cmd) . " |") {
+	my $fh;
+	if (! open $fh, join(' ', @cmd) . " |") {
 	    $self->seterror("Could not retrieve certificate list in MQ keystore");
 	    return;
 	}
-	while (<HANDLE>) {
+	my $match = $self->{OPTIONS}->{ENTRY}->{labelmatch} || "ibmwebspheremq.*";
+	while (<$fh>) {
 	    chomp;
-	    s/^\s*//;
 	    s/\s*$//;
-	    next if (/^Certificates in database/);
-	    next if (/^No key/);
+	    next if (m{ \A Certificates\ in\ database}xms);
+	    next if (m{ \A No\ key}xms);
+	    next if (m{ \A \S }xms);
+	    next if (m{ $match }xms);
+	    s/^\s*//;
 	    push(@calabels, $_);
 	}
-	close HANDLE;
+	close $fh;
 	
 	# now delete all preloaded CAs
 	foreach (@calabels) {
