@@ -1293,6 +1293,11 @@ sub getrootcerts {
     my $self = shift;
     my @result = ();
 
+    my $exclude_expired 
+	= $self->{OPTIONS}->{ENTRY}->{excludeexpiredrootcerts} || 'yes';
+    my $exclude_notyetvalid 
+	= $self->{OPTIONS}->{ENTRY}->{excludenotyetvalidrootcerts} || 'no';
+
   ROOTCERT:
     foreach my $index (keys %{$self->{OPTIONS}->{ENTRY}->{rootcacert}}) {
 	next if ($index eq "INHERIT");
@@ -1308,11 +1313,19 @@ sub getrootcerts {
 	my $notafter  = CertNanny::Util::isodatetoepoch($certinfo->{NotAfter});
 	my $now = time;
 	
-	if (($now < $notbefore) || ($now > $notafter)) {
-	    $self->info("Skipping root certificate " . $certinfo->{SubjectName});
+	if ($exclude_expired =~ m{ yes }xmsi
+	    && ($now > $notafter)) {
+	    $self->info("Skipping expired root certificate " . $certinfo->{SubjectName});
 	    next ROOTCERT;
 	}
-	
+
+	if ($exclude_notyetvalid =~ m{ yes }xmsi
+	    && ($now < $notbefore)) {
+	    $self->info("Skipping not yet valid root certificate " . $certinfo->{SubjectName});
+	    next ROOTCERT;
+	}
+	$self->info("Trusted root certificate: " . $certinfo->{SubjectName});
+
 	push (@result, { CERTINFO => $certinfo,
 			 CERTFILE => $certfile,
 			 CERTFORMAT => $certformat,

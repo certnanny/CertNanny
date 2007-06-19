@@ -738,6 +738,30 @@ SCEP keystore state directory. Specify a directory where CertNanny may create
 temporary files associated with the keystore (i. e. private key, temporary
 keystore and enrollment state) May be the same as scepcertdir.
 
+=item keystore.LABEL.excludeexpiredrootcerts
+
+Policy setting that determines if expired Root Certificates referenced
+in the configuration should be included in newly created keystores.
+It is recommended to exclude expired Root Certificates in order to avoid
+problems with certain keystore types (notably MQ/GSKit).
+
+Default: yes
+
+Example: no
+
+
+=item keystore.LABEL.excludenotyetvalidrootcerts
+
+Policy setting that determines if not yet valid Root Certificates referenced
+in the configuration should be included in newly created keystores.
+It is recommended to include not yet valid Root Certificates to allow for
+seamless CA rollover.
+
+Default: no
+
+Example: yes
+
+
 =item keystore.LABEL.rootcacert.1
 
 =item keystore.LABEL.rootcacert.2 
