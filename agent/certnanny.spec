@@ -9,7 +9,7 @@ License:      GPL
 Group:        Productivity/Security
 Autoreqprov:  on
 Summary:      Certificate renewal agent
-Version:      0.8
+Version:      0.10
 Release:      1
 Source:       %{name}-%{version}.tar.gz
 URL:          http://www.cynops.de/oss/CertNanny/
