@@ -313,6 +313,7 @@ sub createrequest {
 	    return;
     }
     $enroll->{ProviderName} = $privkey->{ProviderName};
+    $enroll->{ProviderType} = $privkey->{ProviderType};
     $enroll->{RequestStoreFlags} = $certlocation{lc($storelocation)};
     $enroll->{KeySpec} = $privkey->{KeySpec};
     my $keysize = $cert->{PublicKey}->{Length};
@@ -428,6 +429,7 @@ sub installcert {
     }
     $enroll->{RequestStoreFlags}=$certlocation{lc($storelocation)};
     $enroll->{ProviderName} = $privkey->{ProviderName};
+    $enroll->{ProviderType} = $privkey->{ProviderType};
     $enroll->{KeySpec} = $privkey->{KeySpec};
     my $openssl = $self->{OPTIONS}->{CONFIG}->get('cmd.openssl', 'FILE');
        
