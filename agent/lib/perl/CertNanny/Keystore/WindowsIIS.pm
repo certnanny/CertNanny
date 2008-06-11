@@ -1,6 +1,6 @@
 #
 # CertNanny - Automatic renewal for X509v3 certificates using SCEP
-# 2005, 2006 Martin Bartosch <m.bartosch@cynops.de>
+# 2008 Soeren Rinne <srinne@gmail.com>
 #
 # This software is distributed under the GNU General Public License - see the
 # accompanying LICENSE file for more details.
