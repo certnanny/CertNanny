@@ -1261,8 +1261,64 @@ will not work and one of the  certificates has to be removed manually.
 
 =back
 
+=head4 2.2.2.5 Windows IIS keystore
 
-=head4 2.2.2.5 PKCS#12 keystore
+Windows IIS keystore description
+
+=over
+
+=item keystore.LABEL.location
+
+Mandatory, specifies the Distinguished Name of a certificate in the Windows keystore, which shall be monitored/renewed. Only one certificate with the specified DN may be present in the store.
+
+Example: 
+    CN=www.example.com,O=Example Ltd.,DC=example,DC=com
+
+=item keystore.LABEL.type
+
+Mandatory, must literally be set to WindowsIIS.
+
+=item keystore.LABEL.issuerregex
+
+Issuer Distingushed Name as (Perl) regular expression.
+
+=item keystore.LABEL.storename
+
+Optional, specifies the name of the certificate store, e.g. MY. This setting should generally not be changed.
+
+Default: MY
+
+=item keystore.LABEL.storelocation
+
+Optional, specifies the name of the certificate store location: memory, machine, user  
+
+Default: machine
+
+=item keystore.LABEL.instanceidentifier
+
+Mandatory, specifies the Instance Name of the IIS server. The Instance Name is equal to the identifier listed in 'Web Sites' in your IIS Manager.
+
+Default: 1
+
+=back
+
+Limitations:
+
+=over
+
+=item
+
+The key must be exportable and strong private key protection may not be enabled.
+
+=item 
+
+If there are two or more identical certificates in the certificate store, the renewal process
+will not work and one of the  certificates has to be removed manually.
+
+=back
+
+
+=head4 2.2.2.6 PKCS#12 keystore
 
 This keystore type is a raw PKCS#12 file that is e. g. used by Oracle.
 The generated keystore will retain the existing FriendlyName as present
