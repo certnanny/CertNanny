@@ -19,6 +19,7 @@ use IO::File;
 use File::Spec;
 use File::Copy;
 use Data::Dumper;
+use CertNanny::Util;
 
 $VERSION = 0.10;
 
@@ -254,7 +255,7 @@ sub createpkcs12 {
 	$self->log({ MSG => "Execute: " . join(" ", @cmd),
 		     PRIO => 'debug' });
 	
-	if (system(join(' ', @cmd)) != 0) {
+	if (run_command(join(' ', @cmd)) != 0) {
 	    $self->seterror("Certificate format conversion failed");
 	    return;
 	}
@@ -336,7 +337,7 @@ sub createpkcs12 {
     $self->log({ MSG => "Execute: " . join(" ", @cmd),
 		 PRIO => 'debug' });
 
-    if (system(join(' ', @cmd)) != 0) {
+    if (run_command(join(' ', @cmd)) != 0) {
 	$self->seterror("PKCS#12 export failed");
 	delete $ENV{PIN};
 	delete $ENV{EXPORTPIN};
@@ -390,7 +391,7 @@ sub generatekey {
 		 PRIO => 'debug' });
 
     $ENV{PIN} = $pin;
-    if (system(join(' ', @cmd)) != 0) {
+    if (run_command(join(' ', @cmd)) != 0) {
 	$self->seterror("RSA key generation failed");
 	delete $ENV{PIN};
 	return;
@@ -498,7 +499,7 @@ sub createrequest {
 		 PRIO => 'debug' });
 
     $ENV{PIN} = $pin;
-    if (system(join(' ', @cmd)) != 0) {
+    if (run_command(join(' ', @cmd)) != 0) {
 	$self->seterror("Request creation failed");
 	delete $ENV{PIN};
 	unlink $tmpconfigfile;

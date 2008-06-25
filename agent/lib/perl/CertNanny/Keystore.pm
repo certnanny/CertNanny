@@ -375,7 +375,7 @@ sub convertkey {
 
     ### PASSIN: $ENV{PASSOUT}
     ### PASSOUT: $ENV{PASSOUT}
-    #$output->{KEYDATA} = `$cmd 2>/dev/null`;
+    #$output->{KEYDATA} = `$cmd`;
     $output->{KEYDATA} = `$cmd`;
     ### keydata: $output->{KEYDATA}
 
@@ -972,8 +972,7 @@ sub getcertinfo
 	       qq("$outfile"));
 
     $self->log({ MSG => "Execute: " . join(" ", @cmd),
-		 PRIO => 'debug' });
-
+		 PRIO => 'debug' });	
     my $fh;
     if (!open $fh, "|" . join(' ', @cmd))
     {
@@ -1145,8 +1144,7 @@ sub getcertinfo
 	$certinfo->{$var} = sprintf("%04d%02d%02d%02d%02d%02d",
 				    $year, $dmon, $day, $hh, $mm, $ss);
     }
-
-
+	
     return $certinfo;
 }
 
@@ -1546,7 +1544,7 @@ sub executehook {
 	}
 	
 	$self->info("Exec: $hook");
-	return system($hook) / 256;
+	return run_command($hook) / 256;
     }
 }
 
@@ -1617,7 +1615,7 @@ sub getcacerts {
 	       qq("$cacertbase"));
     
     $self->debug("Exec: " . join(' ', @cmd));
-    if (system(join(' ', @cmd)) != 0) {
+    if (run_command(join(' ', @cmd)) != 0) {
 	$self->seterror("Could not retrieve CA certs");
 	return;
     }
@@ -1815,7 +1813,7 @@ sub sendrequest {
     eval {
 	local $SIG{ALRM} = sub { die "alarm\n" }; # NB: \n required
 	eval { alarm 120 }; # eval not supported in perl 5.7.1 on win32
-	$rc = system(join(' ', @cmd)) / 256;
+	$rc = run_command(join(' ', @cmd)) / 256;
 	eval { alarm 0 }; # eval not supported in perl 5.7.1 on win32
 	$self->info("Return code: $rc");
     };

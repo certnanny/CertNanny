@@ -25,8 +25,25 @@ use Exporter;
 
 $VERSION = 0.10;
 
-@EXPORT      = qw(timestamp isodatetoepoch epochtoisodate addisodate printableisodate);       # Symbols to autoexport (:DEFAULT tag)
+@EXPORT      = qw(timestamp isodatetoepoch epochtoisodate addisodate printableisodate run_command system);       # Symbols to autoexport (:DEFAULT tag)
 
+#sub system {
+#	die "do not use system() in CertNanny, it is broken when CertNanny is used as a Windows service";
+#}
+
+sub run_command
+{
+	my $command = shift;
+	
+	open my $PROGRAM, "$command|" or die "could note execute $command";
+	my $output = do {
+		local $/;
+		<$PROGRAM>;
+	};
+	close($PROGRAM);
+	print $output;
+	return $?;
+}
 
 # returns current time as ISO timestamp (UTC)
 # format: yyyymmddhhmmss
