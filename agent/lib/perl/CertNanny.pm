@@ -22,6 +22,8 @@ use CertNanny::Config;
 use CertNanny::Keystore;
 use Data::Dumper;
 
+use IPC::Open3;
+
 $VERSION = 0.10;
 
 
@@ -38,15 +40,9 @@ sub new
 
     $self->{CONFIG} = CertNanny::Config->new($args{CONFIG});
     return unless defined $self->{CONFIG};
-    if($self->{CONFIG}->get("logfile", "FILE"))
-    {
-       #TODO Fehlerbehandlung
-       #write alle messages into a file 
-       my $file = $self->{CONFIG}->get("logfile", "FILE");
-       open STDOUT, "> $file";
-       open STDERR, ">&STDOUT";
-       $|=1;
-    }
+	
+	$self->redirect_stdout_stderr();
+    
     # set default library path
     my @dirs = File::Spec->splitdir($FindBin::Bin);
     pop @dirs;
@@ -71,6 +67,29 @@ sub new
     return ($self);
 }
 
+sub DESTROY {
+	# Windows apparently flushes file handles on close() and ignores autoflush...
+	close STDOUT;
+	close STDERR;
+}
+
+
+
+sub redirect_stdout_stderr
+{
+	my $self = shift;
+	if($self->{CONFIG}->get("logfile", "FILE"))
+	{
+	   #TODO Fehlerbehandlung
+	   #write alle messages into a file 
+	   my $file = $self->{CONFIG}->get("logfile", "FILE");
+	   $|=1;
+	   open STDOUT, ">>", $file || die "Could not redirect STDOUT. Stopped";
+	   open STDERR, ">>", $file || die "Could not redirect STDERR. Stopped";
+	}
+	
+	return 1;
+}
 
 sub AUTOLOAD
 {
