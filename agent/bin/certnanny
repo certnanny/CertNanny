@@ -1,4 +1,4 @@
-#!/usr/bin/perl -w
+#!/usr/bin/perl
 #
 # CertNanny - Automatic renewal for X509v3 certificates using SCEP
 # 2005-02 Martin Bartosch <m.bartosch@cynops.de>
@@ -8,6 +8,10 @@
 #
 
 use strict;
+use warnings;
+use English;
+
+use File::Spec;
 
 use Pod::Usage;
 use Getopt::Long;
@@ -17,9 +21,15 @@ use lib "$FindBin::Bin/../lib/perl";
 
 use CertNanny;
 
+if($OSNAME eq "MSWin32") {
+	use Win32;
+	use Win32::Daemon;
+}
+
 
 ###########################################################################
 # main
+
 
 my %config;
 
@@ -29,6 +39,8 @@ GetOptions(\%config,
 	      help|?
 	      man
 	      cfg|cfgfile|conf|config=s
+			win_user=s
+			win_password=s
 	      )) or pod2usage(-msg => $msg, -verbose => 0);
 
 pod2usage(-exitstatus => 0, -verbose => 2) if $config{man};
@@ -40,10 +52,155 @@ die "Could not read config file $config{cfg}. Stopped"
 
 my $monitor = CertNanny->new(CONFIG => $config{cfg});
 
+
 while (my $cmd = shift) {
-    $monitor->$cmd(%config) || die "Invalid action: $cmd. Stopped";
+	if ($OSNAME eq 'MSWin32') {
+		# Windows Service related commands
+		my $servicename = $monitor->get_config_value("platform.windows.servicename", "FILE") || "CertNanny";
+		if ($cmd eq "install") {
+			my $cfgpath = $config{cfg};
+			my $servicepath= File::Spec->catfile($FindBin::Bin, $FindBin::Script);
+			
+			my $ret = Win32::Daemon::CreateService({
+				machine =>  '',
+				name    =>  $servicename,
+				display =>  $servicename,
+				path    =>  $EXECUTABLE_NAME,
+				user    =>  $config{win_user} || "",
+				pwd     =>  $config{win_password} || "",
+				description => 'Automatic certificate renewal',
+				parameters =>qq{"$servicepath" --cfg "$cfgpath"},
+			});
+			
+			if ($ret) {
+				print "Service successfully added.\n";
+				exit 0;
+			} else {
+				print "Failed to add service: " . Win32::FormatMessage( Win32::Daemon::GetLastError() ) . "\n";
+				exit 1;
+			}
+		} elsif ($cmd eq "uninstall") {
+			if (Win32::Daemon::DeleteService('',$servicename)) {
+				print "Service successfully uninstalled.\n";
+				exit 0;
+			} else {
+				print "Failed to uninstall service: " . Win32::FormatMessage( Win32::Daemon::GetLastError() ) . "\n";
+				exit 1;
+			}
+		}
+	}
+	$monitor->$cmd(%config) || die "Invalid action: $cmd. Stopped";
 }
 
+if ($OSNAME eq 'MSWin32') {
+
+	my $State="";
+	my $PrevState="";
+  
+	#start service
+   if(Win32::Daemon::StartService())
+   {
+       print "Successfully started.\n";
+   }
+   else
+   {
+       print "Failed to start service: " . Win32::FormatMessage( Win32::Daemon::GetLastError() ) . "\n";
+      exit; 
+   }
+  
+  my $starttime=0;
+  
+  my $SERVICE_SLEEP_TIME = 1000; # 1 second
+  $PrevState = SERVICE_START_PENDING;
+
+  while( SERVICE_STOPPED != ( $State = Win32::Daemon::State() ) )
+  {
+    
+    if( SERVICE_START_PENDING == $State )
+    {
+      # Initialization code
+      
+      Win32::Daemon::State( SERVICE_RUNNING );
+      $PrevState = SERVICE_RUNNING;
+    }
+    elsif( SERVICE_STOP_PENDING == $State )
+    {
+      Win32::Daemon::State( SERVICE_STOPPED );
+    }
+    elsif( SERVICE_PAUSE_PENDING == $State )
+    {
+      # "Pausing...";
+      Win32::Daemon::State( SERVICE_PAUSED );
+      $PrevState = SERVICE_PAUSED;
+      next;
+    }
+    elsif( SERVICE_CONTINUE_PENDING == $State )
+    {
+      # "Resuming...";
+      Win32::Daemon::State( SERVICE_RUNNING );
+      $PrevState = SERVICE_RUNNING;
+      next;
+    }
+    elsif( SERVICE_STOP_PENDING == $State )
+    {
+      # "Stopping...";
+      Win32::Daemon::State( SERVICE_STOPPED );
+      $PrevState = SERVICE_STOPPED;
+      next;
+    }
+    elsif( SERVICE_RUNNING == $State )
+    {
+      my $currtime=time;	    
+	  
+      if($currtime >= $starttime)
+      {
+	  	# reinstantiate CertNanny object (make sure that destructor gets called)
+		$monitor = CertNanny->new(CONFIG => $config{cfg});
+		# The service is running as normal...
+		# ...add the main code here...
+		$monitor->redirect_stdout_stderr();
+
+		my $rc = $monitor->renew();
+	 
+		#if the renewal was successful the starttime will be increased by one day (86400 seconds -> 24hours -> 3600 seconds per hour)
+		my $timeframe = $monitor->get_config_value("platform.windows.serviceinterval", "FILE") || 86400;
+		$starttime=$currtime+$timeframe;  
+      }      
+    }
+    else
+    {
+      # Got an unhandled control message. Set the state to
+      # whatever the previous state was.
+      Win32::Daemon::State( $PrevState );
+    }
+
+        # Check for any outstanding commands. Pass in a non zero value
+        # and it resets the Last Message to SERVICE_CONTROL_NONE.
+        if( SERVICE_CONTROL_NONE != ( my $Message = Win32::Daemon::QueryLastMessage( 1 ) ) )
+        {
+          if( SERVICE_CONTROL_INTERROGATE == $Message )
+          {
+            # Got here if the Service Control Manager is requesting
+            # the current state of the service. This can happen for
+            # a variety of reasons. Report the last state we set.
+            Win32::Daemon::State( $PrevState );
+          }
+        elsif( SERVICE_CONTROL_SHUTDOWN == $Message )
+        {
+          # Yikes! The system is shutting down. We had better clean up
+          # and stop.
+          # Tell the SCM that we are preparing to shutdown and that we expect
+          # it to take 25 seconds (so don't terminate us for at least 1 second)...
+	  Win32::Daemon::State( SERVICE_STOP_PENDING, 1000 );
+        }
+      }
+      # Snooze for awhile so we don't suck up cpu time...
+      Win32::Sleep( $SERVICE_SLEEP_TIME );
+   }
+   
+   # We are done so close down...
+   Win32::Daemon::StopService();
+}
 
 __END__
 
@@ -63,11 +220,15 @@ Options:
   --man             full documentation
 
   --cfg             specify config file to use
+  --win_user        specify alternative Windows username to run the Windows Service
+  --win_password    specify password corresponding to win_user
 
 Actions:
 
   check             Check all configured keystores
   renew             Run automatic renewal on all configured keystores
+  install           Install CertNanny as a Windows Service (applicable only on Windows platforms)
+  uninstall         Uninstall CertNanny service (applicable only on Windows platforms)
     
 =head1 OPTIONS
 
