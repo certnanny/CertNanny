@@ -1457,7 +1457,12 @@ Default: machine
 
 =item keystore.LABEL.instanceidentifier
 
-Mandatory, specifies the Instance Name of the IIS server. The Instance Name is equal to the identifier listed in 'Web Sites' in your IIS Manager.
+Mandatory, specifies the Instance Name of the IIS server. The Instance Name is equal to the
+identifier listed in 'Web Sites' in your IIS Manager. If you want to install the same certificate into
+multiple instances, please provide a comma separated list.
+
+Example:
+    1,2,12440
 
 Default: 1
 

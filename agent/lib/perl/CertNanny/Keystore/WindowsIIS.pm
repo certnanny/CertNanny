@@ -89,16 +89,22 @@ sub installcert {
 	    return;
     }
 	
-	# read IIS Webserver InstanceName from config
-	my $instanceidentifier = $self->{OPTIONS}->{ENTRY}->{instanceidentifier};
-	$certobj->SetProperty('InstanceName', 'w3svc/' . $instanceidentifier);
-	$self->info("Using InstanceName w3svc/$instanceidentifier");
-	
 	my $result = $self->deleteoldcerts();
+	
+	# read IIS Webserver InstanceName(s) from config
+	my @instanceidentifier_array = split(/, */ ,$self->{OPTIONS}->{ENTRY}->{instanceidentifier});
+	
+	my $instanceidentifier = '';
+	
+	# go through all instances using the same certificate
+	foreach $instanceidentifier (@instanceidentifier_array) {
+		$certobj->SetProperty('InstanceName', 'w3svc/' . $instanceidentifier);
+		$self->info("Using InstanceName w3svc/$instanceidentifier");
 
-    if($result == 1) {
-		# import the new certificate into IIS
-		$certobj->Import($pkcs12file, $self->{PIN}, 1, 1);
+		 if($result == 1) {
+			# import the new certificate into IIS
+			$certobj->Import($pkcs12file, $self->{PIN}, 1, 1);
+		}
 	}
 	
 	# delete requests
@@ -118,7 +124,7 @@ sub installcert {
 		}	
 	}
 
-	# check if cert is installed (one match on name - getcertobject())
+	# check if cert is installed (one match on fingerprint - getcertobject())
 	my $old_thumbprint = $self->{CERT}->{INFO}->{CertificateFingerprint};
     $old_thumbprint =~ s/://g;
 
