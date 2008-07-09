@@ -22,8 +22,15 @@ use lib "$FindBin::Bin/../lib/perl";
 use CertNanny;
 
 if($OSNAME eq "MSWin32") {
-	use Win32;
-	use Win32::Daemon;
+	require Win32; import Win32;
+	require Win32::Daemon; import Win32::Daemon;
+} else {
+	foreach my $name qw(SERVICE_STOPPED SERVICE_START_PENDING SERVICE_STOP_PENDING SERVICE_PAUSE_PENDING SERVICE_PAUSED SERVICE_CONTINUE_PENDING SERVICE_RUNNING SERVICE_CONTROL_NONE SERVICE_CONTROL_INTERROGATE SERVICE_CONTROL_SHUTDOWN) {
+		no strict;
+		# declare a dummy function for symbols listed in Win32(::Daemon)
+		*{$name} = sub { 1; };
+		use strict;
+	}
 }
 
 
@@ -93,6 +100,7 @@ while (my $cmd = shift) {
 }
 
 if ($OSNAME eq 'MSWin32') {
+   no strict;
 
 	my $State="";
 	my $PrevState="";
@@ -200,6 +208,7 @@ if ($OSNAME eq 'MSWin32') {
    
    # We are done so close down...
    Win32::Daemon::StopService();
+   use strict;
 }
 
 __END__
@@ -262,7 +271,15 @@ is within the configured warning interval.
 Check the configured keystores and schedule automatic renewal.
 Can be repeated as many times as desired and will automatically keep
 the correct state.
- 
+
+=item B<install>
+
+Install CertNanny as a Win32 Service. CertNanny will appear on the Windows Services list and can now be started, restarted or stopped. After installing, CertNanny Service has to be started manually or gets started automatically after reboot. As a windows service, CertNanny runs only in renew mode.
+
+=item B<uninstall>
+
+Uninstall CertNanny Win32 Service. Removes CertNanny froom the Windows Services list. 
+
 =back
  
 =head1 DESCRIPTION
@@ -427,8 +444,8 @@ Renewal URL (SCEP URL)
 The CertNanny script should be invoked in 'renew' mode at least 
 once a day, e. g. via cron.
 
-On Win32 platforms the CertNanny script must be installed as a
-Windows service via the cernanny-service.pl.
+On Win32 platforms the CertNanny script can be installed as a
+Windows service via the <install> option.
 
 The CertNanny script may be invoked in 'check' mode that will only 
 check if the configured keystores are valid for more than a configured 
