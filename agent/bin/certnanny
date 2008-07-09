@@ -810,13 +810,13 @@ Example: 3
 
 =item platform.windows.servicename
 
-Defines the Windows Service name.
+Defines the Windows Service name (optional).
 
 Default: CertNanny
 
 =item platform.windows.serviceinterval
 
-Sets the time frame for starting the renewal process (in seconds). Should be set to at least one day (86400 seconds).
+Sets the time frame for starting the renewal process in seconds (optional). Should be set to at least one day (86400 seconds).
 
 Default: 86400 
 
