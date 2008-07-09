@@ -808,6 +808,18 @@ Values: 0: fatal, 1: error, 2: notice, 3: info, 4: debug, 5: scep verbose, 6: sc
 
 Example: 3
 
+=item platform.windows.servicename
+
+Defines the Windows Service name.
+
+Default: CertNanny
+
+=item platform.windows.serviceinterval
+
+Sets the time frame for starting the renewal process (in seconds). Should be set to at least one day (86400 seconds).
+
+Default: 86400 
+
 =back
 
 
