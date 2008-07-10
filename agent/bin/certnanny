@@ -21,9 +21,11 @@ use lib "$FindBin::Bin/../lib/perl";
 
 use CertNanny;
 
-if($OSNAME eq "MSWin32") {
-	require Win32; import Win32;
-	require Win32::Daemon; import Win32::Daemon;
+if ($OSNAME eq "MSWin32") {
+    require Win32;
+    Win32->import();
+    require Win32::Daemon;
+    Win32::Daemon->import();
 } else {
 	foreach my $name qw(SERVICE_STOPPED SERVICE_START_PENDING SERVICE_STOP_PENDING SERVICE_PAUSE_PENDING SERVICE_PAUSED SERVICE_CONTINUE_PENDING SERVICE_RUNNING SERVICE_CONTROL_NONE SERVICE_CONTROL_INTERROGATE SERVICE_CONTROL_SHUTDOWN) {
 		no strict;
@@ -59,8 +61,7 @@ die "Could not read config file $config{cfg}. Stopped"
 
 my $monitor = CertNanny->new(CONFIG => $config{cfg});
 
-
-while (my $cmd = shift) {
+foreach my $cmd (@ARGV) {
 	if ($OSNAME eq 'MSWin32') {
 		# Windows Service related commands
 		my $servicename = $monitor->get_config_value("platform.windows.servicename", "FILE") || "CertNanny";
@@ -96,13 +97,18 @@ while (my $cmd = shift) {
 			}
 		}
 	}
+	
+	
 	$monitor->$cmd(%config) || die "Invalid action: $cmd. Stopped";
 }
+if (scalar @ARGV > 0) {
+   # if we had commands as arguments, we're done, else we are a service and do a lot of stuff below :)
+	exit;
+}
+
 
 if ($OSNAME eq 'MSWin32') {
-   no strict;
-
-	my $State="";
+   my $State="";
 	my $PrevState="";
   
 	#start service
@@ -119,44 +125,43 @@ if ($OSNAME eq 'MSWin32') {
   my $starttime=0;
   
   my $SERVICE_SLEEP_TIME = 1000; # 1 second
-  $PrevState = SERVICE_START_PENDING;
+  $PrevState = SERVICE_START_PENDING();
 
-  while( SERVICE_STOPPED != ( $State = Win32::Daemon::State() ) )
+  while( SERVICE_STOPPED() != ( $State = Win32::Daemon::State() ) )
   {
-    
-    if( SERVICE_START_PENDING == $State )
+    if( SERVICE_START_PENDING() == $State )
     {
       # Initialization code
       
-      Win32::Daemon::State( SERVICE_RUNNING );
-      $PrevState = SERVICE_RUNNING;
+      Win32::Daemon::State( SERVICE_RUNNING() );
+      $PrevState = SERVICE_RUNNING();
     }
-    elsif( SERVICE_STOP_PENDING == $State )
+    elsif( SERVICE_STOP_PENDING() == $State )
     {
-      Win32::Daemon::State( SERVICE_STOPPED );
+      Win32::Daemon::State( SERVICE_STOPPED() );
     }
-    elsif( SERVICE_PAUSE_PENDING == $State )
+    elsif( SERVICE_PAUSE_PENDING() == $State )
     {
       # "Pausing...";
-      Win32::Daemon::State( SERVICE_PAUSED );
-      $PrevState = SERVICE_PAUSED;
+      Win32::Daemon::State( SERVICE_PAUSED() );
+      $PrevState = SERVICE_PAUSED();
       next;
     }
-    elsif( SERVICE_CONTINUE_PENDING == $State )
+    elsif( SERVICE_CONTINUE_PENDING() == $State )
     {
       # "Resuming...";
-      Win32::Daemon::State( SERVICE_RUNNING );
-      $PrevState = SERVICE_RUNNING;
+      Win32::Daemon::State( SERVICE_RUNNING() );
+      $PrevState = SERVICE_RUNNING();
       next;
     }
-    elsif( SERVICE_STOP_PENDING == $State )
+    elsif( SERVICE_STOP_PENDING() == $State )
     {
       # "Stopping...";
-      Win32::Daemon::State( SERVICE_STOPPED );
-      $PrevState = SERVICE_STOPPED;
+      Win32::Daemon::State( SERVICE_STOPPED() );
+      $PrevState = SERVICE_STOPPED();
       next;
     }
-    elsif( SERVICE_RUNNING == $State )
+    elsif( SERVICE_RUNNING() == $State )
     {
       my $currtime=time;	    
 	  
@@ -184,22 +189,22 @@ if ($OSNAME eq 'MSWin32') {
 
         # Check for any outstanding commands. Pass in a non zero value
         # and it resets the Last Message to SERVICE_CONTROL_NONE.
-        if( SERVICE_CONTROL_NONE != ( my $Message = Win32::Daemon::QueryLastMessage( 1 ) ) )
+        if( SERVICE_CONTROL_NONE() != ( my $Message = Win32::Daemon::QueryLastMessage( 1 ) ) )
         {
-          if( SERVICE_CONTROL_INTERROGATE == $Message )
+          if( SERVICE_CONTROL_INTERROGATE() == $Message )
           {
             # Got here if the Service Control Manager is requesting
             # the current state of the service. This can happen for
             # a variety of reasons. Report the last state we set.
             Win32::Daemon::State( $PrevState );
           }
-        elsif( SERVICE_CONTROL_SHUTDOWN == $Message )
+        elsif( SERVICE_CONTROL_SHUTDOWN() == $Message )
         {
           # Yikes! The system is shutting down. We had better clean up
           # and stop.
           # Tell the SCM that we are preparing to shutdown and that we expect
           # it to take 25 seconds (so don't terminate us for at least 1 second)...
-	  Win32::Daemon::State( SERVICE_STOP_PENDING, 1000 );
+	  Win32::Daemon::State( SERVICE_STOP_PENDING(), 1000 );
         }
       }
       # Snooze for awhile so we don't suck up cpu time...
@@ -208,7 +213,6 @@ if ($OSNAME eq 'MSWin32') {
    
    # We are done so close down...
    Win32::Daemon::StopService();
-   use strict;
 }
 
 __END__
