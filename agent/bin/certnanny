@@ -64,7 +64,7 @@ my $monitor = CertNanny->new(CONFIG => $config{cfg});
 foreach my $cmd (@ARGV) {
 	if ($OSNAME eq 'MSWin32') {
 		# Windows Service related commands
-		my $servicename = $monitor->get_config_value("platform.windows.servicename", "FILE") || "CertNanny";
+		my $servicename = $monitor->get_config_value("platform.windows.servicename") || "CertNanny";
 		if ($cmd eq "install") {
 			my $cfgpath = $config{cfg};
 			my $servicepath= File::Spec->catfile($FindBin::Bin, $FindBin::Script);
