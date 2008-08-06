@@ -291,23 +291,27 @@ sub get
     
      if (! defined $arg)
      {
- 	return $self->{CONFIG};
+		return $self->{CONFIG};
      } 
      else
      {
-	 my $value = get_ref($self, $arg);
+		my $value = get_ref($self, $arg);
 	 
-	 return $value unless defined $mangle;
+		return $value unless defined $mangle;
 
-	 $value = "" if !defined $value;
+		$value = "" if !defined $value;
 
-	 return File::Spec->catfile(File::Spec->canonpath($value)) if ($mangle eq "FILE");
-	 return uc($value) if ($mangle eq "UC");
-	 return lc($value) if ($mangle eq "LC");
-	 return ucfirst($value) if ($mangle eq "UCFIRST");
-
-	 return; # don't know how to handle this mangle option
+		if ($value ne '') {
+			# mangle only if value is not "", otherwise File::Spec converts "" into "\", which doesn't make much sense ...
+			return File::Spec->catfile(File::Spec->canonpath($value)) if ($mangle eq "FILE");
+			return uc($value) if ($mangle eq "UC");
+			return lc($value) if ($mangle eq "LC");
+			return ucfirst($value) if ($mangle eq "UCFIRST");
+			return; # don't know how to handle this mangle option
+		}
      }
+	 
+	 return;
 }
 
 
