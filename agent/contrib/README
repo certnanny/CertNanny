@@ -21,3 +21,8 @@ To create RPMs use sscep.spec.
 
 Source code for the ExtractKey Java class (see lib/java/) is contained
 in ExtractKey.tar.gz.
+
+* Wizard
+
+Wx::Perl based wizard to automatically generate a configuration file under Windows OS (for now).
+Expects the path to the CertNanny installation as argument.
