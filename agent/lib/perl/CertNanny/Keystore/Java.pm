@@ -49,8 +49,12 @@ sub new
     croak "cmd.java not found in config and JAVA_HOME not set" 
     	unless (defined $options->{java} && -x $options->{java});
 
-    if (!defined $entry->{location} || !-r $entry->{location}) {
-    	croak("keystore.$entryname.location not defined or undreadable");
+    if (!defined $entry->{location}) {
+    	croak("keystore.$entryname.location not defined");
+	return;
+    }
+    if (!-r $entry->{location}) {
+    	croak("keystore file $entry->{location} not readable");
 	return;
     }
     if (!defined $entry->{pin}) {
