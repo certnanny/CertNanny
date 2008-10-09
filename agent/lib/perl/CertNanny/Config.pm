@@ -8,8 +8,6 @@
 #
 # CertNanny::Config
 #
-# $Id$
-#
 # 2002-11-05 Martin Bartosch; Cynops GmbH <m.bartosch@cynops.de>
 #
 #
