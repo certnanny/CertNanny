@@ -8,8 +8,6 @@
 #
 # DBCA::Util
 #
-# $Id$
-#
 # 2002-11-11 Martin Bartosch; Cynops GmbH <m.bartosch@cynops.de>
 #
 

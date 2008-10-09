@@ -71,6 +71,8 @@ sub new
 	$self->{OPTIONS}->{JAVA} ||= 
 	    File::Spec->catfile($ENV{JAVA_HOME}, 'bin', 'java');
     }
+
+    $self->{OPTIONS}->{GSKIT_CLASSPATH} = $args{CONFIG}->get('path.gskclasspath', 'FILE');
     
 
     # set key generation operation mode:
