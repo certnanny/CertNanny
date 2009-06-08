@@ -106,10 +106,9 @@ if (scalar @ARGV > 0) {
 	exit;
 }
 
-
 if ($OSNAME eq 'MSWin32') {
    my $State="";
-	my $PrevState="";
+   my $PrevState = SERVICE_START_PENDING();
   
 	#start service
    if(Win32::Daemon::StartService())
@@ -125,7 +124,7 @@ if ($OSNAME eq 'MSWin32') {
   my $starttime=0;
   
   my $SERVICE_SLEEP_TIME = 1000; # 1 second
-  $PrevState = SERVICE_START_PENDING();
+
 
   while( SERVICE_STOPPED() != ( $State = Win32::Daemon::State() ) )
   {
@@ -135,10 +134,12 @@ if ($OSNAME eq 'MSWin32') {
       
       Win32::Daemon::State( SERVICE_RUNNING() );
       $PrevState = SERVICE_RUNNING();
+      next;
     }
     elsif( SERVICE_STOP_PENDING() == $State )
     {
       Win32::Daemon::State( SERVICE_STOPPED() );
+      next;
     }
     elsif( SERVICE_PAUSE_PENDING() == $State )
     {
@@ -164,21 +165,22 @@ if ($OSNAME eq 'MSWin32') {
     elsif( SERVICE_RUNNING() == $State )
     {
       my $currtime=time;	    
-	  
+
       if($currtime >= $starttime)
       {
-	  	# reinstantiate CertNanny object (make sure that destructor gets called)
-		$monitor = CertNanny->new(CONFIG => $config{cfg});
-		# The service is running as normal...
-		# ...add the main code here...
-		$monitor->redirect_stdout_stderr();
+	# reinstantiate CertNanny object (make sure that destructor gets called)
+	$monitor = CertNanny->new(CONFIG => $config{cfg});
+	# The service is running as normal...
+	# ...add the main code here...
+	$monitor->redirect_stdout_stderr();
 
-		my $rc = $monitor->renew();
-	 
-		#if the renewal was successful the starttime will be increased by one day (86400 seconds -> 24hours -> 3600 seconds per hour)
-		my $timeframe = $monitor->get_config_value("platform.windows.serviceinterval", "FILE") || 86400;
-		$starttime=$currtime+$timeframe;  
+	my $rc = $monitor->renew();
+ 
+	#if the renewal was successful the starttime will be increased by one day (86400 seconds -> 24hours -> 3600 seconds per hour)
+	my $timeframe = $monitor->get_config_value("platform.windows.serviceinterval", "FILE") || 86400;
+	$starttime=$currtime+$timeframe;  
       }      
+      Win32::Sleep( $SERVICE_SLEEP_TIME );
     }
     else
     {
@@ -187,28 +189,7 @@ if ($OSNAME eq 'MSWin32') {
       Win32::Daemon::State( $PrevState );
     }
 
-        # Check for any outstanding commands. Pass in a non zero value
-        # and it resets the Last Message to SERVICE_CONTROL_NONE.
-        if( SERVICE_CONTROL_NONE() != ( my $Message = Win32::Daemon::QueryLastMessage( 1 ) ) )
-        {
-          if( SERVICE_CONTROL_INTERROGATE() == $Message )
-          {
-            # Got here if the Service Control Manager is requesting
-            # the current state of the service. This can happen for
-            # a variety of reasons. Report the last state we set.
-            Win32::Daemon::State( $PrevState );
-          }
-        elsif( SERVICE_CONTROL_SHUTDOWN() == $Message )
-        {
-          # Yikes! The system is shutting down. We had better clean up
-          # and stop.
-          # Tell the SCM that we are preparing to shutdown and that we expect
-          # it to take 25 seconds (so don't terminate us for at least 1 second)...
-	  Win32::Daemon::State( SERVICE_STOP_PENDING(), 1000 );
-        }
-      }
-      # Snooze for awhile so we don't suck up cpu time...
-      Win32::Sleep( $SERVICE_SLEEP_TIME );
+     next;
    }
    
    # We are done so close down...
