@@ -14,3 +14,9 @@ Platforms:
 SCEP servers:
 
 * support OpenXPKI
+
+
+***
+* don't renew based on expired certifiates
+* CertNanny creates warnings when parsing certs with large serial numbers
+* OpenSSL keystore: new option cacertbundle: root certs + intermediate certs
