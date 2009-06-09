@@ -162,7 +162,14 @@ sub do_check
     my $autorenew = $self->{ITEMS}->{$args{ENTRY}}->{autorenew_days};
     my $warnexpiry = $self->{ITEMS}->{$args{ENTRY}}->{warnexpiry_days};
     
-    my $rc = $keystore->checkvalidity($autorenew);
+    my $rc;
+    $rc = $keystore->checkvalidity(0);
+    if (! $rc) {
+	$keystore->log({MSG => "Certificate has expired. No automatic renewal can be performed.", PRIO => 'error'});
+	return 1;
+    }
+
+    $rc = $keystore->checkvalidity($autorenew);
     if (! $rc) {
 	$keystore->log({MSG => "Certificate is to be scheduled for automatic renewal ($autorenew days prior to expiry)"});
     }
@@ -184,8 +191,16 @@ sub do_renew
 
     my $autorenew = $self->{ITEMS}->{$args{ENTRY}}->{autorenew_days};
     my $warnexpiry = $self->{ITEMS}->{$args{ENTRY}}->{warnexpiry_days};
+
+    my $rc;
+
+    $rc = $keystore->checkvalidity(0);
+    if (! $rc) {
+	$keystore->log({MSG => "Certificate has expired. No automatic renewal can be performed.", PRIO => 'error'});
+	return 1;
+    }
     
-    my $rc = $keystore->checkvalidity($autorenew);
+    $rc = $keystore->checkvalidity($autorenew);
     if (! $rc) {
 	# schedule automatic renewal
 	$keystore->log({MSG => "Scheduling renewal"});
@@ -197,9 +212,7 @@ sub do_renew
 	$keystore->log({MSG => "Certificate is valid for less than $warnexpiry days",PRIO => 'notice'});
 	$keystore->warnexpiry();
     }
+    return 1;
 }
-
-
-
 
 1;
