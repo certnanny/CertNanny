@@ -107,6 +107,14 @@ if (scalar @ARGV > 0) {
 }
 
 if ($OSNAME eq 'MSWin32') {
+  open my $LOG, '>>', 'c:\temp\debug.txt';
+  print $LOG "SERVICE_STOPPED = " . SERVICE_STOPPED() . "\n";
+  print $LOG "SERVICE_START_PENDING = " . SERVICE_START_PENDING() . "\n";
+  print $LOG "SERVICE_STOP_PENDING = " . SERVICE_STOP_PENDING() . "\n";
+  print $LOG "SERVICE_PAUSE_PENDING = " . SERVICE_PAUSE_PENDING() . "\n";
+  print $LOG "SERVICE_CONTINUE_PENDING = " . SERVICE_CONTINUE_PENDING() . "\n";
+  print $LOG "SERVICE_STOP_PENDING = " . SERVICE_STOP_PENDING() . "\n";
+  print $LOG "SERVICE_RUNNING = " . SERVICE_RUNNING() . "\n";
    my $State="";
    my $PrevState = SERVICE_START_PENDING();
   
@@ -128,6 +136,14 @@ if ($OSNAME eq 'MSWin32') {
 
   while( SERVICE_STOPPED() != ( $State = Win32::Daemon::State() ) )
   {
+
+    print $LOG "state: " . $State . "\n";
+    
+    # if ($State == 0 ) {
+#	    Win32::Daemon::State( SERVICE_RUNNING() );
+#	    $PrevState = SERVICE_RUNNING();
+    #   }
+
     if( SERVICE_START_PENDING() == $State )
     {
       # Initialization code
@@ -166,30 +182,78 @@ if ($OSNAME eq 'MSWin32') {
     {
       my $currtime=time;	    
 
+      print $LOG "currtime: " . $currtime . "\n";
+
       if($currtime >= $starttime)
       {
-	# reinstantiate CertNanny object (make sure that destructor gets called)
-	$monitor = CertNanny->new(CONFIG => $config{cfg});
-	# The service is running as normal...
-	# ...add the main code here...
-	$monitor->redirect_stdout_stderr();
+	        print $LOG "currtime > starttime\n";
+	  	# reinstantiate CertNanny object (make sure that destructor gets called)
+		$monitor = CertNanny->new(CONFIG => $config{cfg});
+		print $LOG "new monitor object\n";
+		# The service is running as normal...
+		# ...add the main code here...
+		$monitor->redirect_stdout_stderr();
+		print $LOG "stdout/stderr redirect\n";
 
-	my $rc = $monitor->renew();
- 
-	#if the renewal was successful the starttime will be increased by one day (86400 seconds -> 24hours -> 3600 seconds per hour)
-	my $timeframe = $monitor->get_config_value("platform.windows.serviceinterval", "FILE") || 86400;
-	$starttime=$currtime+$timeframe;  
+		my $rc;
+		eval {
+			$rc = $monitor->renew();
+		};
+		print $LOG "EVAL_ERROR? " . $EVAL_ERROR;
+	        print $LOG "renew was called: $rc\n";
+
+	 
+		#if the renewal was successful the starttime will be increased by one day (86400 seconds -> 24hours -> 3600 seconds per hour)
+		my $timeframe = $monitor->get_config_value("platform.windows.serviceinterval", "FILE") || 86400;
+		$starttime=$currtime+$timeframe;  
       }      
+      print $LOG "before sleep ...\n";
       Win32::Sleep( $SERVICE_SLEEP_TIME );
+      print $LOG "calling next ...\n";
+      next;
     }
     else
     {
       # Got an unhandled control message. Set the state to
       # whatever the previous state was.
       Win32::Daemon::State( $PrevState );
+      next;
     }
 
-     next;
+    print $LOG "before outstanding commands checking ...\n";
+        # Check for any outstanding commands. Pass in a non zero value
+        # and it resets the Last Message to SERVICE_CONTROL_NONE.
+	eval {
+   	my $Message = Win32::Daemon::QueryLastMessage(1);
+	};
+	print $LOG "EVAL_ERROR? " . $EVAL_ERROR;
+
+
+        if( SERVICE_CONTROL_NONE() != ( my $Message = Win32::Daemon::QueryLastMessage( 1 ) ) )
+        {
+	
+    	  print $LOG "Message: $Message ...\n";
+          if( SERVICE_CONTROL_INTERROGATE() == $Message )
+          {
+            # Got here if the Service Control Manager is requesting
+            # the current state of the service. This can happen for
+            # a variety of reasons. Report the last state we set.
+            Win32::Daemon::State( $PrevState );
+          }
+        elsif( SERVICE_CONTROL_SHUTDOWN() == $Message )
+        {
+          # Yikes! The system is shutting down. We had better clean up
+          # and stop.
+          # Tell the SCM that we are preparing to shutdown and that we expect
+          # it to take 25 seconds (so don't terminate us for at least 1 second)...
+	  Win32::Daemon::State( SERVICE_STOP_PENDING(), 1000 );
+        }
+      }
+      # Snooze for awhile so we don't suck up cpu time...
+      print $LOG "before sleep ...\n";
+      Win32::Sleep( $SERVICE_SLEEP_TIME );
+      print $LOG "calling next ...\n";
+      next;
    }
    
    # We are done so close down...
@@ -778,16 +842,6 @@ Location of the GSKit lib directory (optional, only required for GSKit
 keystores on the Windows platform).
 
 Example: c:\Program Files\IBM\gsk7\lib
-
-=item cmd.gskclasspath
-
-Location of the GSKit Java Classes, normally autodetected by CertNanny.
-Newer versions of GSKit (notably GSKit 7 on Windows) sometimes have 
-the problem that autodetection is not possible ("unable to 
-determine GSKit classpath"). In this case set this explicitly and make
-sure that cmd.java is set properly, otherwise leave this commented out.
-
-Example: path.gskclasspath = $(ibmprefix)\gsk7\classes\cfwk.zip;$(ibmprefix)\gsk7\classes\jlog.jar;$(ibmprefix)\gsk7\classes\gsk7cls.jar;$(ibmprefix)\gsk7\classes;$(ibmprefix)\IBM\WebSphere MQ\Java\lib\providerutil.jar;$(ibmprefix)\WebSphere MQ\Java\lib\com.ibm.mqjms.jar;$(ibmprefix)\WebSphere MQ\Java\lib\ldap.jar;$(ibmprefix)\WebSphere MQ\Java\lib\jta.jar;$(ibmprefix)\WebSphere MQ\Java\lib\jndi.jar;$(ibmprefix)\WebSphere MQ\Java\lib\jms.jar;$(ibmprefix)\WebSphere MQ\Java\lib\connector.jar;$(ibmprefix)\WebSphere MQ\Java\lib\fscontext.jar;$(ibmprefix)\WebSphere MQ\Java\lib\com.ibm.mq.jar
 
 =back
 

@@ -879,7 +879,6 @@ sub installfile
 # SubjectName => <cert subject common name>
 # IssuerName => <cert issuer common name>
 # SerialNumber => <cert serial number> Format: xx:xx:xx... (hex, upper case)
-# Serial => <cert serial number> As integer number
 # NotBefore => <cert validity> Format: YYYYDDMMHHMMSS
 # NotAfter  => <cert validity> Format: YYYYDDMMHHMMSS
 # PublicKey => <cert public key> Format: Base64 encoded (PEM)
@@ -1102,7 +1101,7 @@ sub getcertinfo
     #$certinfo->{SerialNumber} =~ s/.*\(0x(.*)\)/$1/;
 
     # store decimal serial number
-    $certinfo->{Serial} = hex($certinfo->{SerialNumber});
+    #$certinfo->{Serial} = hex($certinfo->{SerialNumber});
 
     # pad with a leading zero if length is odd
     if (length($certinfo->{SerialNumber}) % 2)
