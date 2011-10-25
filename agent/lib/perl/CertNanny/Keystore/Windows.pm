@@ -405,6 +405,8 @@ sub createrequest {
 # A true return code indicates that the keystore was installed properly.
 sub installcert {
     my $self = shift;
+
+
     
     my %args = ( 
 		 @_,         # argument pair list
@@ -413,6 +415,10 @@ sub installcert {
     # please see examples in other keystores on ideas how to do this
     my $enroll = Win32::OLE->new ('CEnroll.CEnroll') or die;
     my $storelocation = $self->{OPTIONS}->{ENTRY}->{storelocation};
+
+    #Install cert chain without root certificates
+    $self->installcertchain(); #install certificate chain 
+
     my $cert;
     eval { $cert = $self->getcertobject( $self->{STORE} ) };
     if ($@) {
@@ -644,8 +650,7 @@ sub importrequest {
     my $requeststore = $self->openstore($storename, $storelocation);
     
     my $filename = $self->{OPTIONS}->{ENTRYNAME} . ".pfx";
-    $filename =  
-	File::Spec->catfile($self->{OPTIONS}->{ENTRY}->{statedir},
+    $filename =	File::Spec->catfile($self->{OPTIONS}->{ENTRY}->{statedir},
 			    $filename);
     
     $requeststore->Load($filename,"",$const->{CAPICOM_KEY_STORAGE_EXPORTABLE});
@@ -655,6 +660,257 @@ sub importrequest {
 	chomp($@);
 	$self->debug("Ignoring store close error: [$@]\n");
     }
+}
+
+sub installcertchain{
+my $self = shift;
+
+my $storelocation = $self->{OPTIONS}->{ENTRY}->{storelocation};
+
+# all trusted Root CA certificates... 
+my $storename = 'Root';
+my @trustedcerts = @{$self->{STATE}->{DATA}->{ROOTCACERTS}};
+my $rootstore = $self->openstore($storename, $storelocation);
+my $extension = ".cer"; 
+my $tmpfilename;
+my $certs = $rootstore->Certificates;
+
+
+# trusted root certificates will not be installed in the chain since there is manual action (OK confirmation) required by the windows root keystore
+	$self->info("installing configured root certificates");
+	foreach my $entry (@trustedcerts){
+		my $tmpfilename = $self->gettmpfile($extension);
+		my @rdn = split(/(?<!\\),\s*/, $entry ->{CERTINFO}->{SubjectName});
+		my $cn = $rdn[0];
+		$cn =~ s/^CN=//;
+		my $subject= $entry ->{CERTINFO}->{SubjectName};
+		
+		$self->info("Adding certificate '$subject' from file $entry ->{CERTFILE}");
+		# rewrite certificate into pem format
+		my $cacert = $self->convertcert(OUTFORMAT => 'PEM',
+					    CERTFILE => $entry ->{CERTFILE},
+					    CERTFORMAT => 'PEM',
+		);
+		
+		if (! defined $cacert)
+		{
+		    $self->seterror("installcert(): Could not convert certificate $entry ->{CERTFILE}");
+		return;
+		}
+    
+		
+		if (! $self->write_file(FILENAME => $tmpfilename,
+				    CONTENT  => $cacert->{CERTDATA})) {
+		    $self->seterror("installcert(): Could not write temporary ca file");
+		    return;
+		}
+		#$self->write_file(FILENAME =>$tmpfilename, CONTENT=>$entry );
+		$rootstore->Load($tmpfilename);
+	}
+	
+	eval { $rootstore->Close() };
+	if ($@) {
+		chomp($@);
+		$self->debug("Ignoring store close error: [$@]\n");
+	    }
+
+
+
+$self->info("Check for configured root certificates...");
+$rootstore = $self->openstore($storename, $storelocation);
+$certs = $rootstore->Certificates;
+
+foreach my $entry (@trustedcerts){
+	my $thumbprint = $entry ->{CERTINFO}->{CertificateFingerprint};
+	   $thumbprint =~ s/://g;
+	my $subject = $entry ->{CERTINFO}->{SubjectName};
+	   
+	my $installedrootCAs = $certs->Find($const->{CAPICOM_CERTIFICATE_FIND_SHA1_HASH},$thumbprint);
+	
+	if($installedrootCAs->Count == 0)
+	{
+            my $rootCN = $entry ->{CERTINFO}->{SubjectName}; 
+	    $self->seterror("installcertificatechain: Can't install valid certificate chain when missung '$subject' in keystore.");
+	    return 0;
+	}else
+	{
+	   $self->info("Found $subject in key store.");
+	}
+	
+}
+
+
+
+$self->info("installing certificate chain");
+# all certificates from the CA key chain minus its root cert will be installed 
+my $storename = 'CA';
+my @cachain;
+my $CAstore = $self->openstore($storename, $storelocation);
+
+	push(@cachain,@{$self->{STATE}->{DATA}->{CERTCHAIN}}[1..$#{$self->{STATE}->{DATA}->{CERTCHAIN}}]);
+	
+	foreach my $entry (@cachain){
+		$tmpfilename= $self->gettmpfile(".cer");
+			
+		my @rdn = split(/(?<!\\),\s*/, $entry ->{CERTINFO}->{SubjectName});
+		my $cn = $rdn[0];
+		$cn =~ s/^CN=//;
+	    
+		print("debug line 741", $entry ->{CERTINFO}->{SubjectName} , "\n");
+		$self->info("Adding certificate '$entry ->{CERTINFO}->{SubjectName}' from file $entry ->{CERTFILE}");
+	    
+		# rewrite certificate into pem format
+		my $cacert = $self->convertcert(OUTFORMAT => 'PEM',
+					    CERTFILE => $entry ->{CERTFILE},
+					    CERTFORMAT => 'PEM',
+		);
+		
+		if (! defined $cacert)
+		{
+		    $self->seterror("installcert(): Could not convert certificate $entry ->{CERTFILE}");
+		return;
+		}
+    
+		if (! $self->write_file(FILENAME => $tmpfilename,
+				    CONTENT  => $cacert->{CERTDATA})) {
+		    $self->seterror("installcert(): Could not write temporary ca file");
+		    return;
+		}
+				
+		$CAstore->Load($tmpfilename);
+	}
+	
+	eval { $CAstore->Close() };
+	if ($@) {
+		chomp($@);
+		$self->debug("Ignoring store close error: [$@]\n");
+	    }
+}
+
+
+sub installcertchain{
+my $self = shift;
+
+my $storelocation = $self->{OPTIONS}->{ENTRY}->{storelocation};
+
+# all trusted Root CA certificates... 
+my $storename = 'Root';
+my @trustedcerts = @{$self->{STATE}->{DATA}->{ROOTCACERTS}};
+my $rootstore = $self->openstore($storename, $storelocation);
+my $extension = ".cer"; 
+my $tmpfilename;
+my $certs = $rootstore->Certificates;
+
+
+# trusted root certificates will not be installed in the chain since there is manual action (OK confirmation) required by the windows root keystore
+	$self->info("installing configured root certificates");
+	foreach my $entry (@trustedcerts){
+		my $tmpfilename = $self->gettmpfile($extension);
+		my @rdn = split(/(?<!\\),\s*/, $entry ->{CERTINFO}->{SubjectName});
+		my $cn = $rdn[0];
+		$cn =~ s/^CN=//;
+		my $subject= $entry ->{CERTINFO}->{SubjectName};
+		
+		$self->info("Adding certificate '$subject' from file $entry ->{CERTFILE}");
+		# rewrite certificate into pem format
+		my $cacert = $self->convertcert(OUTFORMAT => 'PEM',
+					    CERTFILE => $entry ->{CERTFILE},
+					    CERTFORMAT => 'PEM',
+		);
+		
+		if (! defined $cacert)
+		{
+		    $self->seterror("installcert(): Could not convert certificate $entry ->{CERTFILE}");
+		return;
+		}
+    
+		
+		if (! $self->write_file(FILENAME => $tmpfilename,
+				    CONTENT  => $cacert->{CERTDATA})) {
+		    $self->seterror("installcert(): Could not write temporary ca file");
+		    return;
+		}
+		#$self->write_file(FILENAME =>$tmpfilename, CONTENT=>$entry );
+		$rootstore->Load($tmpfilename);
+	}
+	
+	eval { $rootstore->Close() };
+	if ($@) {
+		chomp($@);
+		$self->debug("Ignoring store close error: [$@]\n");
+	    }
+
+
+
+$self->info("Check for configured root certificates...");
+$rootstore = $self->openstore($storename, $storelocation);
+$certs = $rootstore->Certificates;
+
+foreach my $entry (@trustedcerts){
+	my $thumbprint = $entry ->{CERTINFO}->{CertificateFingerprint};
+	   $thumbprint =~ s/://g;
+	my $subject = $entry ->{CERTINFO}->{SubjectName};
+	   
+	my $installedrootCAs = $certs->Find($const->{CAPICOM_CERTIFICATE_FIND_SHA1_HASH},$thumbprint);
+	
+	if($installedrootCAs->Count == 0)
+	{
+            my $rootCN = $entry ->{CERTINFO}->{SubjectName}; 
+	    $self->seterror("installcertificatechain: Can't install valid certificate chain when missung '$subject' in keystore.");
+	    return 0;
+	}else
+	{
+	   $self->info("Found $subject in key store.");
+	}
+	
+}
+
+
+
+$self->info("installing certificate chain");
+# all certificates from the CA key chain minus its root cert will be installed 
+my $storename = 'CA';
+my @cachain;
+my $CAstore = $self->openstore($storename, $storelocation);
+
+	push(@cachain,@{$self->{STATE}->{DATA}->{CERTCHAIN}}[1..$#{$self->{STATE}->{DATA}->{CERTCHAIN}}]);
+	
+	foreach my $entry (@cachain){
+		$tmpfilename= $self->gettmpfile(".cer");
+			
+		my @rdn = split(/(?<!\\),\s*/, $entry ->{CERTINFO}->{SubjectName});
+		my $cn = $rdn[0];
+		$cn =~ s/^CN=//;
+	    
+		print("debug line 741", $entry ->{CERTINFO}->{SubjectName} , "\n");
+		$self->info("Adding certificate '$entry ->{CERTINFO}->{SubjectName}' from file $entry ->{CERTFILE}");
+	    
+		# rewrite certificate into pem format
+		my $cacert = $self->convertcert(OUTFORMAT => 'PEM',
+					    CERTFILE => $entry ->{CERTFILE},
+					    CERTFORMAT => 'PEM',
+		);
+		
+		if (! defined $cacert)
+		{
+		    $self->seterror("installcert(): Could not convert certificate $entry ->{CERTFILE}");
+		return;
+		}
+    
+		if (! $self->write_file(FILENAME => $tmpfilename,
+				    CONTENT  => $cacert->{CERTDATA})) {
+		    $self->seterror("installcert(): Could not write temporary ca file");
+		    return;
+		}
+				
+		$CAstore->Load($tmpfilename);
+	}
+	
+	eval { $CAstore->Close() };
+	if ($@) {
+		chomp($@);
+		$self->debug("Ignoring store close error: [$@]\n");
+	    }
 }
 
 1;
