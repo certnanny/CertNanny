@@ -11,6 +11,7 @@ A: The CA must not modify the requested DN, in particular adding the
 
 Q: Which CA software (SCEP servers) are supported?
 A: The following CA software packages are currently supported:
+   - OpenXPKI (0.9 or higher): http://www.openxpki.org/
    - OpenCA 0.9.2.4 (or higher): http://www.openca.info/legacy/index.html
 
 

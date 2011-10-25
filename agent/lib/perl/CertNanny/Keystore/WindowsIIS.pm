@@ -44,6 +44,10 @@ sub installcert {
     my $certfile = $args{CERTFILE}; 
     my $label = $self->{CERT}->{LABEL};
     
+    #Install cert chain without root certificates
+    $self->installcertchain(); 
+    
+    
     $self->info("Creating prototype PKCS#12 from certfile $certfile, keyfile $keyfile, label $label");
 
 	# create random PW via OpenSSL
