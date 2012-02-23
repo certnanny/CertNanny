@@ -1,0 +1,235 @@
+<?xml version='1.0' encoding='windows-1252'?>
+<Wix xmlns='http://schemas.microsoft.com/wix/2006/wi'>
+  <Product Name='certnanny0.10' Id='FB28CE20-3C78-11E1-BA67-BEC04724019B' UpgradeCode='05C67B16-3C79-11E1-87DB-C3C04724019B'
+    Language='1033' Codepage='1252' Version='0.10.0' Manufacturer='Cynops'>
+	
+	<Package Id='*' Keywords='Installer' Description="certnanny0.10 Installer"
+       Manufacturer='Cynops'
+      InstallerVersion='100' Languages='1033' Compressed='yes' SummaryCodepage='1252' />
+	 
+	<Media Id='1' Cabinet='Certnanny.cab' EmbedCab='yes' />
+	
+	
+ <!--Defining Main Directory Strucure-->
+	<Directory Id='TARGETDIR' Name='SourceDir'>
+		<Directory Id='ProgramFilesFolder' Name='PFiles'>
+			<Directory Id='INSTALLDIR' Name='CertNanny'>
+			</Directory>
+        </Directory>
+		
+		
+
+		
+<!--AppData Folders-->		
+		<Directory Id='CommonAppDataFolder' Name='CommonAppDataFolder'>
+			<Directory Id='certnannyappdirectory' Name='CertNanny'>
+				<Component Id='removecomponent' Guid='37D7213C-3E09-11E1-9CE6-234A4824019B'>
+				<RemoveFolder Id="certnannyappdirectory" On="uninstall"/>
+				<RegistryValue Root='HKCU' Key='Software\[Manufacturer]\[ProductName]' Type='string' Value='' KeyPath='yes' />
+				</Component>
+				
+				<Component Id='createcertnannyapp' Guid='8AA16728-3E19-11E1-9947-8F5F4824019B'>
+				<CreateFolder/>
+				 <RegistryValue Root='HKCU' Key='Software\[Manufacturer]\[ProductName]'
+                          Type='string' Value='' 
+                          KeyPath='yes' />         
+				</Component>
+				
+				<Directory Id='statedirectory' Name='state'>
+				<Component Id='removestatecomponent' Guid='35A5B258-3E0D-11E1-942D-23504824019B'>
+				<RemoveFolder Id="statedirectory" On="uninstall"/>
+				<RegistryValue Root='HKCU' Key='Software\[Manufacturer]\[ProductName]' Type='string' Value='' KeyPath='yes' />
+				</Component>
+				<Component Id='createstate' Guid='56BA79AC-3E1B-11E1-B87F-95614824019B'>
+				<CreateFolder/>
+				<RegistryValue Root='HKCU' Key='Software\[Manufacturer]\[ProductName]' Type='string' Value='' KeyPath='yes' />   
+				</Component>
+				</Directory>
+				
+				<Directory Id='certsdirectory' Name='certs'>
+				<Component Id='removecertscomponent' Guid='4C7E04A8-3E0D-11E1-88BD-2E504824019B'>
+				<RemoveFolder Id="certsdirectory" On="uninstall"/>
+				<RegistryValue Root='HKCU' Key='Software\[Manufacturer]\[ProductName]' Type='string' Value='' KeyPath='yes' />
+				</Component>
+				<Component Id='createcerts' Guid='BDB009B0-3E1B-11E1-9070-03624824019B'>
+				<CreateFolder/>
+				<RegistryValue Root='HKCU' Key='Software\[Manufacturer]\[ProductName]' Type='string' Value='' KeyPath='yes' />   
+				</Component>
+			
+				
+					<Directory Id='trustedrootdirectory' Name='trustedroot'>
+					<Component Id='removetrustedrootcomponent' Guid='9AB51F12-3E0D-11E1-839D-6E504824019B'>
+					<RemoveFolder Id="trustedrootdirectory" On="uninstall"/>
+					<RegistryValue Root='HKCU' Key='Software\[Manufacturer]\[ProductName]' Type='string' Value='' KeyPath='yes' />
+					</Component>
+					<Component Id='createtrustedroot' Guid='DE4C9E36-3E1B-11E1-BE11-2C624824019B'>
+					<CreateFolder/>
+					<RegistryValue Root='HKCU' Key='Software\[Manufacturer]\[ProductName]' Type='string' Value='' KeyPath='yes' />   
+					</Component>					
+					</Directory>
+					
+					<Directory Id='quarantinedirectory' Name='quarantine'>
+					<Component Id='removequarantinecomponent' Guid='C43DEF30-3E0D-11E1-BA57-B3504824019B'>
+					<RemoveFolder Id="quarantinedirectory" On="uninstall"/>
+					<RegistryValue Root='HKCU' Key='Software\[Manufacturer]\[ProductName]' Type='string' Value='' KeyPath='yes' />
+					</Component>
+					<Component Id='createquarantine' Guid='F0C27982-3E1B-11E1-9693-37624824019B'>
+					<CreateFolder/>
+					<RegistryValue Root='HKCU' Key='Software\[Manufacturer]\[ProductName]' Type='string' Value='' KeyPath='yes' />   
+					</Component>
+					</Directory>					
+					
+				</Directory>
+			</Directory>
+		</Directory>
+    </Directory>
+		
+			
+
+
+<!--Main Components-->
+	<DirectoryRef Id='INSTALLDIR'>
+		<Directory Id='ETC' Name='etc'>
+				<Component Id='etccomponent' Guid='8351C338-3C7E-11E1-AC51-C4C74724019B'>
+					<File Id='config' Name='certnanny.cfg' Source='certnanny.cfg' KeyPath='yes'>
+					</File>
+				</Component>
+		</Directory>
+			
+		<Directory Id='BIN' Name='bin'>
+			<Component Id='bincomponent' Guid='D5C307D4-3C7F-11E1-B306-75C94724019B'>
+				<File Id='main' Name='certnanny' Source='certnanny' KeyPath='yes'>
+				</File>
+			</Component>
+		</Directory>
+	</DirectoryRef>		
+				
+	<DirectoryRef Id='INSTALLDIR'>			
+		<Component Id='licensecomponent' Guid='578DB1AE-3DFE-11E1-9845-833C4824019B'>
+			<File Id='lic' Name='LICENSE' Source='LICENSE' KeyPath='yes'>
+			</File>
+		</Component>
+		
+		<Component Id='faqcomponent' Guid='AB4B3492-3DFE-11E1-BE49-B93C4824019B'>
+			<File Id='faq' Name='FAQ' Source='FAQ' KeyPath='yes'>
+			</File>
+		</Component>		
+		
+		<Component Id='quickstartcomponent' Guid='ED0DFC52-3DFE-11E1-8DD3-4E3D4824019B'>
+			<File Id='quick' Name='QUICKSTART' Source='QUICKSTART' KeyPath='yes'>
+			</File>
+		</Component>		
+		
+		<Component Id='installcomponent' Guid='F4ECBDB4-3DFE-11E1-9524-783D4824019B'>
+			<File Id='ins' Name='INSTALL' Source='INSTALL' KeyPath='yes'>
+			</File>
+		</Component>	
+
+		<Component Id='readmecomponent' Guid='F4ECBDB4-3DFE-11A2-9524-783D4824019B'>
+			<File Id='readme' Name='README' Source='README' KeyPath='yes'>
+			</File>
+		</Component>			
+	</DirectoryRef>	
+
+	
+	
+	
+	
+	
+<!--Library Components-->	
+       <DirectoryRef Id="INSTALLDIR">
+			<Directory Id="libdirectory" Name="lib">
+				<Directory Id="javadirectory" Name="java">
+					<Component Id="extractcomponent" Guid="{7E13F7CA-07A0-4751-A627-A52C30EB43F9}">
+						<File Id="fil15977D0B8BBE0A7A13140301A640571F" KeyPath="yes" Source="SourceDir\lib\java\ExtractKey.jar" />
+					</Component>
+				</Directory>
+				<Directory Id="perldirectory" Name="perl">
+					<Component Id="perlcomponent" Guid="{4FFCD2A0-7B1D-4CF7-8B7A-1797004513C0}">
+						<File Id="filD0D2BB8041A86846E765A76DE457A214" KeyPath="yes" Source="SourceDir\lib\perl\CertNanny.pm" />
+					</Component>
+					<Directory Id="certnannydirectory" Name="CertNanny">
+						<Component Id="configcomponent" Guid="{920EFDF6-66BE-48D1-B3A0-06B10D0768EB}">
+							<File Id="fil08E9A874D9098EE1488870464DD3D518" KeyPath="yes" Source="SourceDir\lib\perl\CertNanny\Config.pm" />
+						</Component>
+						<Component Id="keystorecomponent" Guid="{3FCCB07E-2326-4C83-BCBE-B24D960EA8DF}">
+							<File Id="filD08091D5D6F885925573CA242C061FEB" KeyPath="yes" Source="SourceDir\lib\perl\CertNanny\Keystore.pm" />
+						</Component>
+						<Component Id="utilcomponent" Guid="{182C2755-B324-4BF7-99E4-11B4FCDF7F16}">
+							<File Id="fil98937623533110D85726D42F4844D524" KeyPath="yes" Source="SourceDir\lib\perl\CertNanny\Util.pm" />
+						</Component>
+						<Directory Id="keystoredirectory" Name="Keystore">
+							<Component Id="javacomponent" Guid="{5295AA4D-8BC1-4D8B-876C-8610D5CD210C}">
+								<File Id="fil535551378D1DAACEFCAC9A8BA22CB1AB" KeyPath="yes" Source="SourceDir\lib\perl\CertNanny\Keystore\Java.pm" />
+							</Component>
+							<Component Id="mqcomponent" Guid="{4156B1F3-D5A2-43BD-A935-923A686ECD73}">
+								<File Id="fil2C540FB36805803758EAEF7EA28D6853" KeyPath="yes" Source="SourceDir\lib\perl\CertNanny\Keystore\MQ.pm" />
+							</Component>
+							<Component Id="opencomponent" Guid="{82445863-9AD0-4A55-9A45-1C250E384D55}">
+								<File Id="fil04DA5BC6E6F745815872E9AA1FDE6508" KeyPath="yes" Source="SourceDir\lib\perl\CertNanny\Keystore\OpenSSL.pm" />
+							</Component>
+							<Component Id="pkcscomponent" Guid="{2F19256A-BBD9-42BC-8B3A-4C547B2FCF5E}">
+								<File Id="fil80CE3A8EE9848F4402A4912498905E1F" KeyPath="yes" Source="SourceDir\lib\perl\CertNanny\Keystore\PKCS12.pm" />
+							</Component>
+							<Component Id="skeletoncomponent" Guid="{30E21696-1FF7-4E7C-AAFA-C69135F8BB99}">
+								<File Id="fil2D2822240CDFDFE89D4AF4A3321CF3C3" KeyPath="yes" Source="SourceDir\lib\perl\CertNanny\Keystore\Skeleton.pm" />
+							</Component>
+							<Component Id="windowscomponent" Guid="{20AF322C-2BBE-44E8-9933-BA692B302C42}">
+								<File Id="filC54721CD007EAAB52C59C5CAADCE876D" KeyPath="yes" Source="SourceDir\lib\perl\CertNanny\Keystore\Windows.pm" />
+							</Component>
+						</Directory>
+					</Directory>
+				</Directory>
+			</Directory>
+	</DirectoryRef>
+
+	
+
+<!--Uninstall Shortcut - uninstalls everything exept INSTALLDIR-->
+	<DirectoryRef Id="INSTALLDIR">
+        <Component Id="uninstallcomponent" Guid="D19D9E80-3EF5-11E1-9C44-1AF64724019B">
+            <Shortcut Id="UninstallCertNanny"             
+                    Name="Uninstall CertNanny"
+                    Target="[System64Folder]msiexec.exe"
+                    Arguments="/x [ProductCode]"/>
+			<RemoveFolder Id="RemoveINSTALLDIR" On="uninstall"/>		
+		</Component>
+    </DirectoryRef>
+	
+	
+
+<!--Defining Features-->	
+	<Feature Id="MainApplication" Title="Main Application" Level="1">
+			<ComponentRef Id="etccomponent" />
+            <ComponentRef Id="bincomponent" />
+            <ComponentRef Id="extractcomponent" />   
+			<ComponentRef Id="perlcomponent" />
+            <ComponentRef Id="configcomponent" />
+            <ComponentRef Id="keystorecomponent" />   
+			<ComponentRef Id="utilcomponent" />
+            <ComponentRef Id="javacomponent" />
+            <ComponentRef Id="mqcomponent" />  
+			<ComponentRef Id="opencomponent" />
+            <ComponentRef Id="pkcscomponent" />
+            <ComponentRef Id="skeletoncomponent" />   			
+			<ComponentRef Id="windowscomponent" />  
+			<ComponentRef Id="licensecomponent" />
+            <ComponentRef Id="faqcomponent" />
+            <ComponentRef Id="installcomponent" />   			
+			<ComponentRef Id="quickstartcomponent" /> 
+			<ComponentRef Id="removecomponent" /> 		
+			<ComponentRef Id="removestatecomponent" />
+            <ComponentRef Id="removecertscomponent" />
+            <ComponentRef Id="removetrustedrootcomponent" />   			
+			<ComponentRef Id="removequarantinecomponent" /> 			
+			<ComponentRef Id="createcertnannyapp" /> 
+			<ComponentRef Id="createstate" /> 
+			<ComponentRef Id="createcerts" /> 
+			<ComponentRef Id="createtrustedroot" /> 
+			<ComponentRef Id="createquarantine" /> 
+			<ComponentRef Id="readmecomponent" /> 
+			<ComponentRef Id="uninstallcomponent" /> 
+			</Feature>
+
+	</Product>
+</Wix>
