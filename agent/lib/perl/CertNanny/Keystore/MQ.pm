@@ -135,7 +135,7 @@ sub getIBMJavaEnvironment
 	# determine classpath for IBM classes
 	my $gsk6cmd = $self->{OPTIONS}->{gsk6cmd};
 
-	my $cmd = qq("$gsk6cmd") . " -version";
+	my $cmd = qq('$gsk6cmd') . " -version";
 
 	$self->log({ MSG => "Execute: $cmd",
 		     PRIO => 'debug' });
@@ -232,14 +232,14 @@ sub getcertlabel {
     croak "Could not get gsk6cmd location" unless defined $gsk6cmd;
 
     # get label name for user certificate
-    my @cmd = (qq("$gsk6cmd"),
+    my @cmd = (qq('$gsk6cmd'),
 	       '-cert',
 	       '-list',
 	       'personal',
 	       '-db',
-	       qq("$filename.kdb"),
+	       qq('$filename.kdb'),
 	       '-pw',
-	       qq("$self->{PIN}"));
+	       qq('$self->{PIN}'));
     
     $self->log({ MSG => "Execute: " . join(" ", hidepin(@cmd)),
 		 PRIO => 'debug' });
@@ -325,25 +325,25 @@ sub getkey {
 
     my @gsklibdir;
     if (defined $self->{OPTIONS}->{gsklibdir}) {
-	@gsklibdir = ('-Djava.library.path=' . qq("$self->{OPTIONS}->{gsklibdir}"));
+	@gsklibdir = ('-Djava.library.path=' . qq('$self->{OPTIONS}->{gsklibdir}'));
 	$ENV{PATH} .= $separator . $self->{OPTIONS}->{gsklibdir};
     }
     my @cmd;
-    @cmd = (qq("$self->{OPTIONS}->{JAVA}"),
+    @cmd = (qq('$self->{OPTIONS}->{JAVA}'),
 	    '-classpath',
-	    qq("$classpath"),
+	    qq('$classpath'),
 	    'de.cynops.java.crypto.keystore.ExtractKey',
 	    @gsklibdir,
 	    '-keystore',
-	    qq("$keystore"),
+	    qq('$keystore'),
 	    '-storepass',
-	    qq("$self->{PIN}"),
+	    qq('$self->{PIN}'),
 	    '-keypass',
-	    qq("$self->{PIN}"),
+	    qq('$self->{PIN}'),
 	    '-key',
-	    qq("$label"),
+	    qq('$label'),
 	    '-keyfile',
-	    qq("$p8file"),
+	    qq('$p8file'),
 	    '-provider',
 	    'IBMJCE',
 	    '-type',
@@ -400,17 +400,17 @@ sub getcert {
     my $certfile = $self->gettmpfile();
     # get label name for user certificate
     my @cmd;
-    @cmd = (qq("$gsk6cmd"),
+    @cmd = (qq('$gsk6cmd'),
 	    '-cert',
 	    '-extract',
 	    '-db',
-	    qq("$filename.kdb"),
+	    qq('$filename.kdb'),
 	    '-pw',
-	    qq("$self->{PIN}"),
+	    qq('$self->{PIN}'),
 	    '-label',
-	    qq("$label"),
+	    qq('$label'),
 	    '-target',
-	    qq("$certfile"),
+	    qq('$certfile'),
 	    '-format',
 	    'binary');
 
@@ -465,19 +465,19 @@ sub createrequest {
 # 	my $label = $self->{CERT}->{LABEL};
 # 	$self->debug("Label: $label");
 
-# 	my @cmd = (qq("$gsk6cmd"),
+# 	my @cmd = (qq('$gsk6cmd'),
 # 		   '-certreq',
 # 		   '-create',
 # 		   '-file',
-# 		   qq("$result->{REQUESTFILE}"),
+# 		   qq('$result->{REQUESTFILE}'),
 # 		   '-db',
-# 		   qq("$kdbfile"),
+# 		   qq('$kdbfile'),
 # 		   '-pw',
-# 		   qq("$self->{PIN}"),
+# 		   qq('$self->{PIN}'),
 # 		   '-dn',
-# 		   qq("$DN"),
+# 		   qq('$DN'),
 # 		   '-label',
-# 		   qq("$label"),
+# 		   qq('$label'),
 # 		   '-size',
 # 		   '1024');
 
@@ -545,15 +545,15 @@ sub installcert {
 
 	# FIXME: create new pin?
 	my @cmd;
-	@cmd = (qq("$gsk6cmd"),
+	@cmd = (qq('$gsk6cmd'),
 		'-keydb',
 		'-create',
 		'-type',
 		'cms',
 		'-db',
-		qq("$newkeystoredb"),
+		qq('$newkeystoredb'),
 		'-pw',
-		qq("$self->{PIN}"),
+		qq('$self->{PIN}'),
 		'-stash',
 		);
 
@@ -569,13 +569,13 @@ sub installcert {
 
 	# remove all certificates from this keystore
 	
-	@cmd = (qq("$gsk6cmd"),
+	@cmd = (qq('$gsk6cmd'),
 		'-cert',
 		'-list',
 		'-db',
-		qq("$newkeystoredb"),
+		qq('$newkeystoredb'),
 		'-pw',
-		qq("$self->{PIN}"),
+		qq('$self->{PIN}'),
 		);
 
 	$self->log({ MSG => "Execute: " . join(" ", hidepin(@cmd)),
@@ -605,15 +605,15 @@ sub installcert {
 	foreach (@calabels) {
 	    $self->debug("deleting label '$_' from MQ keystore");
 
-	    @cmd = (qq("$gsk6cmd"),
+	    @cmd = (qq('$gsk6cmd'),
 		    '-cert',
 		    '-delete',
 		    '-db',
-		    qq("$newkeystoredb"),
+		    qq('$newkeystoredb'),
 		    '-pw',
-		    qq("$self->{PIN}"),
+		    qq('$self->{PIN}'),
 		    '-label',
-		    qq("$_"),
+		    qq('$_'),
 		    );
 
 	    $self->log({ MSG => "Execute: " . join(" ", hidepin(@cmd)),
@@ -664,19 +664,19 @@ sub installcert {
 	    }
 
 
-	    @cmd = (qq("$gsk6cmd"),
+	    @cmd = (qq('$gsk6cmd'),
 		    '-cert',
 		    '-add',
 		    '-db',
-		    qq("$newkeystoredb"),
+		    qq('$newkeystoredb'),
 		    '-pw',
-		    qq("$self->{PIN}"),
+		    qq('$self->{PIN}'),
 		    '-file',
-		    qq("$cacertfile"),
+		    qq('$cacertfile'),
 		    '-format',
 		    'ascii',
 		    '-label',
-		    qq("$CN"),
+		    qq('$CN'),
 		    );
 
 	    $self->log({ MSG => "Execute: " . join(" ", hidepin(@cmd)),
@@ -704,17 +704,17 @@ sub installcert {
 	    return;
 	}
 
-	@cmd = (qq("$gsk6cmd"),
+	@cmd = (qq('$gsk6cmd'),
 		'-cert',
 		'-import',
 		'-target',
-		qq("$basename"),
+		qq('$basename'),
 		'-target_pw',
-		qq("$self->{PIN}"),
+		qq('$self->{PIN}'),
 		'-file',
-		qq("$pkcs12file"),
+		qq('$pkcs12file'),
 		'-pw',
-		qq("$self->{PIN}"),
+		qq('$self->{PIN}'),
 		'-type',
 		'pkcs12',
 		);
@@ -734,19 +734,19 @@ sub installcert {
     elsif ($self->{OPTIONS}->{keygenmode} eq "internal") {
 	$self->info("Internal key generation not supported");
 
-#  	my @cmd = (qq("$gsk6cmd"),
+#  	my @cmd = (qq('$gsk6cmd'),
 #  		   '-certreq',
 #  		   '-create',
 #  		   '-file',
-#  		   qq("$result->{REQUESTFILE}"),
+#  		   qq('$result->{REQUESTFILE}'),
 #  		   '-db',
-#  		   qq("$kdbfile"),
+#  		   qq('$kdbfile'),
 #  		   '-pw',
-#  		   qq("$self->{PIN}"),
+#  		   qq('$self->{PIN}'),
 #  		   '-dn',
-#  		   qq("$DN"),
+#  		   qq('$DN'),
 #  		   '-label',
-#  		   qq("$label"),
+#  		   qq('$label'),
 #  		   '-size',
 #  		   '1024');
 		   
