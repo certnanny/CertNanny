@@ -240,14 +240,14 @@ sub createpkcs12 {
     if ($args{CERTFORMAT} eq "DER") {
 	$certfile = $self->gettmpfile();
 
-	@cmd = (qq("$openssl"),
+	@cmd = (qq('$openssl'),
 		'x509',
 		'-in',
-		qq("$args{CERTFILE}"),
+		qq('$args{CERTFILE}'),
 		'-inform',
-		qq("$args{CERTFORMAT}"),
+		qq('$args{CERTFORMAT}'),
 		'-out',
-		qq("$certfile"),
+		qq('$certfile'),
 		'-outform',
 		'PEM',
 		);
@@ -278,7 +278,7 @@ sub createpkcs12 {
     my @name = ();
     if (defined $args{FRIENDLYNAME} and $args{FRIENDLYNAME} ne "") {
 	@name = ('-name',
-		 qq("$args{FRIENDLYNAME}"));
+		 qq('$args{FRIENDLYNAME}'));
     }
 
     my $cachainfile;
@@ -294,7 +294,7 @@ sub createpkcs12 {
 	
 	# add this temp file
 	push (@cachain, '-certfile');
-	push (@cachain, qq("$cachainfile"));
+	push (@cachain, qq('$cachainfile'));
 	
 	foreach my $entry (@{$args{CACHAIN}}) {
 	    my $file = $entry->{CERTFILE};
@@ -313,21 +313,21 @@ sub createpkcs12 {
 
 	    print $fh $content;
 	    push(@cachain, '-caname');
-	    push(@cachain, qq("$CN"));
+	    push(@cachain, qq('$CN'));
 	}
 	$fh->close;
     }
 
-    @cmd = (qq("$openssl"),
+    @cmd = (qq('$openssl'),
 	    'pkcs12',
 	    '-export',
 	    '-out',
-	    qq("$args{FILENAME}"),
+	    qq('$args{FILENAME}'),
 	    @passout,
 	    '-in',
-	    qq("$certfile"),
+	    qq('$certfile'),
 	    '-inkey',
-	    qq("$args{KEYFILE}"),
+	    qq('$args{KEYFILE}'),
 	    @passin,
 	    @name,
 	    @cachain,
@@ -380,10 +380,10 @@ sub generatekey {
     }
 
     # generate key
-    my @cmd = (qq("$openssl"),
+    my @cmd = (qq('$openssl'),
 	       'genrsa',
 	       '-out',
-	       qq("$outfile"),
+	       qq('$outfile'),
 	       @passout,
 	       $bits);
 
@@ -481,16 +481,16 @@ sub createrequest {
     $fh->close();
 
     # generate request
-    my @cmd = (qq("$openssl"),
+    my @cmd = (qq('$openssl'),
 	       'req',
 	       '-config',
-	       qq("$tmpconfigfile"),
+	       qq('$tmpconfigfile'),
 	       '-new',
 	       '-sha1',
 	       '-out',
-	       qq("$result->{REQUESTFILE}"),
+	       qq('$result->{REQUESTFILE}'),
 	       '-key',
-	       qq("$result->{KEYFILE}"),
+	       qq('$result->{KEYFILE}'),
 	);
 
     push (@cmd, ('-passin', 'env:PIN')) unless $pin eq "";
