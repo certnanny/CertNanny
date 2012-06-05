@@ -20,6 +20,7 @@ use File::Spec;
 use File::Copy;
 use Data::Dumper;
 use CertNanny::Util;
+use Cwd;
 
 $VERSION = 0.01;
 
@@ -153,7 +154,10 @@ sub CertutilWriteCerts()
 	push(@cmd, $outfile_tmp) if defined(($serial));
 	my $cmd = join(" ", @cmd);
 	CertNanny::Logging->debug("Execute: $cmd.");
+	my $olddir = getcwd();
+	chdir $self->{OPTIONS}->{ENTRY}->{statedir};
 	my $cmd_output = `$cmd`;
+	chdir $olddir;
 	CertNanny::Logging->debug("Dumping output of above command:\n $cmd_output");
 	CertNanny::Logging->debug("Output was written to $outfile_tmp") if defined($outfile_tmp);
 	return $outfile_tmp;
