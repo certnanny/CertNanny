@@ -1,3 +1,7 @@
 *.cfg
 lib/certs
 lib/rootcerts
+bin/sscep.exe
+log/*
+.includepath
+.project
