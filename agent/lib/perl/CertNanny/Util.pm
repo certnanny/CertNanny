@@ -15,6 +15,9 @@ package CertNanny::Util;
 
 use base qw(Exporter);
 
+use IO::File;
+use File::Glob qw(:globally :nocase);
+use File::Spec;
 use strict;
 use Time::Local;
 
@@ -33,13 +36,13 @@ sub run_command
 {
 	my $command = shift;
 	
-	open my $PROGRAM, "$command|" or die "could note execute $command";
+	open my $PROGRAM, "$command|" or die "could not execute $command";
 	my $output = do {
 		local $/;
 		<$PROGRAM>;
 	};
 	close($PROGRAM);
-	print $output;
+	print $output; #TODO Logging
 	return $?;
 }
 
@@ -133,7 +136,93 @@ sub printableisodate
 }
 
 
+# read (slurp) file from disk
+# Example: $self->read_file($filename);
+sub read_file
+{
+    my $self     = shift;
+    my $filename = shift;
+
+    if (! -e $filename)
+    {
+	CertNanny::Logging->error("read_file(): file does not exist");
+	return;
+    }
+
+    if (! -r $filename)
+    {
+	CertNanny::Logging->error("read_file(): file is not readable");
+	return;
+    }
+
+    my $result = do {
+	open my $fh, '<', $filename;
+	if (! $fh) {
+	    CertNanny::Logging->error("read_file(): file open failed");
+	    return;
+	}
+	binmode $fh;
+	local $/;
+	<$fh>;
+    };
+
+    return $result;
+}
 
 
+# write file to disk
+#
+# Example: $self->write_file(FILENAME => $filename, CONTENT => $data);
+#
+# The method will return false if the file already exists unless
+# the optional argument FORCE is set. In this case the method will overwrite
+# the specified file.
+# 
+# Example: $self->write_file(FILENAME => $filename, CONTENT => $data, FORCE => 1);
+# 
+
+sub write_file
+{
+    my $self     = shift;
+    my $keys     = { @_ };
+    my $filename = $keys->{FILENAME};
+    my $content  = $keys->{CONTENT};
+
+    if (! defined $filename)
+    {
+	CertNanny::Logging->error("write_file(): no filename specified");
+	return;
+    }
+
+    if (! defined $content)
+    {
+	CertNanny::Logging->error("write_file(): no content specified");
+	return;
+    }
+
+    if ((-e $filename) && (! $keys->{FORCE}))
+    {
+	CertNanny::Logging->error("write_file(): file already exists");
+	return;
+    }
+
+
+    my $mode = O_WRONLY;
+    if (! -e $filename) {
+	$mode |= O_EXCL | O_CREAT;
+    }
+
+    my $fh;
+    if (not sysopen($fh, $filename, $mode))
+    {
+	CertNanny::Logging->error("write_file(): file open failed");
+	return;
+    }
+    binmode $fh;
+    print {$fh} $content;
+    close $fh;
+
+    return 1;
+}
 
 1;
