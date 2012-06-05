@@ -124,7 +124,7 @@ sub getcert {
     my $self = shift;
     my $filename = $self->{OPTIONS}->{ENTRY}->{location};
 
-    my $certdata = $self->read_file($filename);
+    my $certdata = CertNanny::Util->read_file($filename);
     if (! defined $certdata) {
     	$self->seterror("getcert(): Could not read instance certificate file $filename");
 	return;
@@ -149,7 +149,7 @@ sub getkey {
 	return;
     }
 
-    my $keydata = $self->read_file($filename);
+    my $keydata = CertNanny::Util->read_file($filename);
     if (! defined $keydata || ($keydata eq "")) {
 	$self->seterror("getkey(): Could not read private key");
 	return;
@@ -218,7 +218,7 @@ sub createpkcs12 {
 	return;
     }
 
-    $self->debug("Certformat: $args{CERTFORMAT}");
+    CertNanny::Logging->debug("Certformat: $args{CERTFORMAT}");
 
     if (! defined $args{CERTFORMAT} or $args{CERTFORMAT} !~ /^(PEM|DER)$/) {
 	$self->seterror("createpks12(): Illegal certificate format specified");
@@ -240,19 +240,19 @@ sub createpkcs12 {
     if ($args{CERTFORMAT} eq "DER") {
 	$certfile = $self->gettmpfile();
 
-	@cmd = (qq('$openssl'),
+	@cmd = (qq("$openssl"),
 		'x509',
 		'-in',
-		qq('$args{CERTFILE}'),
+		qq("$args{CERTFILE}"),
 		'-inform',
-		qq('$args{CERTFORMAT}'),
+		qq("$args{CERTFORMAT}"),
 		'-out',
-		qq('$certfile'),
+		qq("$certfile"),
 		'-outform',
 		'PEM',
 		);
 
-	$self->log({ MSG => "Execute: " . join(" ", @cmd),
+	CertNanny::Logging->log({ MSG => "Execute: " . join(" ", @cmd),
 		     PRIO => 'debug' });
 	
 	if (run_command(join(' ', @cmd)) != 0) {
@@ -278,7 +278,7 @@ sub createpkcs12 {
     my @name = ();
     if (defined $args{FRIENDLYNAME} and $args{FRIENDLYNAME} ne "") {
 	@name = ('-name',
-		 qq('$args{FRIENDLYNAME}'));
+		 qq("$args{FRIENDLYNAME}"));
     }
 
     my $cachainfile;
@@ -294,16 +294,16 @@ sub createpkcs12 {
 	
 	# add this temp file
 	push (@cachain, '-certfile');
-	push (@cachain, qq('$cachainfile'));
+	push (@cachain, qq("$cachainfile"));
 	
 	foreach my $entry (@{$args{CACHAIN}}) {
 	    my $file = $entry->{CERTFILE};
 	    my @RDN = split(/(?<!\\),\s*/, $entry->{CERTINFO}->{SubjectName});
 	    my $CN = $RDN[0];
 	    $CN =~ s/^CN=//;
-	    $self->debug("Adding CA certificate '$CN' in $file");
+	    CertNanny::Logging->debug("Adding CA certificate '$CN' in $file");
 
-	    my $content = $self->read_file($file);
+	    my $content = CertNanny::Util->read_file($file);
 	    if (! defined $content) {
 		$self->seterror("createpkcs12(): Could not read CA chain entry");
 		$fh->close;
@@ -313,28 +313,28 @@ sub createpkcs12 {
 
 	    print $fh $content;
 	    push(@cachain, '-caname');
-	    push(@cachain, qq('$CN'));
+	    push(@cachain, qq("$CN"));
 	}
 	$fh->close;
     }
 
-    @cmd = (qq('$openssl'),
+    @cmd = (qq("$openssl"),
 	    'pkcs12',
 	    '-export',
 	    '-out',
-	    qq('$args{FILENAME}'),
+	    qq("$args{FILENAME}"),
 	    @passout,
 	    '-in',
-	    qq('$certfile'),
+	    qq("$certfile"),
 	    '-inkey',
-	    qq('$args{KEYFILE}'),
+	    qq("$args{KEYFILE}"),
 	    @passin,
 	    @name,
 	    @cachain,
 	    );
 
 
-    $self->log({ MSG => "Execute: " . join(" ", @cmd),
+    CertNanny::Logging->log({ MSG => "Execute: " . join(" ", @cmd),
 		 PRIO => 'debug' });
 
     if (run_command(join(' ', @cmd)) != 0) {
@@ -361,41 +361,58 @@ sub generatekey {
     my $keyfile = $self->{OPTIONS}->{ENTRYNAME} . "-key.pem";
     my $outfile = File::Spec->catfile($self->{OPTIONS}->{ENTRY}->{statedir},
 				      $keyfile);
-
     my $pin = $self->{PIN} || $self->{OPTIONS}->{ENTRY}->{pin} || "";
+	my $bits = $self->{SIZE} || $self->{OPTIONS}->{ENTRY}->{size} ||'1024';
+	my $engine = $self->{ENGINE} || $self->{OPTIONS}->{ENTRY}->{engine} ||'no';
+	my $enginetype = $self->{ENGINETYPE} || $self->{OPTIONS}->{ENTRY}->{enginetype} ||'none';
+	my $enginename = $self->{ENGINENAME} || $self->{OPTIONS}->{ENTRY}->{enginename} ||'none';
+	#TODO Doku!
+	if ($engine eq "yes" && $enginetype eq "hook"){
+		my $hook = $self->{INSTANCE}->{OPTIONS}->{ENTRY}->{hook}->{genkey}
+		  || $self->{OPTIONS}->{ENTRY}->{hook}->{genkey};
+	
+		$self->executehook($hook,
+		__SIZE__    => $bits,
+		__TMPFILE__ =>"$outfile");
+    } else{
+    	my $openssl = $self->{OPTIONS}->{CONFIG}->get('cmd.openssl', 'FILE');
+    	if (! defined $openssl) {
+		$self->seterror("No openssl shell specified");
+		return;
+    	}
 
-    my $openssl = $self->{OPTIONS}->{CONFIG}->get('cmd.openssl', 'FILE');
-    if (! defined $openssl) {
-	$self->seterror("No openssl shell specified");
-	return;
-    }
+	    my @passout = ();
+    	if (defined $pin and $pin ne "") {
+		@passout = ('-des3',
+			    '-passout',
+			    'env:PIN');
+	   	 }	
 
-    my $bits = '1024';
+         my @engine_cmd = ();
+         if($enginetype eq "OpenSSL" && $engine eq "yes")
+         {
+            @engine_cmd = ('-engine', $enginename); 
+         }
 
-    my @passout = ();
-    if (defined $pin and $pin ne "") {
-	@passout = ('-des3',
-		    '-passout',
-		    'env:PIN');
-    }
+    	# generate key
+    	my @cmd = (qq("$openssl"),
+	    	'genrsa',
+		   	'-out',
+	       	qq("$outfile"),
+	       	@passout,
+            @engine_cmd,
+	       	$bits);
 
-    # generate key
-    my @cmd = (qq('$openssl'),
-	       'genrsa',
-	       '-out',
-	       qq('$outfile'),
-	       @passout,
-	       $bits);
+	    CertNanny::Logging->log({ MSG => "Execute: " . join(" ", @cmd),
+			 PRIO => 'debug' });
 
-    $self->log({ MSG => "Execute: " . join(" ", @cmd),
-		 PRIO => 'debug' });
-
-    $ENV{PIN} = $pin;
-    if (run_command(join(' ', @cmd)) != 0) {
-	$self->seterror("RSA key generation failed");
-	delete $ENV{PIN};
-	return;
-    }
+	    $ENV{PIN} = $pin;
+	    if (run_command(join(' ', @cmd)) != 0) {
+		$self->seterror("RSA key generation failed");
+		delete $ENV{PIN};
+		return;
+   		}
+	}
     chmod 0600, $outfile;
     delete $ENV{PIN};
     
@@ -404,7 +421,7 @@ sub generatekey {
 
 sub createrequest {
     my $self = shift;
-    $self->info("Creating request");
+    CertNanny::Logging->info("Creating request");
 
     #print Dumper $self;
     my $result = $self->generatekey();
@@ -429,7 +446,7 @@ sub createrequest {
 
     my $DN = $self->{CERT}->{INFO}->{SubjectName};
 
-    $self->debug("DN: $DN");
+    CertNanny::Logging->debug("DN: $DN");
     # split DN into individual RDNs. This regex splits at the ','
     # character if it is not escaped with a \ (negative look-behind)
     my @RDN = split(/(?<!\\),\s*/, $DN);
@@ -481,21 +498,24 @@ sub createrequest {
     $fh->close();
 
     # generate request
-    my @cmd = (qq('$openssl'),
+    my @cmd = (qq("$openssl"),
 	       'req',
 	       '-config',
-	       qq('$tmpconfigfile'),
+	       qq("$tmpconfigfile"),
 	       '-new',
 	       '-sha1',
 	       '-out',
-	       qq('$result->{REQUESTFILE}'),
+	       qq("$result->{REQUESTFILE}"),
 	       '-key',
-	       qq('$result->{KEYFILE}'),
+	       qq("$result->{KEYFILE}"),
 	);
-
+	my $engine = $self->{ENGINE} || $self->{OPTIONS}->{ENTRY}->{engine} ||'no';
+	if ($engine eq "yes"){
+		push (@cmd, ('-engine', $self->{OPTIONS}->{ENTRY}->{enginename}));
+	}
     push (@cmd, ('-passin', 'env:PIN')) unless $pin eq "";
 
-    $self->log({ MSG => "Execute: " . join(" ", @cmd),
+    CertNanny::Logging->log({ MSG => "Execute: " . join(" ", @cmd),
 		 PRIO => 'debug' });
 
     $ENV{PIN} = $pin;
@@ -689,7 +709,7 @@ sub installcert {
 		$dir,
 		$filename);
 	    
-	    if (! $self->write_file(
+	    if (! CertNanny::Util->write_file(
 		      FILENAME => $filename,
 		      CONTENT  => $cert->{CERTDATA},
 		      FORCE    => 1,

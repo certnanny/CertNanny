@@ -20,6 +20,9 @@ use File::Spec;
 
 use CertNanny::Config;
 use CertNanny::Keystore;
+use CertNanny::Logging;
+use CertNanny::Enroll;
+use CertNanny::Enroll::Sscep;
 use Data::Dumper;
 
 use IPC::Open3;
@@ -40,8 +43,7 @@ sub new
 
     $self->{CONFIG} = CertNanny::Config->new($args{CONFIG});
     return unless defined $self->{CONFIG};
-	
-	$self->redirect_stdout_stderr();
+    CertNanny::Logging->new(CONFIG => $self->{CONFIG});
     
     # set default library path
     my @dirs = File::Spec->splitdir($FindBin::Bin);
@@ -74,23 +76,6 @@ sub DESTROY {
 }
 
 
-
-sub redirect_stdout_stderr
-{
-	my $self = shift;
-	if($self->{CONFIG}->get("logfile", "FILE"))
-	{
-	   #TODO Fehlerbehandlung
-	   #write alle messages into a file 
-	   my $file = $self->{CONFIG}->get("logfile", "FILE");
-	   $|=1;
-	   open STDOUT, ">>", $file || die "Could not redirect STDOUT. Stopped";
-	   open STDERR, ">>", $file || die "Could not redirect STDERR. Stopped";
-	}
-	
-	return 1;
-}
-
 sub AUTOLOAD
 {
     my $self = shift;
@@ -101,6 +86,9 @@ sub AUTOLOAD
     # automagically call
     if ($attr =~ /(?:info|check|renew)/) {
 	return $self->iterate_entries("do_$attr");
+    }
+    elsif($attr =~ /initialenroll/i){
+    	do_challengePW();
     }
 }
 
@@ -119,7 +107,7 @@ sub iterate_entries
 
     my $rc = 1;
     foreach my $entry (keys %{$self->{ITEMS}}) {
-	print "LOG: [info] Checking keystore $entry\n" if ($loglevel >= 3);
+	CertNanny::Logging->info("Checking keystore $entry\n");
 	my $keystore = 
 	    CertNanny::Keystore->new(CONFIG => $self->{CONFIG},
 				     ENTRY =>  $self->{ITEMS}->{$entry},
@@ -165,23 +153,31 @@ sub do_check
     my $rc;
     $rc = $keystore->checkvalidity(0);
     if (! $rc) {
-	$keystore->log({MSG => "Certificate has expired. No automatic renewal can be performed.", PRIO => 'error'});
+	CertNanny::Logging->log({MSG => "Certificate has expired. No automatic renewal can be performed.", PRIO => 'error'});
 	return 1;
     }
 
     $rc = $keystore->checkvalidity($autorenew);
     if (! $rc) {
-	$keystore->log({MSG => "Certificate is to be scheduled for automatic renewal ($autorenew days prior to expiry)"});
+	CertNanny::Logging->log({MSG => "Certificate is to be scheduled for automatic renewal ($autorenew days prior to expiry)"});
     }
     $rc = $keystore->checkvalidity($warnexpiry);
     if (! $rc) {
-	$keystore->log({MSG => "Certificate is valid for less than $warnexpiry days",PRIO => 'notice'});
+	CertNanny::Logging->log({MSG => "Certificate is valid for less than $warnexpiry days",PRIO => 'notice'});
 	$keystore->warnexpiry();
     }
     return 1;
 }
 
-
+sub do_challengePW{
+	my $self = shift;
+	my %args = ( @_ );
+	
+#	my $rootCerts CertNanny::Enroll::Sscep::getCa();
+	
+	print"ende";#TODO
+	
+}
 sub do_renew
 {
     my $self = shift;
@@ -196,20 +192,20 @@ sub do_renew
 
     $rc = $keystore->checkvalidity(0);
     if (! $rc) {
-	$keystore->log({MSG => "Certificate has expired. No automatic renewal can be performed.", PRIO => 'error'});
+	CertNanny::Logging->log({MSG => "Certificate has expired. No automatic renewal can be performed.", PRIO => 'error'});
 	return 1;
     }
     
     $rc = $keystore->checkvalidity($autorenew);
-    if (! $rc) {
+    if (! $rc) { 
 	# schedule automatic renewal
-	$keystore->log({MSG => "Scheduling renewal"});
+	CertNanny::Logging->log({MSG => "Scheduling renewal"});
 	$keystore->{INSTANCE}->renew();
     }
 
     $rc = $keystore->checkvalidity($warnexpiry);
     if (! $rc) {
-	$keystore->log({MSG => "Certificate is valid for less than $warnexpiry days",PRIO => 'notice'});
+	CertNanny::Logging->log({MSG => "Certificate is valid for less than $warnexpiry days",PRIO => 'notice'});
 	$keystore->warnexpiry();
     }
     return 1;

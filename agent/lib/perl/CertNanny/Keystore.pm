@@ -20,6 +20,7 @@ use File::Temp;
 use File::Basename;
 use Carp;
 use Data::Dumper;
+use CertNanny::Logging;
 
 use CertNanny::Util;
 
@@ -67,7 +68,7 @@ sub new
 	$args{ENTRY}->{statefile} = $statefile;
     }
     
-    $self->loglevel($args{CONFIG}->get('loglevel') || 3);
+    CertNanny::Logging->loglevel($args{CONFIG}->get('loglevel') || 3);
 
     # set defaults
     $self->{OPTIONS}->{tmp_dir} = 
@@ -118,6 +119,7 @@ sub new
 
     if (defined $self->{CERT}) {
 	$self->{CERT}->{INFO} = $self->getcertinfo(%{$self->{CERT}});
+	
 
 	my %convopts = %{$self->{CERT}};
 
@@ -141,7 +143,6 @@ sub new
 
     return ($self);
 }
-
 
 sub DESTROY
 {
@@ -185,7 +186,7 @@ sub convertcert {
     # sanity checks
     foreach my $key qw( CERTFORMAT OUTFORMAT ) {
 	if ($options{$key} !~ m{ \A (?: DER | PEM ) \z }xms) {
-	    $self->seterror("convertcert(): Incorrect $key: $options{$key}");
+	    CertNanny::Logging->error("convertcert(): Incorrect $key: $options{$key}");
 	    return;
 	}
     }
@@ -195,23 +196,23 @@ sub convertcert {
     my $openssl = $self->{OPTIONS}->{openssl_shell};
     my $infile;
 
-    my @cmd = (qq('$openssl'),
+    my @cmd = (qq("$openssl"),
 	       'x509',
 	       '-in',
 	);
     
     if (exists $options{CERTDATA}) {
 	$infile = $self->gettmpfile();
-	if (! $self->write_file(FILENAME => $infile,
+	if (! CertNanny::Util->write_file(FILENAME => $infile,
 				CONTENT  => $options{CERTDATA},
 	    )) {
-	    $self->seterror("convertcert(): Could not write temporary file");
+	    CertNanny::Logging->error("convertcert(): Could not write temporary file");
 	    return;
 	}
 
-	push(@cmd, qq('$infile'));
+	push(@cmd, qq("$infile"));
     } else {
-	push(@cmd, qq('$options{CERTFILE}'));
+	push(@cmd, qq("$options{CERTFILE}"));
     }
     
     push(@cmd, ('-inform', $options{CERTFORMAT}));
@@ -220,14 +221,14 @@ sub convertcert {
     $output->{CERTFORMAT} = $options{OUTFORMAT};
 
     my $cmd = join(' ', @cmd);
-    $self->log({ MSG => "Execute: " . $cmd,
+    CertNanny::Logging->log({ MSG => "Execute: " . $cmd,
 		 PRIO => 'debug' });
 
     $output->{CERTDATA} = `$cmd`;
     unlink $infile if defined $infile;
 
     if ($? != 0) {
-	$self->seterror("convertcert(): Could not convert certificate");
+	CertNanny::Logging->error("convertcert(): Could not convert certificate");
 	return;
     }
     
@@ -266,14 +267,14 @@ sub convertkey {
     # sanity checks
     foreach my $key qw( KEYFORMAT OUTFORMAT ) {
 	if ($options{$key} !~ m{ \A (?: DER | PEM ) \z }xms) {
-	    $self->seterror("convertkey(): Incorrect $key: $options{$key}");
+	    CertNanny::Logging->error("convertkey(): Incorrect $key: $options{$key}");
 	    return;
 	}
     }
 
     foreach my $key qw( KEYTYPE OUTTYPE ) {
 	if ($options{$key} !~ m{ \A (?: OpenSSL | PKCS8 ) \z }xms) {
-	    $self->seterror("convertkey(): Incorrect $key: $options{$key}");
+	    CertNanny::Logging->error("convertkey(): Incorrect $key: $options{$key}");
 	    return;
 	}
     }
@@ -281,7 +282,7 @@ sub convertkey {
     my $openssl = $self->{OPTIONS}->{openssl_shell};
     my $output;
 
-    my @cmd = (qq('$openssl'),
+    my @cmd = (qq("$openssl"),
 	);
 
     # KEYTYPE OUTTYPE  CMD
@@ -311,7 +312,7 @@ sub convertkey {
 	    if (defined($options{OUTPASS}) && $options{OUTPASS} ne "") {
 		# if -nocrypt is specified on the command line, the output
 		# is always unencrypted, even if -passout is specified.
-		$self->seterror("convertkey(): PKCS8 conversion from unencrypted to encrypted key is not supported");
+		CertNanny::Logging->error("convertkey(): PKCS8 conversion from unencrypted to encrypted key is not supported");
 		return;
 	    }
 	}
@@ -336,16 +337,16 @@ sub convertkey {
     push(@cmd, '-in');
     if (defined $options{KEYDATA}) {
 	$infile = $self->gettmpfile();
-	if (! $self->write_file(FILENAME => $infile,
+	if (! CertNanny::Util->write_file(FILENAME => $infile,
 				CONTENT  => $options{KEYDATA},
 	    )) {
-	    $self->seterror("convertkey(): Could not write temporary file");
+	    CertNanny::Logging->error("convertkey(): Could not write temporary file");
 	    return;
 	}
 
-	push(@cmd, qq('$infile'));
+	push(@cmd, qq("$infile"));
     } else {
-	push(@cmd, qq('$options{KEYFILE}'));
+	push(@cmd, qq("$options{KEYFILE}"));
     }
 
     $ENV{PASSIN} = "";
@@ -370,7 +371,7 @@ sub convertkey {
     
     my $cmd = join(' ', @cmd);
 
-    $self->log({ MSG => "Execute: " . $cmd,
+    CertNanny::Logging->log({ MSG => "Execute: " . $cmd,
 		 PRIO => 'debug' });
 
     ### PASSIN: $ENV{PASSOUT}
@@ -384,14 +385,12 @@ sub convertkey {
     unlink $infile if defined $infile;
     
     if ($? != 0) {
-	$self->seterror("convertkey(): Could not convert key");
+	CertNanny::Logging->error("convertkey(): Could not convert key");
 	return;
     }
     
     return $output;
 }
-
-
 
 sub loglevel {
     my $self = shift;
@@ -471,6 +470,7 @@ sub store_state
 # arg:
 # return: error message description caused by the last operation (cleared 
 #         after each query)
+#TODO Is this used anywhere?
 sub geterror
 {
     my $self = shift;
@@ -486,70 +486,6 @@ sub geterror
 
     $errmsg;
 }
-
-# set error message
-# arg: error message
-# message is also logged with priority ERROR
-sub seterror
-{
-    my $self = shift;
-    my $arg = shift;
-    
-    $self->{ERRMSG} = $arg;
-    $self->log({ MSG => $arg,
-		 PRIO => 'error' });
-}
-
-sub log
-{
-    my $self = shift;
-    my $arg = shift;
-    confess "Not a hash ref" unless (ref($arg) eq "HASH");
-    return unless (defined $arg->{MSG});
-    my $entryname = $self->{OPTIONS}->{ENTRYNAME};
-    my $prio = lc($arg->{PRIO}) || "info";
-
-    my %level = ( 'debug'  => 4,
-		  'info'   => 3,
-		  'notice' => 2,
-		  'error'  => 1,
-		  'fatal'  => 0 );
-
-
-    print STDERR "WARNING: log called with undefined priority '$prio'" unless exists $level{$prio};
-    if ($level{$prio} <= $self->loglevel()) {
-
-	# fallback to STDERR
-	print STDERR "LOG: [$prio] $entryname: $arg->{MSG}\n";
-	
-	# call hook
-	#$self->executehook($self->{INSTANCE}->{OPTIONS}->{ENTRY}->{hook}->{log},
-#			   '__PRIORITY__' => $prio,
-#			   '__MESSAGE__' => $arg->{MSG});
-    }
-    return 1;
-}
-
-sub debug
-{
-    my $self = shift;
-    my $arg = shift;
-
-#    if (exists $self->{DEBUG} and $self->{DEBUG}) {
-	$self->log({ MSG => $arg,
-		     PRIO => 'debug' });
-#    }
-}
-
-sub info
-{
-    my $self = shift;
-    my $arg = shift;
-
-    $self->log({ MSG => $arg,
-		 PRIO => 'info' });
-}
-
 
 
 # dynamically load keystore instance module
@@ -584,97 +520,6 @@ sub gettmpfile
     
     push (@{$self->{TMPFILE}}, $tmpfile);
     return ($tmpfile);
-}
-
-
-# read (slurp) file from disk
-# Example: $self->read_file($filename);
-
-sub read_file
-{
-    my $self     = shift;
-    my $filename = shift;
-
-    if (! -e $filename)
-    {
-	$self->seterror("read_file(): file does not exist");
-	return;
-    }
-
-    if (! -r $filename)
-    {
-	$self->seterror("read_file(): file is not readable");
-	return;
-    }
-
-    my $result = do {
-	open my $fh, '<', $filename;
-	if (! $fh) {
-	    $self->seterror("read_file(): file open failed");
-	    return;
-	}
-	binmode $fh;
-	local $/;
-	<$fh>;
-    };
-
-    return $result;
-}
-
-
-# write file to disk
-#
-# Example: $self->write_file(FILENAME => $filename, CONTENT => $data);
-#
-# The method will return false if the file already exists unless
-# the optional argument FORCE is set. In this case the method will overwrite
-# the specified file.
-# 
-# Example: $self->write_file(FILENAME => $filename, CONTENT => $data, FORCE => 1);
-# 
-
-sub write_file
-{
-    my $self     = shift;
-    my $keys     = { @_ };
-    my $filename = $keys->{FILENAME};
-    my $content  = $keys->{CONTENT};
-
-    if (! defined $filename)
-    {
-	$self->seterror("write_file(): no filename specified");
-	return;
-    }
-
-    if (! defined $content)
-    {
-	$self->seterror("write_file(): no content specified");
-	return;
-    }
-
-    if ((-e $filename) && (! $keys->{FORCE}))
-    {
-	$self->seterror("write_file(): file already exists");
-	return;
-    }
-
-
-    my $mode = O_WRONLY;
-    if (! -e $filename) {
-	$mode |= O_EXCL | O_CREAT;
-    }
-
-    my $fh;
-    if (not sysopen($fh, $filename, $mode))
-    {
-	$self->seterror("write_file(): file open failed");
-	return;
-    }
-    binmode $fh;
-    print {$fh} $content;
-    close $fh;
-
-    return 1;
 }
 
 
@@ -717,7 +562,7 @@ sub installfile
 	# write content data to suitable temporary file
 	my $tries = 10;
 	while ($ii < $tries 
-	       && (! $self->write_file(
+	       && (! CertNanny::Util->write_file(
 			 FILENAME => $tmpfile,
 			 CONTENT  => $entry->{CONTENT}))) {
 	    # write_file() will not overwrite existing files, an error
@@ -761,7 +606,7 @@ sub installfile
 	foreach my $entry (@args) {
 	    unlink $entry->{TMPFILENAME};
 	}
-	$self->seterror("installfile(): could not create new file(s)");
+	CertNanny::Logging->error("installfile(): could not create new file(s)");
 	return;
     }
 
@@ -781,7 +626,7 @@ sub installfile
 
 	# check if it still persists
 	if (-e $backupfile) {
-	    $self->seterror("installfile(): could not unlink backup file $backupfile");
+	    CertNanny::Logging->error("installfile(): could not unlink backup file $backupfile");
 
 	    # clean up and bail out
 
@@ -802,7 +647,7 @@ sub installfile
 	    # only if the file exists
 	    if ((! rename $file, $backupfile)  # but cannot be moved away
 		|| (-e $file)) {               # or still exists after moving
-		$self->seterror("installfile(): could not rename $file to backup file $backupfile");
+		CertNanny::Logging->error("installfile(): could not rename $file to backup file $backupfile");
 		
 		# undo rename operations
 		foreach my $undo (@original_files) {
@@ -837,13 +682,13 @@ sub installfile
 	    $msg .= " ($entry->{DESCRIPTION})";
 	}
 
-	$self->info($msg);
+	CertNanny::Logging->info($msg);
 
 	if (! rename $tmpfile, $file) {
 	    # should not happen!
 	    # ... but we have to handle this nevertheless
 
-	    $self->seterror("installfile(): could not rename $tmpfile to target file $file");
+	    CertNanny::Logging->error("installfile(): could not rename $tmpfile to target file $file");
 	    # undo rename operations
 	    foreach my $undo (@original_files) {
 		unlink $undo->{SRC};
@@ -931,12 +776,12 @@ sub getcertinfo
     # sanity checks
     if (! (defined $options{CERTFILE} or defined $options{CERTDATA}))
     {
-	$self->seterror("getcertinfo(): No input data specified");
+	CertNanny::Logging->error("getcertinfo(): No input data specified");
 	return;
     }
     if ((defined $options{CERTFILE} and defined $options{CERTDATA}))
     {
-	$self->seterror("getcertinfo(): Ambigous input data specified");
+	CertNanny::Logging->error("getcertinfo(): Ambigous input data specified");
 	return;
     }
     
@@ -947,11 +792,11 @@ sub getcertinfo
 
     my @input = ();
     if (defined $options{CERTFILE}) {
-	@input = ('-in', qq('$options{CERTFILE}'));
+	@input = ('-in', qq("$options{CERTFILE}"));
     }
 
     # export certificate
-    my @cmd = (qq('$openssl'),
+    my @cmd = (qq("$openssl"),
 	       'x509',
 	       @input,
 	       '-inform',
@@ -968,14 +813,14 @@ sub getcertinfo
 	       '-pubkey',
 	       '-purpose',
 	       '>',
-	       qq('$outfile'));
+	       qq("$outfile"));
 
-    $self->log({ MSG => "Execute: " . join(" ", @cmd),
+    CertNanny::Logging->log({ MSG => "Execute: " . join(" ", @cmd),
 		 PRIO => 'debug' });	
     my $fh;
     if (!open $fh, "|" . join(' ', @cmd))
     {
-    	$self->seterror("getcertinfo(): open error");
+    	CertNanny::Logging->error("getcertinfo(): open error");
 	unlink $outfile;
 	return;
 
@@ -990,7 +835,7 @@ sub getcertinfo
     
     if ($? != 0)
     {
-    	$self->seterror("getcertinfo(): Error ASN.1 decoding certificate");
+    	CertNanny::Logging->error("getcertinfo(): Error ASN.1 decoding certificate");
 	unlink $outfile;
 	return;
     }
@@ -998,7 +843,7 @@ sub getcertinfo
     open $fh, '<', $outfile;
     if (! $fh)
     {
-    	$self->seterror("getcertinfo(): Error analysing ASN.1 decoded certificate");
+    	CertNanny::Logging->error("getcertinfo(): Error analysing ASN.1 decoded certificate");
 	unlink $outfile;
     	return;
     }
@@ -1086,7 +931,7 @@ sub getcertinfo
     {
 	if (! exists $certinfo->{$var})
 	{
-	    $self->seterror("getcertinfo(): Could not determine field '$var' from X.509 certificate");
+	    CertNanny::Logging->error("getcertinfo(): Could not determine field '$var' from X.509 certificate");
 	    return;
 	}
     }
@@ -1136,7 +981,7 @@ sub getcertinfo
 	my $dmon = $month{$mon};
 	if (! defined $dmon)
 	{
-	    $self->seterror("getcertinfo(): could not parse month '$mon' in date '$certinfo->{$var}' returned by OpenSSL");
+	    CertNanny::Logging->error("getcertinfo(): could not parse month '$mon' in date '$certinfo->{$var}' returned by OpenSSL");
 	    return;
 	}
 	
@@ -1167,7 +1012,7 @@ sub getinfo
 # return true if certificate is still valid for more than <days>
 # return false otherwise
 # return undef on error
-sub checkvalidity {
+sub checkvalidity {	
     my $self = shift;
     my $days = shift || 0;
     
@@ -1191,13 +1036,13 @@ sub renew {
 	$laststate = $self->renewalstate();
 	# renewal state machine
 	if ($self->renewalstate() eq "initial") {
-	    $self->log({ MSG => "State: initial",
+	    CertNanny::Logging->log({ MSG => "State: initial",
 			 PRIO => 'debug' });
 	    
 	    $self->{STATE}->{DATA}->{RENEWAL}->{REQUEST} = $self->createrequest();
 	    
 	    if (! defined $self->{STATE}->{DATA}->{RENEWAL}->{REQUEST}) {
-		$self->log({ MSG => "Could not create certificate request",
+		CertNanny::Logging->log({ MSG => "Could not create certificate request",
 			     PRIO => 'error' });
 		return;
 	    }	    
@@ -1205,18 +1050,18 @@ sub renew {
 	} 
 	elsif ($self->renewalstate() eq "sendrequest") 
 	{
-	    $self->log({ MSG => "State: sendrequest",
+	    CertNanny::Logging->log({ MSG => "State: sendrequest",
 			 PRIO => 'debug' });
 	    
 	    if (! $self->sendrequest()) {
-		$self->log({ MSG => "Could not send request",
+		CertNanny::Logging->log({ MSG => "Could not send request",
 			     PRIO => 'error' });
 		return;
 	    }
 	}
 	elsif ($self->renewalstate() eq "completed") 
 	{
-	    $self->log({ MSG => "State: completed",
+	    CertNanny::Logging->log({ MSG => "State: completed",
 			 PRIO => 'debug' });
 
 	    # reset state
@@ -1233,7 +1078,7 @@ sub renew {
 	}
 	else
 	{
-	    $self->log({ MSG => "State unknown: " . $self->renewalstate(),
+	    CertNanny::Logging->log({ MSG => "State unknown: " . $self->renewalstate(),
 			 PRIO => 'error' });
 	    return;
 	}
@@ -1290,47 +1135,73 @@ sub getrootcerts {
     my $self = shift;
     my @result = ();
 
-    my $exclude_expired 
+  ROOTCERT:
+    foreach my $index (keys %{$self->{OPTIONS}->{ENTRY}->{rootcacert}}) {
+		next if ($index eq "INHERIT");
+		#....{$index} is a valid cert?
+		my $res = $self->checkCert($self->{OPTIONS}->{ENTRY}->{rootcacert}->{$index});
+		if ($res !=0) {
+			push(@result,$res);
+		}
+		else{ 
+			#check if ...{$index} is folder
+			if ( not opendir(inFolder,$self->{OPTIONS}->{ENTRY}->{rootcacert}->{$index})){
+				CertNanny::Logging->error("can't open folder: $index"); 
+				next ROOTCERT; #eventuell die? 
+			}
+			#go through each file in the folder and check if it is avalid cert
+			my @files = readdir inFolder;
+			foreach my $file (@files){
+				my $res = $self->checkCert("$self->{OPTIONS}->{ENTRY}->{rootcacert}->{$index}$file");
+				if ($res !=0) {
+					push(@result,$res);
+				}	
+			}	
+		}		
+    }
+	return \@result;
+    
+}
+	
+sub checkCert{
+	my $self=shift;
+	my $certfile=shift;	
+	
+	my $exclude_expired 
 	= $self->{OPTIONS}->{ENTRY}->{excludeexpiredrootcerts} || 'yes';
     my $exclude_notyetvalid 
 	= $self->{OPTIONS}->{ENTRY}->{excludenotyetvalidrootcerts} || 'no';
-
-  ROOTCERT:
-    foreach my $index (keys %{$self->{OPTIONS}->{ENTRY}->{rootcacert}}) {
-	next if ($index eq "INHERIT");
-
+		
 	# FIXME: determine certificate format of root certificate
-	my $certfile = $self->{OPTIONS}->{ENTRY}->{rootcacert}->{$index};
+	#my $certfile = $self->{OPTIONS}->{ENTRY}->{rootcacert}->{$index};
 	my $certformat = 'PEM';
 	my $certinfo = $self->getcertinfo(CERTFILE => $certfile,
 					  CERTFORMAT => $certformat);
 
-	next ROOTCERT if (! defined $certinfo);
+	return 0 if (! defined $certinfo);
 	my $notbefore = CertNanny::Util::isodatetoepoch($certinfo->{NotBefore});
 	my $notafter  = CertNanny::Util::isodatetoepoch($certinfo->{NotAfter});
 	my $now = time;
 	
 	if ($exclude_expired =~ m{ yes }xmsi
 	    && ($now > $notafter)) {
-	    $self->info("Skipping expired root certificate " . $certinfo->{SubjectName});
-	    next ROOTCERT;
+	    CertNanny::Logging->info("Skipping expired root certificate " . $certinfo->{SubjectName});
+	    return 0;
 	}
 
 	if ($exclude_notyetvalid =~ m{ yes }xmsi
 	    && ($now < $notbefore)) {
-	    $self->info("Skipping not yet valid root certificate " . $certinfo->{SubjectName});
-	    next ROOTCERT;
+	    CertNanny::Logging->info("Skipping not yet valid root certificate " . $certinfo->{SubjectName});
+	    return 0;
 	}
-	$self->info("Trusted root certificate: " . $certinfo->{SubjectName});
+	CertNanny::Logging->info("Trusted root certificate: " . $certinfo->{SubjectName});
 
-	push (@result, { CERTINFO => $certinfo,
+	return {CERTINFO => $certinfo,
 			 CERTFILE => $certfile,
 			 CERTFORMAT => $certformat,
-	      });
+	      };
     }
     
-    return \@result;
-}
 
 
 # build a certificate chain for the specified certificate. the certificate 
@@ -1420,7 +1291,7 @@ sub buildcertificatechain {
     # output structure, for building the chain start with the end entity cert
     my @chain = ( $cert );
 
-    $self->info("Building certificate chain");
+    CertNanny::Logging->info("Building certificate chain");
   BUILDCHAIN:
     while (1) {
 	### check if the first cert in the chain is a root certificate...
@@ -1434,7 +1305,7 @@ sub buildcertificatechain {
 	my $issuer_found = 0;
 
 	my $subject = $chain[0]->{CERTINFO}->{SubjectName} || $chain[0]->{INFO}->{SubjectName};
-	$self->info("Subject: $subject");
+	CertNanny::Logging->info("Subject: $subject");
 
       FINDISSUER:
 	foreach my $entry (@cacerts, @trustedroots) {
@@ -1457,19 +1328,19 @@ sub buildcertificatechain {
 	    $subject = $entry->{CERTINFO}->{SubjectName} || $entry->{INFO}->{SubjectName};
 	    if ($issuer_found) {
 		if ($issuer_found == 1) {
-		    $self->info("  Issuer identified via AuthKeyID match: $subject");
+		    CertNanny::Logging->info("  Issuer identified via AuthKeyID match: $subject");
 		} else {
-		    $self->info("  Issuer identified via DN match: $subject");
+		    CertNanny::Logging->info("  Issuer identified via DN match: $subject");
 		}
 	    } else {
-		$self->debug("  Unrelated: $subject");
+		CertNanny::Logging->debug("  Unrelated: $subject");
 	    }
 
 	    last FINDISSUER if ($issuer_found);
 	}
 
 	if (! $issuer_found) {
-	    $self->seterror("No matching issuer certificate was found");
+	    CertNanny::Logging->error("No matching issuer certificate was found");
 	    return;
 	}
 	if (! defined $cert) {
@@ -1488,18 +1359,18 @@ sub buildcertificatechain {
 
     # verify that the first certificate in the chain is a trusted root
     if (scalar @chain == 0) {
-	$self->seterror("Certificate chain could not be built");
+	CertNanny::Logging->error("Certificate chain could not be built");
 	return;
     }
 
     my $fingerprint = $chain[0]->{CERTINFO}->{CertificateFingerprint};
     if (! exists $rootcertfingerprint{ $fingerprint }) {
-	$self->seterror("Root certificate is not trusted");
-	$self->info("Untrusted root certificate DN: " . 
+	CertNanny::Logging->error("Root certificate is not trusted");
+	CertNanny::Logging->info("Untrusted root certificate DN: " . 
 		    $chain[0]->{CERTINFO}->{SubjectName});
 	return;
     }
-    $self->info("Root certificate is marked as trusted in configuration");
+    CertNanny::Logging->info("Root certificate is marked as trusted in configuration");
     
     return \@chain;
 }
@@ -1522,16 +1393,16 @@ sub executehook {
     # hook not defined -> success
     return 1 unless defined $hook;
     
-    $self->info("Running external hook function");
+    CertNanny::Logging->info("Running external hook function");
     
     if ($hook =~ /::/) {
 	# execute Perl method
-	$self->info("Perl method hook not yet supported");
+	CertNanny::Logging->info("Perl method hook not yet supported");
 	return;
     } 
     else {
 	# assume it's an executable
-	$self->debug("Calling shell hook executable");
+	CertNanny::Logging->debug("Calling shell hook executable");
 
 	$args{'__LOCATION__'} = $self->{INSTANCE}->{OPTIONS}->{ENTRY}->{location} || $self->{OPTIONS}->{ENTRY}->{location};
 	$args{'__ENTRY__'}    =  $self->{INSTANCE}->{OPTIONS}->{ENTRYNAME} || $self->{OPTIONS}->{ENTRYNAME};
@@ -1542,7 +1413,7 @@ sub executehook {
 	    $hook =~ s/$key/$value/g;
 	}
 	
-	$self->info("Exec: $hook");
+	CertNanny::Logging->info("Exec: $hook");
 	return run_command($hook) / 256;
     }
 }
@@ -1580,13 +1451,13 @@ sub getcacerts {
     my $sscep = $self->{OPTIONS}->{CONFIG}->get('cmd.sscep');
     my $cacertdir = $self->{OPTIONS}->{ENTRY}->{scepcertdir};
     if (! defined $cacertdir) {
-	$self->seterror("scepcertdir not specified for keystore");
+	CertNanny::Logging->error("scepcertdir not specified for keystore");
 	return;
     }
     my $cacertbase = File::Spec->catfile($cacertdir, 'cacert');
     my $scepurl = $self->{OPTIONS}->{ENTRY}->{scepurl};
     if (! defined $scepurl) {
-	$self->seterror("scepurl not specified for keystore");
+	CertNanny::Logging->error("scepurl not specified for keystore");
 	return;
     }
 
@@ -1594,28 +1465,28 @@ sub getcacerts {
     my $ii = 0;
     while (-e $cacertbase . "-" . $ii) {
 	my $file = $cacertbase . "-" . $ii;
-	$self->debug("Unlinking $file");
+	CertNanny::Logging->debug("Unlinking $file");
 	unlink $file;
 	if (-e $file) {
-	    $self->seterror("could not delete CA certificate file $file, cannot proceed");
+	    CertNanny::Logging->error("could not delete CA certificate file $file, cannot proceed");
 	    return;
 	}
 	$ii++;
     }
     
 
-    $self->info("Requesting CA certificates");
+    CertNanny::Logging->info("Requesting CA certificates");
     
-    my @cmd = (qq('$sscep'),
+    my @cmd = (qq("$sscep"),
 	       'getca',
 	       '-u',
 	       qq($scepurl),
 	       '-c',
-	       qq('$cacertbase'));
+	       qq("$cacertbase"));
     
-    $self->debug("Exec: " . join(' ', @cmd));
+    CertNanny::Logging->debug("Exec: " . join(' ', @cmd));
     if (run_command(join(' ', @cmd)) != 0) {
-	$self->seterror("Could not retrieve CA certs");
+	CertNanny::Logging->error("Could not retrieve CA certs");
 	return;
     }
     
@@ -1655,11 +1526,11 @@ sub getcacerts {
 sub sendrequest {
     my $self = shift;
 
-    $self->info("Sending request");
+    CertNanny::Logging->info("Sending request");
     #print Dumper $self->{STATE}->{DATA};
 
     if (! $self->getcacerts()) {
-	$self->seterror("Could not get CA certs");
+	CertNanny::Logging->error("Could not get CA certs");
 	return;
     }
 
@@ -1684,15 +1555,15 @@ sub sendrequest {
     my $openssl = $self->{OPTIONS}->{openssl_shell};
     
     
-    $self->debug("request: $requestfile");
-    $self->debug("keyfile: $keyfile");
-    $self->debug("sscep: $sscep");
-    $self->debug("scepurl: $scepurl");
-    $self->debug("scepsignaturekey: $scepsignaturekey");
-    $self->debug("scepchecksubjectname: $scepchecksubjectname");
-    $self->debug("scepracert: $scepracert");
-    $self->debug("newcertfile: $newcertfile");
-    $self->debug("openssl: $openssl");
+    CertNanny::Logging->debug("request: $requestfile");
+    CertNanny::Logging->debug("keyfile: $keyfile");
+    CertNanny::Logging->debug("sscep: $sscep");
+    CertNanny::Logging->debug("scepurl: $scepurl");
+    CertNanny::Logging->debug("scepsignaturekey: $scepsignaturekey");
+    CertNanny::Logging->debug("scepchecksubjectname: $scepchecksubjectname");
+    CertNanny::Logging->debug("scepracert: $scepracert");
+    CertNanny::Logging->debug("newcertfile: $newcertfile");
+    CertNanny::Logging->debug("openssl: $openssl");
 
 
     # get unencrypted new key in PEM format
@@ -1707,21 +1578,21 @@ sub sendrequest {
 	);
 
     if (! defined $newkey) {
-	$self->seterror("Could not convert new key");
+	CertNanny::Logging->error("Could not convert new key");
 	return;
     }
 
     # write new PEM encoded key to temp file
     my $requestkeyfile = $self->gettmpfile();
-    $self->debug("requestkeyfile: $requestkeyfile");
+    CertNanny::Logging->debug("requestkeyfile: $requestkeyfile");
     chmod 0600, $requestkeyfile;
 
-    if (! $self->write_file(
+    if (! CertNanny::Util->write_file(
 	FILENAME => $requestkeyfile,
 	CONTENT  => $newkey->{KEYDATA},
 	FORCE    => 1,
 	)) {
-	$self->seterror("Could not write unencrypted copy of new file to temp file");
+	CertNanny::Logging->error("Could not write unencrypted copy of new file to temp file");
 	return;
     }
 
@@ -1734,7 +1605,7 @@ sub sendrequest {
 	# get existing private key from keystore
 	my $oldkey = $self->getkey();
 	if (! defined $oldkey) {
-	    $self->seterror("Could not get old key from certificate instance");
+	    CertNanny::Logging->error("Could not get old key from certificate instance");
 	    return;
 	}
 
@@ -1747,56 +1618,56 @@ sub sendrequest {
 	    );
 
 	if (! defined $oldkey_pem_unencrypted) {
-	    $self->seterror("Could not convert (old) private key");
+	    CertNanny::Logging->error("Could not convert (old) private key");
 	    return;
 	}
 
  	$oldkeyfile = $self->gettmpfile();
         chmod 0600, $oldkeyfile;
 
-	if (! $self->write_file(
+	if (! CertNanny::Util->write_file(
 		  FILENAME => $oldkeyfile,
 		  CONTENT  => $oldkey_pem_unencrypted->{KEYDATA},
 		  FORCE    => 1,
 	    )) {
-	    $self->seterror("Could not write temporary key file (old key)");
+	    CertNanny::Logging->error("Could not write temporary key file (old key)");
 	    return;
 	}
 
 	$oldcertfile = $self->gettmpfile();
-	if (! $self->write_file(
+	if (! CertNanny::Util->write_file(
 		  FILENAME => $oldcertfile,
 		  CONTENT  => $self->{CERT}->{RAW}->{PEM},
 		  FORCE    => 1,
 	    )) {
-	    $self->seterror("Could not write temporary cert file (old certificate)");
+	    CertNanny::Logging->error("Could not write temporary cert file (old certificate)");
 	    return;
 	}
 
 
         @autoapprove = ('-K', 
-			qq('$oldkeyfile'),
+			qq("$oldkeyfile"),
 			'-O',
-			qq('$oldcertfile'),
+			qq("$oldcertfile"),
 	    );
     }
     my @checksubjectname = ();
     @checksubjectname = ('-C') if $scepchecksubjectname =~ /yes/i;
     my @verbose = ();
-    push @verbose, '-v' if $self->loglevel() >= 5;
-    push @verbose, '-d' if $self->loglevel() >= 6;
-    @cmd = (qq('$sscep'),
+    push @verbose, '-v' if CertNanny::Logging->loglevel() >= 5;
+    push @verbose, '-d' if CertNanny::Logging->loglevel() >= 6;
+    @cmd = (qq("$sscep"),
 	    'enroll',
 	    '-u',
 	    qq($scepurl),
 	    '-c',
-	    qq('$scepracert'),
+	    qq("$scepracert"),
 	    '-r',
-	    qq('$requestfile'),
+	    qq("$requestfile"),
 	    '-k',
-	    qq('$requestkeyfile'),
+	    qq("$requestkeyfile"),
 	    '-l',
-	    qq('$newcertfile'),
+	    qq("$newcertfile"),
 	    @autoapprove,
 	    @checksubjectname,
 	    @verbose,
@@ -1805,8 +1676,12 @@ sub sendrequest {
 	    '-n',
 	    '1',
 	    );
+	    if(defined $self->{OPTIONS}->{CONFIG}->{ENTRY}->{enginename} || $self->{OPTIONS}->{ENTRY}->{enginename}){
+	    	push @cmd, '-g';
+	    	push @cmd,  "$self->{OPTIONS}->{CONFIG}->{ENTRY}->{enginename}" || "$self->{OPTIONS}->{ENTRY}->{enginename}";
+	    }  
 
-    $self->debug("Exec: " . join(' ', @cmd));
+    CertNanny::Logging->debug("Exec: " . join(' ', @cmd));
     
     my $rc;
     eval {
@@ -1814,7 +1689,7 @@ sub sendrequest {
 	eval { alarm 120 }; # eval not supported in perl 5.7.1 on win32
 	$rc = run_command(join(' ', @cmd)) / 256;
 	eval { alarm 0 }; # eval not supported in perl 5.7.1 on win32
-	$self->info("Return code: $rc");
+	CertNanny::Logging->info("Return code: $rc");
     };
     unlink $requestkeyfile;
     unlink $oldkeyfile if (defined $oldkeyfile);
@@ -1823,19 +1698,19 @@ sub sendrequest {
     if ($@) {
 	# timed out
 	die unless $@ eq "alarm\n";   # propagate unexpected errors
-	$self->info("Timed out.");
+	CertNanny::Logging->info("Timed out.");
 	return;
     }
 
 
     if ($rc == 3) {
 	# request is pending
-	$self->info("Request is still pending");
+	CertNanny::Logging->info("Request is still pending");
 	return 1;
     }
 
     if ($rc != 0) {
-	$self->seterror("Could not run SCEP enrollment");
+	CertNanny::Logging->error("Could not run SCEP enrollment");
 	return;
     }
 
@@ -1854,7 +1729,7 @@ sub sendrequest {
 	    $self->buildcertificatechain($newcert);
 	
 	if (! defined $self->{STATE}->{DATA}->{CERTCHAIN}) {
-	    $self->seterror("Could not build certificate chain, probably trusted root certificate was not configured");
+	    CertNanny::Logging->error("Could not build certificate chain, probably trusted root certificate was not configured");
 	    return;
 	}
 

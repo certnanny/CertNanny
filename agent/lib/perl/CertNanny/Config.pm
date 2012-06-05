@@ -267,8 +267,10 @@ sub parse
 	    inherit_config($self->{CONFIG}->{$toplevel}, $entry);
         }
     }
+  
     1;
 }
+
 
 
 
