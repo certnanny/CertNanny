@@ -174,7 +174,7 @@ sub getkey {
 
     my $cmd = join(' ', @cmd);
     my $handle;
-    if (! open $handle, "$cmd 2>/dev/null |") {
+    if (! open $handle, "$cmd |") {
 	$self->seterror("could not run OpenSSL shell");
 	delete $ENV{PIN};
 	return;
