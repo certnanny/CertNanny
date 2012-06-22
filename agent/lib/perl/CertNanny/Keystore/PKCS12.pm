@@ -106,7 +106,7 @@ sub getcert {
 
     my $cmd = join(' ', @cmd);
     my $handle;
-    if (! open $handle, "$cmd |") {
+    if (! open $handle, "$cmd 2>/dev/null |") {
 	$self->seterror("could not run OpenSSL shell");
 	delete $ENV{PIN};
 	return;

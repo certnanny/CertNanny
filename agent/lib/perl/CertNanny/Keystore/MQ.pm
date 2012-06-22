@@ -239,7 +239,7 @@ sub getcertlabel {
 	       '-db',
 	       qq("$filename.kdb"),
 	       '-pw',
-	       qq('$self->{PIN}'));
+	       qq("$self->{PIN}"));
     
     $self->log({ MSG => "Execute: " . join(" ", hidepin(@cmd)),
 		 PRIO => 'debug' });
@@ -337,11 +337,11 @@ sub getkey {
 	    '-keystore',
 	    qq("$keystore"),
 	    '-storepass',
-	    qq('$self->{PIN}'),
+	    qq("$self->{PIN}"),
 	    '-keypass',
-	    qq('$self->{PIN}'),
+	    qq("$self->{PIN}"),
 	    '-key',
-	    qq('$label'),
+	    qq("$label"),
 	    '-keyfile',
 	    qq("$p8file"),
 	    '-provider',
@@ -406,9 +406,9 @@ sub getcert {
 	    '-db',
 	    qq("$filename.kdb"),
 	    '-pw',
-	    qq('$self->{PIN}'),
+	    qq("$self->{PIN}"),
 	    '-label',
-	    qq('$label'),
+	    qq("$label"),
 	    '-target',
 	    qq("$certfile"),
 	    '-format',
@@ -553,7 +553,7 @@ sub installcert {
 		'-db',
 		qq("$newkeystoredb"),
 		'-pw',
-		qq('$self->{PIN}'),
+		qq("$self->{PIN}"),
 		'-stash',
 		);
 
@@ -575,7 +575,7 @@ sub installcert {
 		'-db',
 		qq("$newkeystoredb"),
 		'-pw',
-		qq('$self->{PIN}'),
+		qq("$self->{PIN}"),
 		);
 
 	$self->log({ MSG => "Execute: " . join(" ", hidepin(@cmd)),
@@ -611,9 +611,9 @@ sub installcert {
 		    '-db',
 		    qq("$newkeystoredb"),
 		    '-pw',
-		    qq('$self->{PIN}'),
+		    qq("$self->{PIN}"),
 		    '-label',
-		    qq('$_'),
+		    qq("$_"),
 		    );
 
 	    $self->log({ MSG => "Execute: " . join(" ", hidepin(@cmd)),
@@ -670,13 +670,13 @@ sub installcert {
 		    '-db',
 		    qq("$newkeystoredb"),
 		    '-pw',
-		    qq('$self->{PIN}'),
+		    qq("$self->{PIN}"),
 		    '-file',
 		    qq("$cacertfile"),
 		    '-format',
 		    'ascii',
 		    '-label',
-		    qq('$CN),
+		    qq("$CN"),
 		    );
 
 	    $self->log({ MSG => "Execute: " . join(" ", hidepin(@cmd)),
@@ -710,11 +710,11 @@ sub installcert {
 		'-target',
 		qq("$basename"),
 		'-target_pw',
-		qq('$self->{PIN}'),
+		qq("$self->{PIN}"),
 		'-file',
 		qq("$pkcs12file"),
 		'-pw',
-		qq('$self->{PIN}'),
+		qq("$self->{PIN}"),
 		'-type',
 		'pkcs12',
 		);

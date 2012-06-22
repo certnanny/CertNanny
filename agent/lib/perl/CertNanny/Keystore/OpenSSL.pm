@@ -245,7 +245,7 @@ sub createpkcs12 {
 		'-in',
 		qq("$args{CERTFILE}"),
 		'-inform',
-		qq('$args{CERTFORMAT}'),
+		qq("$args{CERTFORMAT}"),
 		'-out',
 		qq("$certfile"),
 		'-outform',
@@ -278,7 +278,7 @@ sub createpkcs12 {
     my @name = ();
     if (defined $args{FRIENDLYNAME} and $args{FRIENDLYNAME} ne "") {
 	@name = ('-name',
-		 qq('$args{FRIENDLYNAME}'));
+		 qq("$args{FRIENDLYNAME}"));
     }
 
     my $cachainfile;
@@ -313,7 +313,7 @@ sub createpkcs12 {
 
 	    print $fh $content;
 	    push(@cachain, '-caname');
-	    push(@cachain, qq('$CN'));
+	    push(@cachain, qq("$CN"));
 	}
 	$fh->close;
     }
