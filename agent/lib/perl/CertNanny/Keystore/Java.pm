@@ -129,7 +129,7 @@ sub keytoolcmd {
     my @cmd = ($options->{keytool}, -storepass => qq{'$entry->{pin}'});
     push(@cmd, -provider => qq{'$entry->{provider}'}) if ($entry->{provider});
     push(@cmd, -storetype => qq{'$entry->{format}'}) if ($entry->{format});
-    push(@cmd, -keystore => qq{'$location'}) if ($location);
+    push(@cmd, -keystore => qq{"$location"}) if ($location);
     push(@cmd, @_);
     @cmd;
 }
@@ -213,7 +213,7 @@ sub getkey {
     	-keypass => qq{'$entry->{keypin}'},
 	-key => qq{'$entry->{alias}'});
     shift @cmd; # remove keytool
-    unshift @cmd, qq{'$options->{java}'}, -cp => qq{'$classpath'}, 
+    unshift @cmd, qq{"$options->{java}"}, -cp => qq{"$classpath"}, 
     	'de.cynops.java.crypto.keystore.ExtractKey';
 
     $self->log({MSG => "Execute: " . join(' ',hidepin(@cmd)), PRIO => 'debug'});
@@ -311,7 +311,7 @@ sub createrequest {
     @cmd = $self->keytoolcmd($tmpkeystore, '-certreq',
         -keypass => qq{'$entry->{keypin}'},
 	-alias => qq{'$entry->{alias}'},
-	-file => qq{'$requestfile'},
+	-file => qq{"$requestfile"},
 	);
     push(@cmd, -sigalg => $entry->{sigalg}) if ($entry->{sigalg});
     $self->log({MSG => "Execute: " . join(' ',hidepin(@cmd)), PRIO => 'debug'});
@@ -381,7 +381,7 @@ sub installcert {
     
         @cmd = $self->keytoolcmd($tmpkeystore,
 		'-import','-noprompt',
-		-file => qq('$cacertfile'),
+		-file => qq("$cacertfile"),
 		-alias => qq('$cn'));
     
         $self->log({MSG => "execute: " . join(" ", hidepin(@cmd)), PRIO => 'debug' });
@@ -397,7 +397,7 @@ sub installcert {
     @cmd = $self->keytoolcmd($tmpkeystore,
 		'-import','-noprompt',
 		-alias => qq{'$entry->{alias}'},
-		-file => qq('$args{CERTFILE}'));
+		-file => qq("$args{CERTFILE}"));
     $self->log({MSG => "execute: " . join(" ", hidepin(@cmd)), PRIO => 'debug' });
     if (system(join(' ', @cmd)) != 0) {
         $self->seterror("could not add certificate to keystore");
