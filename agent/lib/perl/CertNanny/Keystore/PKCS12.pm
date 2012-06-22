@@ -95,10 +95,10 @@ sub getcert {
 
     my @cmd;
 
-    @cmd = (qq('$openssl'),
+    @cmd = (qq("$openssl"),
 	    'pkcs12',
 	    '-in',
-	    qq('$filename'),
+	    qq("$filename"),
 	    '-nokeys',
 	    '-clcerts',
 	    @passin,
@@ -164,10 +164,10 @@ sub getkey {
 
     my @cmd;
 
-    @cmd = (qq('$openssl'),
+    @cmd = (qq("$openssl"),
 	    'pkcs12',
 	    '-in',
-	    qq('$filename'),
+	    qq("$filename"),
 	    '-nocerts',
 	    @passin,
 	);
