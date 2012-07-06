@@ -195,7 +195,7 @@ sub convertcert {
     my $openssl = $self->{OPTIONS}->{openssl_shell};
     my $infile;
 
-    my @cmd = (qq('$openssl'),
+    my @cmd = (qq("$openssl"),
 	       'x509',
 	       '-in',
 	);
@@ -209,9 +209,9 @@ sub convertcert {
 	    return;
 	}
 
-	push(@cmd, qq('$infile'));
+	push(@cmd, qq("$infile"));
     } else {
-	push(@cmd, qq('$options{CERTFILE}'));
+	push(@cmd, qq("$options{CERTFILE}"));
     }
     
     push(@cmd, ('-inform', $options{CERTFORMAT}));
@@ -281,7 +281,7 @@ sub convertkey {
     my $openssl = $self->{OPTIONS}->{openssl_shell};
     my $output;
 
-    my @cmd = (qq('$openssl'),
+    my @cmd = (qq("$openssl"),
 	);
 
     # KEYTYPE OUTTYPE  CMD
@@ -343,9 +343,9 @@ sub convertkey {
 	    return;
 	}
 
-	push(@cmd, qq('$infile'));
+	push(@cmd, qq("$infile"));
     } else {
-	push(@cmd, qq('$options{KEYFILE}'));
+	push(@cmd, qq("$options{KEYFILE}"));
     }
 
     $ENV{PASSIN} = "";
@@ -947,11 +947,11 @@ sub getcertinfo
 
     my @input = ();
     if (defined $options{CERTFILE}) {
-	@input = ('-in', qq('$options{CERTFILE}'));
+	@input = ('-in', qq("$options{CERTFILE}"));
     }
 
     # export certificate
-    my @cmd = (qq('$openssl'),
+    my @cmd = (qq("$openssl"),
 	       'x509',
 	       @input,
 	       '-inform',
@@ -968,7 +968,7 @@ sub getcertinfo
 	       '-pubkey',
 	       '-purpose',
 	       '>',
-	       qq('$outfile'));
+	       qq("$outfile"));
 
     $self->log({ MSG => "Execute: " . join(" ", @cmd),
 		 PRIO => 'debug' });	
@@ -1606,12 +1606,12 @@ sub getcacerts {
 
     $self->info("Requesting CA certificates");
     
-    my @cmd = (qq('$sscep'),
+    my @cmd = (qq("$sscep"),
 	       'getca',
 	       '-u',
 	       qq($scepurl),
 	       '-c',
-	       qq('$cacertbase'));
+	       qq("$cacertbase"));
     
     $self->debug("Exec: " . join(' ', @cmd));
     if (run_command(join(' ', @cmd)) != 0) {
@@ -1775,9 +1775,9 @@ sub sendrequest {
 
 
         @autoapprove = ('-K', 
-			qq('$oldkeyfile'),
+			qq("$oldkeyfile"),
 			'-O',
-			qq('$oldcertfile'),
+			qq("$oldcertfile"),
 	    );
     }
     my @checksubjectname = ();
@@ -1785,18 +1785,18 @@ sub sendrequest {
     my @verbose = ();
     push @verbose, '-v' if $self->loglevel() >= 5;
     push @verbose, '-d' if $self->loglevel() >= 6;
-    @cmd = (qq('$sscep'),
+    @cmd = (qq("$sscep"),
 	    'enroll',
 	    '-u',
 	    qq($scepurl),
 	    '-c',
-	    qq('$scepracert'),
+	    qq("$scepracert"),
 	    '-r',
-	    qq('$requestfile'),
+	    qq("$requestfile"),
 	    '-k',
-	    qq('$requestkeyfile'),
+	    qq("$requestkeyfile"),
 	    '-l',
-	    qq('$newcertfile'),
+	    qq("$newcertfile"),
 	    @autoapprove,
 	    @checksubjectname,
 	    @verbose,

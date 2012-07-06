@@ -95,10 +95,10 @@ sub getcert {
 
     my @cmd;
 
-    @cmd = (qq('$openssl'),
+    @cmd = (qq("$openssl"),
 	    'pkcs12',
 	    '-in',
-	    qq('$filename'),
+	    qq("$filename"),
 	    '-nokeys',
 	    '-clcerts',
 	    @passin,
@@ -164,17 +164,17 @@ sub getkey {
 
     my @cmd;
 
-    @cmd = (qq('$openssl'),
+    @cmd = (qq("$openssl"),
 	    'pkcs12',
 	    '-in',
-	    qq('$filename'),
+	    qq("$filename"),
 	    '-nocerts',
 	    @passin,
 	);
 
     my $cmd = join(' ', @cmd);
     my $handle;
-    if (! open $handle, "$cmd 2>/dev/null |") {
+    if (! open $handle, "$cmd |") {
 	$self->seterror("could not run OpenSSL shell");
 	delete $ENV{PIN};
 	return;
