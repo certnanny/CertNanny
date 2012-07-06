@@ -3,23 +3,13 @@
 #//  Daemon.pm
 #//  Win32::Daemon Perl extension package file
 #//
-#//  Copyright (c) 1998-2002 Dave Roth
-#//  Courtesy of Roth Consulting
-#//  http://www.roth.net/
-#//
-#//  This file may be copied or modified only under the terms of either 
-#//  the Artistic License or the GNU General Public License, which may 
-#//  be found in the Perl 5.0 source kit.
-#//
-#//  2008.03.24  :Date
-#//  20080324    :Version
 #//////////////////////////////////////////////////////////////////////////////
 
 package Win32::Daemon;
 
 $PACKAGE = $Package = "Win32::Daemon";
 
-$VERSION = 20080324;
+$VERSION = 20110117;
 require Exporter;
 require DynaLoader;
 
@@ -60,7 +50,9 @@ my $RECOGNIZED_CONTROLS;
     SERVICE_CONTROL_SESSIONCHANGE
     SERVICE_CONTROL_USER_DEFINED
     SERVICE_CONTROL_RUNNING
-	SERVICE_CONTROL_PRESHUTDOWN 
+    SERVICE_CONTROL_PRESHUTDOWN 
+    SERVICE_CONTROL_TIMER
+    SERVICE_CONTROL_START
 
     SERVICE_ACCEPT_DEVICEEVENT
     SERVICE_ACCEPT_HARDWAREPROFILECHANGE
@@ -158,7 +150,8 @@ return( 1 );
 
 END
 {
-    Win32::Daemon::StopService();
+    # Stop the service only if we are in the main thread (not in a forked process)
+    Win32::Daemon::StopService() if $$ > 0;
 }
 
 __END__
@@ -722,6 +715,7 @@ time it starts.  It will immediately terminate.
 This particular example does not really illustrate the capabilities of a Perl based service.
 
 =head2 Example 2: Typical skeleton code
+
   # This style of Win32::Daemon use is obsolete. It still works but the
   # callback model is more efficient and easier to use. Refer to examples 4 and 5.
   use Win32;
@@ -985,85 +979,72 @@ have to do essentially the same thing that the main while loop in C<Example 2> d
         Win32::Daemon::StopService();
     }
 
+=head1 NOTES:
 
+=head2 Timer/Running Callbacks:
 
+Starting with build 20080321 the "running" callback is deprecated and replaced with the
+"timer" callback. Scripts should no longer test for a state of SERVICE_RUNNING but instead check
+for the state of SERVICE_CONTROL_TIMER to indicate whether or not a callback has occurred 
+due to a timer.
+If a script...
 
-=head1 HISTORY:
+=over 4
 
-    - 20011205 rothd
-        -Fixed bug where "invalid service state 80" is reported in the Win32 event log.
-        -Added initial support for SCM request callbacks (this is not implemented fully and
-         is not supported yet).
-        -Added SERVICE_CONTROL_NONE constant
-        -Fixed State() so it only returns states, not commands.
-        -Modified QueryLastMessage(). It now allows you to reset the last message to SERVICE_CONTROL_NONE.
-        -Added SERVICE_NOT_READY state
-        -Cleaned up some states.
-        -Added AcceptedControls() function.
+=item *
 
-    - 20011217 rothd
-        - Added support for .Net Server accept control contants:
-            SERVICE_ACCEPT_HARDWAREPROFILECHANGE
-            SERVICE_ACCEPT_POWEREVENT
-            SERVICE_ACCEPT_SESSIONCHANGE
+...registers for the "running" callback it will continue to work
+as expected: timer expiration results in a callback to the subroutine registered for the "running"
+callback passing in a value of SERVICE_RUNNING. 
 
-    - 20011221 rothd@roth.net
-        - Fixed bug where service doesn't work properly with Windows NT 4. We were 
-          defaulting by acccepting the SERVICE_ACCEPT_PARAMCHANGE and 
-          SERVICE_ACCEPT_NETBINDCHANGE controls. However, they were introduced in 
-          Win2k so NT 4 coughed up blood with them.
-    
-    - 20020108 rothd@roth.net
-        - Fixed another bug wwhere servie wouldn't work on Win2k machines. We
-          were treating Win2k (version 5.0) the same as WinXP (version 5.1) and
-          adding WinXP specific controls. This rendered the service unable to
-          start, pause or stop. Fix was only in the Daemon.pm file.
+=item *
 
-    - 20020114 marc.pijnappels@nec-computers.com
-        - Fixed another bug where service wouldn't work on WinXP machines. Variable 
-          recognized_controls was wrongly initialized for WinXP systems. This 
-          rendered the service unable to start, pause or stop. Fix was only in 
-          the Daemon.pm file.
+...registers for the "timer" callback then timer expiration results in a callback to the 
+subroutine registered for the "timer" callback, passing in a value of SREVICE_CONTROL_TIMER.
 
-    - 20020605 rothd@roth.net
-        - Added support for reporting service errors. You can now pass in a
-          hash reference into State(). More details in the POD docs.
-          
-    - 20030617 rothd@roth.net
-        - Added support for querying and setting service security. This includes
-          DACL and SACL support. Due to complexity and failures you can not set
-          owner or group. But in most cases (99%) this is not needed.
-          - GetSecurity()
-          - SetSecurity()
-        - Finished incorporating callback routines.
-        - Added a few more events.
-              
-	- 20080321	rothd@roth.net
-	   -Callbacks can now return a state value. This is the functional equivilent of calling 
-	    Win32::Daemon::State( $NewState ) before returning:
-			//	sub EventCallback
-			//	{
-			//	  my( $Event, $Context ) = @_;
-			//		# Process the event
-			//		Win32::Daemon::State( $NewState );		
-			//	  return;
-			//	}
-			//	=================== SAME AS ====================
-			//	sub EventCallback
-			//	{
-			//	  my( $Event, $Context ) = @_;
-			//		# Process the event
-			//	  return( $NewState );
-			//	}
-		
-	  -Callback timer works correctly!
-	  -CALLBACK_RUNNING has been depreciated and replaced with CALLBACK_TIMER. It is only called
-	   when the timer (set by CallbackTimer()) has expired. Use this as a heartbeat. You only need
-	   to set it once either with CallbackTimer() or passing in the timer value when calling into 
-	   StartService().
-	   Set the callback using "timer" as the callback name. Using "running" will also work but it
-	   is mapped to "timer". If you specify both, only "timer" will be registered.
-	   
-	   
- 
-	
+=item *
+
+...registers for both "running" and "timer" then only Win32::Daemon treats it as if only
+"timer" was registered (see above for behavior).
+
+=item *
+
+...registers for everything by passing one subroutine reference into Win32::Daemon::Callback()
+then both "running" and "timer" are registered and only "timer" is recognized (see previous
+2 behaviors above).
+
+=back
+
+Legacy scripts which call Win32::Daemon::Callback() passing in only one catchall subroutine reference
+will be most impacted as they will expect.
+
+=head1 AUTHOR
+
+Dave Roth, Roth Consulting, http://www.roth.net/
+
+=head1 CONTRIBUTORS
+
+Haiko Strotbek <haiko@strotbek.com>
+
+Jan Dubois <jand@activestate.com>
+
+Marc Pijnappels <marc.pijnappels@nec-computers.com>
+
+Olivier MenguE<eacute> <dolmen@cpan.org>
+
+=head1 SUPPORT
+
+Dave has retired from active development of this module.  It is now
+being maintained as part of the libwin32 project <libwin32@perl.org>.
+
+=head1 COPYRIGHT
+
+Copyright (c) 1998 - 2010 the Win32::Daemon L</AUTHOR> and L</CONTRIBUTORS>
+as listed above.
+
+=head1 LICENSE
+
+This library is free software and may be distributed under the same terms
+as perl itself.
+
+=cut
