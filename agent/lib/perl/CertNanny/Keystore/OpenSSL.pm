@@ -40,7 +40,7 @@ sub new
     # propagate PIN to class options
     $self->{PIN} = $self->{OPTIONS}->{ENTRY}->{pin};
 
-    foreach my $entry qw( keyfile location ) {
+    foreach my $entry (qw( keyfile location )) {
 	if (! defined $self->{OPTIONS}->{ENTRY}->{$entry} ||
 	    (! -r $self->{OPTIONS}->{ENTRY}->{$entry})) {
 	    croak("keystore.$entry $self->{OPTIONS}->{ENTRY}->{$entry} not defined, does not exist or unreadable");
@@ -51,7 +51,7 @@ sub new
 
 
     # desired target formats
-    foreach my $format qw( FORMAT KEYFORMAT CACERTFORMAT ROOTCACERTFORMAT ) {
+    foreach my $format (qw( FORMAT KEYFORMAT CACERTFORMAT ROOTCACERTFORMAT )) {
 	# assign format if explicitly defined in config
 	if (defined $self->{OPTIONS}->{ENTRY}->{ lc($format) }) {
 	    $self->{ uc($format) } = $self->{OPTIONS}->{ENTRY}->{ lc($format) };
