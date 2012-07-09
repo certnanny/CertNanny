@@ -154,7 +154,7 @@ sub new
     $self->{PIN} = $self->{OPTIONS}->{ENTRY}->{pin};
     
     # sample sanity checks for configuration settings
-     foreach my $entry qw( location ) {
+     foreach my $entry (qw( location )) {
  	if (! defined $self->{OPTIONS}->{ENTRY}->{$entry} ) {
  	    croak("keystore.$entry $self->{OPTIONS}->{ENTRY}->{$entry} not defined.");
  	    return;
