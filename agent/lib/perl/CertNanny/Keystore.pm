@@ -1527,11 +1527,13 @@ sub sendrequest {
     my $self = shift;
 
     CertNanny::Logging->info("Sending request");
+    my $enroller = $self->get_enroller();
+    return $enroller->enroll();
     #print Dumper $self->{STATE}->{DATA};
 
     if (! $self->getcacerts()) {
 	CertNanny::Logging->error("Could not get CA certs");
-	return;
+	#return;
     }
 
     my $requestfile = $self->{STATE}->{DATA}->{RENEWAL}->{REQUEST}->{REQUESTFILE};
@@ -1761,6 +1763,30 @@ sub sendrequest {
     }
     
     return 1;
+}
+
+sub get_enroller {
+	my $self = shift;
+	
+	if(!defined $self->{OPTIONS}->{ENTRY}->{ENROLLER}) {
+		my $enrollertype_cfg = $self->{OPTIONS}->{ENTRY}->{enroll}->{type};
+		my $enrollertype = ucfirst($enrollertype_cfg);
+		eval "use CertNanny::Enroll::$enrollertype";
+        if ($@) {
+            print STDERR $@;
+            return;
+        }
+        my $entry_options = $self->{OPTIONS}->{ENTRY};
+        my $config = $self->{OPTIONS}->{CONFIG};
+        my $entryname = $self->{OPTIONS}->{ENTRYNAME};
+		eval "\$self->{ENROLLER} = CertNanny::Enroll::$enrollertype->new(\$entry_options, \$config, \$entryname)";
+		if ($@) {
+		    print STDERR $@;
+		    return;
+	    }
+	}
+	
+	return $self->{ENROLLER};
 }
 
 
