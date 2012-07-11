@@ -465,7 +465,6 @@ sub store_state
 }
 
 
-
 # get error message
 # arg:
 # return: error message description caused by the last operation (cleared 
@@ -743,6 +742,8 @@ sub installfile
 sub getcertinfo
 {
     my $self = shift;
+    return CertNanny::Util->getcertinfo(@_);
+=comment  
     my %options = (
 		   CERTFORMAT => 'DER',
 		   @_,         # argument pair list
@@ -988,8 +989,7 @@ sub getcertinfo
 	$certinfo->{$var} = sprintf("%04d%02d%02d%02d%02d%02d",
 				    $year, $dmon, $day, $hh, $mm, $ss);
     }
-	
-    return $certinfo;
+=cut	
 }
 
 
@@ -1445,81 +1445,14 @@ sub getcacerts {
     $self->{STATE}->{DATA}->{ROOTCACERTS} = $self->getrootcerts();
 
     my $scepracert = $self->{STATE}->{DATA}->{SCEP}->{RACERT};    
-
-    # return $scepracert if (defined $scepracert and -r $scepracert);
-
-    my $sscep = $self->{OPTIONS}->{CONFIG}->get('cmd.sscep');
-    my $cacertdir = $self->{OPTIONS}->{ENTRY}->{scepcertdir};
-    if (! defined $cacertdir) {
-	CertNanny::Logging->error("scepcertdir not specified for keystore");
-	return;
-    }
-    my $cacertbase = File::Spec->catfile($cacertdir, 'cacert');
-    my $scepurl = $self->{OPTIONS}->{ENTRY}->{scepurl};
-    if (! defined $scepurl) {
-	CertNanny::Logging->error("scepurl not specified for keystore");
-	return;
-    }
-
-    # delete existing ca certs
-    my $ii = 0;
-    while (-e $cacertbase . "-" . $ii) {
-	my $file = $cacertbase . "-" . $ii;
-	CertNanny::Logging->debug("Unlinking $file");
-	unlink $file;
-	if (-e $file) {
-	    CertNanny::Logging->error("could not delete CA certificate file $file, cannot proceed");
-	    return;
-	}
-	$ii++;
-    }
     
-
-    CertNanny::Logging->info("Requesting CA certificates");
+    my $enroller = $self->get_enroller();
+    my %certs = $enroller->getCA();
     
-    my @cmd = (qq("$sscep"),
-	       'getca',
-	       '-u',
-	       qq($scepurl),
-	       '-c',
-	       qq("$cacertbase"));
+    $self->{STATE}->{DATA}->{SCEP}->{CACERTS} = $certs{CACERTS};
+    $self->{STATE}->{DATA}->{SCEP}->{RACERT} = $certs{RACERT};
     
-    CertNanny::Logging->debug("Exec: " . join(' ', @cmd));
-    if (run_command(join(' ', @cmd)) != 0) {
-	CertNanny::Logging->error("Could not retrieve CA certs");
-	return;
-    }
-    
-    $scepracert = $cacertbase . "-0";
-
-    # collect all ca certificates returned by the SCEP command
-    my @cacerts = ();
-    $ii = 1;
-
-    my $certfile = $cacertbase . "-$ii";
-    while (-r $certfile) {
-	my $certformat = 'PEM'; # always returned by sscep
-	my $certinfo = $self->getcertinfo(CERTFILE => $certfile,
-					  CERTFORMAT => 'PEM');
-
-	if (defined $certinfo) {
-	    push (@cacerts, { CERTINFO => $certinfo,
-			      CERTFILE => $certfile,
-			      CERTFORMAT => $certformat,
-			  });
-	}
-	
-	$ii++;
-	$certfile = $cacertbase . "-$ii";
-    }
-    $self->{STATE}->{DATA}->{SCEP}->{CACERTS} = \@cacerts;
-
-
-    if (-r $scepracert) {
-	$self->{STATE}->{DATA}->{SCEP}->{RACERT} = $scepracert;
-	return $scepracert;
-    }
-
+    return $certs{RACERT} if -r $certs{RACERT};
     return;
 }
 
@@ -1527,8 +1460,8 @@ sub sendrequest {
     my $self = shift;
 
     CertNanny::Logging->info("Sending request");
-    my $enroller = $self->get_enroller();
-    return $enroller->enroll();
+    #my $enroller = $self->get_enroller();
+    #return $enroller->enroll();
     #print Dumper $self->{STATE}->{DATA};
 
     if (! $self->getcacerts()) {
@@ -1604,49 +1537,67 @@ sub sendrequest {
     my $oldkeyfile;
     my $oldcertfile;
     if ($scepsignaturekey =~ /(old|existing)/i) {
-	# get existing private key from keystore
-	my $oldkey = $self->getkey();
-	if (! defined $oldkey) {
-	    CertNanny::Logging->error("Could not get old key from certificate instance");
-	    return;
-	}
+		# get existing private key from keystore
+		my $oldkey = $self->getkey();
+		if (! defined $oldkey) {
+		    CertNanny::Logging->error("Could not get old key from certificate instance");
+		    return;
+		}
+	
+		# convert private key to unencrypted PEM format
+		my $oldkey_pem_unencrypted = $self->convertkey(
+		    %{$oldkey},
+		    OUTFORMAT => 'PEM',
+		    OUTTYPE   => 'OpenSSL',
+		    OUTPASS   => '',
+		    );
+	
+		if (! defined $oldkey_pem_unencrypted) {
+		    CertNanny::Logging->error("Could not convert (old) private key");
+		    return;
+		}
+	
+	 	$oldkeyfile = $self->gettmpfile();
+	        chmod 0600, $oldkeyfile;
+	
+		if (! CertNanny::Util->write_file(
+			  FILENAME => $oldkeyfile,
+			  CONTENT  => $oldkey_pem_unencrypted->{KEYDATA},
+			  FORCE    => 1,
+		    )) {
+		    CertNanny::Logging->error("Could not write temporary key file (old key)");
+		    return;
+		}
+	
+		$oldcertfile = $self->gettmpfile();
+		if (! CertNanny::Util->write_file(
+			  FILENAME => $oldcertfile,
+			  CONTENT  => $self->{CERT}->{RAW}->{PEM},
+			  FORCE    => 1,
+		    )) {
+		    CertNanny::Logging->error("Could not write temporary cert file (old certificate)");
+		    return;
+		}
+    }
+	
+	my %options = (
+		sscep_enroll => {
+			PrivateKeyFile => $requestkeyfile,
+			CertReqFile => $requestfile,
+			SignKeyFile => $oldkeyfile,
+			SignCertFile => $oldcertfile,
+			LocalCertFile => $newcertfile
+		},
+		
+		sscep => {
+			CACertFile => $scepracert
+		}
+	);
+	
+	my $enroller = $self->get_enroller();
+	$enroller->enroll(%options);
 
-	# convert private key to unencrypted PEM format
-	my $oldkey_pem_unencrypted = $self->convertkey(
-	    %{$oldkey},
-	    OUTFORMAT => 'PEM',
-	    OUTTYPE   => 'OpenSSL',
-	    OUTPASS   => '',
-	    );
-
-	if (! defined $oldkey_pem_unencrypted) {
-	    CertNanny::Logging->error("Could not convert (old) private key");
-	    return;
-	}
-
- 	$oldkeyfile = $self->gettmpfile();
-        chmod 0600, $oldkeyfile;
-
-	if (! CertNanny::Util->write_file(
-		  FILENAME => $oldkeyfile,
-		  CONTENT  => $oldkey_pem_unencrypted->{KEYDATA},
-		  FORCE    => 1,
-	    )) {
-	    CertNanny::Logging->error("Could not write temporary key file (old key)");
-	    return;
-	}
-
-	$oldcertfile = $self->gettmpfile();
-	if (! CertNanny::Util->write_file(
-		  FILENAME => $oldcertfile,
-		  CONTENT  => $self->{CERT}->{RAW}->{PEM},
-		  FORCE    => 1,
-	    )) {
-	    CertNanny::Logging->error("Could not write temporary cert file (old certificate)");
-	    return;
-	}
-
-
+=comment
         @autoapprove = ('-K', 
 			qq("$oldkeyfile"),
 			'-O',
@@ -1684,7 +1635,7 @@ sub sendrequest {
 	    }  
 
     CertNanny::Logging->debug("Exec: " . join(' ', @cmd));
-    
+  
     my $rc;
     eval {
 	local $SIG{ALRM} = sub { die "alarm\n" }; # NB: \n required
@@ -1693,28 +1644,10 @@ sub sendrequest {
 	eval { alarm 0 }; # eval not supported in perl 5.7.1 on win32
 	CertNanny::Logging->info("Return code: $rc");
     };
+=cut  
     unlink $requestkeyfile;
     unlink $oldkeyfile if (defined $oldkeyfile);
     unlink $oldcertfile if (defined $oldcertfile);
-
-    if ($@) {
-	# timed out
-	die unless $@ eq "alarm\n";   # propagate unexpected errors
-	CertNanny::Logging->info("Timed out.");
-	return;
-    }
-
-
-    if ($rc == 3) {
-	# request is pending
-	CertNanny::Logging->info("Request is still pending");
-	return 1;
-    }
-
-    if ($rc != 0) {
-	CertNanny::Logging->error("Could not run SCEP enrollment");
-	return;
-    }
 
     if (-r $newcertfile) {
 	# successful installation of the new certificate.
@@ -1769,7 +1702,7 @@ sub get_enroller {
 	my $self = shift;
 	
 	if(!defined $self->{OPTIONS}->{ENTRY}->{ENROLLER}) {
-		my $enrollertype_cfg = $self->{OPTIONS}->{ENTRY}->{enroll}->{type};
+		my $enrollertype_cfg = $self->{OPTIONS}->{ENTRY}->{enroll}->{type} || 'sscep';
 		my $enrollertype = ucfirst($enrollertype_cfg);
 		eval "use CertNanny::Enroll::$enrollertype";
         if ($@) {
