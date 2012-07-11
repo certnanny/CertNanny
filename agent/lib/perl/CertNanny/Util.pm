@@ -18,6 +18,7 @@ use base qw(Exporter);
 use IO::File;
 use File::Glob qw(:globally :nocase);
 use File::Spec;
+use File::Temp;
 use strict;
 use Time::Local;
 
@@ -27,6 +28,44 @@ use Exporter;
 $VERSION = 0.10;
 
 @EXPORT      = qw(timestamp isodatetoepoch epochtoisodate addisodate printableisodate run_command system);       # Symbols to autoexport (:DEFAULT tag)
+
+# This variable stores arbitrary data like created temporary files
+my $INSTANCE;
+
+sub new {
+	my $proto = shift;
+	my $class = ref($proto)  || $proto;
+	my $self = {};
+	
+	bless $self, $class;
+	
+	my $options = CertNanny::Config->getInstance();
+	
+	$self->{OPTIONS}->{tmp_dir} = $options->get('path.tmpdir', 'FILE');
+	$self->{OPTIONS}->{openssl_shell} = $options->get('cmd.openssl', 'FILE');
+	return $self;
+}
+
+sub DESTROY
+{
+    my $self = shift;
+    
+    $self->store_state();
+
+    return unless (exists $self->{TMPFILE});
+
+    foreach my $file (@{$self->{TMPFILE}}) {
+	unlink $file;
+    }
+}
+
+sub getInstance() {
+	unless(defined $INSTANCE) {
+		$INSTANCE = CertNanny::Util->new();
+	}
+	
+	return $INSTANCE;
+}
 
 #sub system {
 #	die "do not use system() in CertNanny, it is broken when CertNanny is used as a Windows service";
@@ -140,7 +179,8 @@ sub printableisodate
 # Example: $self->read_file($filename);
 sub read_file
 {
-    my $self     = shift;
+	shift;
+    my $self     = CertNanny::Util->getInstance();
     my $filename = shift;
 
     if (! -e $filename)
@@ -183,7 +223,8 @@ sub read_file
 
 sub write_file
 {
-    my $self     = shift;
+	shift;
+    my $self     = CertNanny::Util->getInstance();
     my $keys     = { @_ };
     my $filename = $keys->{FILENAME};
     my $content  = $keys->{CONTENT};
@@ -259,7 +300,8 @@ sub write_file
 # 
 sub getcertinfo
 {
-    my $self = shift;
+	shift;
+    my $self = CertNanny::Util->getInstance();
     my %options = (
            CERTFORMAT => 'DER',
            @_,         # argument pair list
@@ -514,7 +556,8 @@ sub getcertinfo
 # temporary files.
 sub gettmpfile
 {
-    my $self = shift;
+	shift;
+    my $self = CertNanny::Util->getInstance();
 
     my $tmpdir = $self->{OPTIONS}->{tmp_dir};
     #if (! defined $tmpdir);
