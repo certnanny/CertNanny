@@ -1,11 +1,14 @@
 agent/etc/*.cfg
 agent/lib/certs
 agent/lib/rootcerts
+agent/lib/state
+agent/lib/cfg
 agent/bin/sscep.exe
-agent/log
-.includepath
-.project
 agent/bin/certnanny.exe
 agent/bin/certnanny.zip
 agent/bin/cn_packed
+agent/log
 agent/tmp
+.includepath
+.project
+.checkstyle
