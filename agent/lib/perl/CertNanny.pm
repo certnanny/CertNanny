@@ -43,7 +43,7 @@ sub new
     my $self = {};
     bless $self, $class;
 
-    $self->{CONFIG} = CertNanny::Config->new($args{CONFIG});
+    $self->{CONFIG} = CertNanny::Config->getInstance($args{CONFIG});
     return unless defined $self->{CONFIG};
     CertNanny::Logging->new(CONFIG => $self->{CONFIG});
     
