@@ -47,7 +47,7 @@ $VERSION = 0.10;
 
 #@EXPORT      = qw(...);       # Symbols to autoexport (:DEFAULT tag)
 
-
+my $INSTANCE;
 
 sub new 
 {
@@ -70,6 +70,18 @@ sub getconfigfilename
 {
     my $self = shift;
     $self->{CONFIGFILE};
+}
+
+sub getInstance {
+	unless(defined $INSTANCE) {
+		my $proto = shift;
+		my %args = (
+			@_,		# argument pair list
+		);
+		$INSTANCE = CertNanny::Config->new(%args);
+	}
+	
+	return $INSTANCE;
 }
 
 
