@@ -145,7 +145,7 @@ sub AUTOLOAD
 
 
 # For a module, you *always* return TRUE...
-return( 1 );
+1;
 
 
 END
