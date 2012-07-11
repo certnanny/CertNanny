@@ -59,7 +59,7 @@ pod2usage(-msg => $msg, -verbose => 1) if ($config{help} or
 die "Could not read config file $config{cfg}. Stopped" 
     unless (-r $config{cfg});
 
-my $monitor = CertNanny->new(CONFIG => $config{cfg});
+my $monitor = CertNanny->getInstance(CONFIG => $config{cfg});
 
 foreach my $cmd (@ARGV) {
 	if ($OSNAME eq 'MSWin32') {
