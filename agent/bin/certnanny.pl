@@ -20,7 +20,7 @@ use FindBin;
 use lib "$FindBin::Bin/../lib/perl";
 
 use CertNanny;
-$OSNAME = "Not Windows";
+
 if ($OSNAME eq "MSWin32") {
     require Win32;
     Win32->import();
