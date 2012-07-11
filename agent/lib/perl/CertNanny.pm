@@ -29,6 +29,8 @@ use IPC::Open3;
 
 $VERSION = 0.10;
 
+my $INSTANCE;
+
 
 sub new 
 {
@@ -67,6 +69,18 @@ sub new
     delete $self->{ITEMS}->{DEFAULT};
 
     return ($self);
+}
+
+sub getInstance() {
+	unless(defined $INSTANCE) {
+		my $proto = shift;
+		my %args = (
+			@_,	#argument pair list
+		);
+		$INSTANCE = CertNanny->new(%args);
+	}
+	
+	return $INSTANCE;
 }
 
 sub DESTROY {
