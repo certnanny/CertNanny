@@ -1701,7 +1701,7 @@ sub sendrequest {
 sub get_enroller {
 	my $self = shift;
 	
-	if(!defined $self->{OPTIONS}->{ENTRY}->{ENROLLER}) {
+	unless(defined $self->{OPTIONS}->{ENTRY}->{ENROLLER}) {
 		my $enrollertype_cfg = $self->{OPTIONS}->{ENTRY}->{enroll}->{type} || 'sscep';
 		my $enrollertype = ucfirst($enrollertype_cfg);
 		eval "use CertNanny::Enroll::$enrollertype";
@@ -1712,14 +1712,14 @@ sub get_enroller {
         my $entry_options = $self->{OPTIONS}->{ENTRY};
         my $config = $self->{OPTIONS}->{CONFIG};
         my $entryname = $self->{OPTIONS}->{ENTRYNAME};
-		eval "\$self->{ENROLLER} = CertNanny::Enroll::$enrollertype->new(\$entry_options, \$config, \$entryname)";
+		eval "\$self->{OPTIONS}->{ENTRY}->{ENROLLER} = CertNanny::Enroll::$enrollertype->new(\$entry_options, \$config, \$entryname)";
 		if ($@) {
 		    print STDERR $@;
 		    return;
 	    }
 	}
 	
-	return $self->{ENROLLER};
+	return $self->{OPTIONS}->{ENTRY}->{ENROLLER};
 }
 
 

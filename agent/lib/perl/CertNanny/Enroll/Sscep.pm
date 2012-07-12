@@ -393,7 +393,7 @@ sub getCA {
 	
 	my $self= shift;
 	my $config = shift;
-	unless($self->{certs}->{RACERT} and $self->{certs}->{CACERTS}) {
+	unless(defined $self->{certs}->{RACERT} and defined $self->{certs}->{CACERTS}) {
 		my $olddir = getcwd();
 		chdir $self->{certdir};
 		$config->{sscep}->{CACertFile} =  'cacert';
