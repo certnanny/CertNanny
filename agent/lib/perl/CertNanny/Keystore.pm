@@ -119,7 +119,10 @@ sub new
 
     if (defined $self->{CERT}) {
 	$self->{CERT}->{INFO} = $self->getcertinfo(%{$self->{CERT}});
-	
+	my $subjectname = $self->{CERT}->{INFO}->{SubjectName};
+	my $serial = $self->{CERT}->{INFO}->{SerialNumber};
+	my $issuer = $self->{CERT}->{INFO}->{IssuerName};
+	CertNanny::Logging->info("Certificate Information:\n\tSubjectName: $subjectname\n\tSerial: $serial\n\tIssuer: $issuer");
 
 	my %convopts = %{$self->{CERT}};
 
@@ -1406,6 +1409,9 @@ sub executehook {
 
 	$args{'__LOCATION__'} = $self->{INSTANCE}->{OPTIONS}->{ENTRY}->{location} || $self->{OPTIONS}->{ENTRY}->{location};
 	$args{'__ENTRY__'}    =  $self->{INSTANCE}->{OPTIONS}->{ENTRYNAME} || $self->{OPTIONS}->{ENTRYNAME};
+	# TODO: Test Subject/Serial Hook!
+	$args{'__SUBJECT__'}  = $self->{CERT}->{INFO}->{SubjectName} || 'UnknownSubject';
+	$args{'__SERIAL__'}   = $self->{CERT}->{INFO}->{SerialNumber} || 'UnknownSerial';
 
 	# replace values passed to this function
 	foreach my $key (keys %args) {
@@ -1499,76 +1505,83 @@ sub sendrequest {
     CertNanny::Logging->debug("scepracert: $scepracert");
     CertNanny::Logging->debug("newcertfile: $newcertfile");
     CertNanny::Logging->debug("openssl: $openssl");
+	my $newkey;
+	my $requestkeyfile;
+	unless($self->isHSM()) {
+	    # get unencrypted new key in PEM format
+	    $newkey = $self->convertkey(
+		KEYFILE   => $keyfile,
+		KEYPASS   => $pin,
+		KEYFORMAT => 'PEM',
+		KEYTYPE   => 'OpenSSL',
+		OUTFORMAT => 'PEM',
+		OUTTYPE   => 'OpenSSL',
+		# no pin
+		);
+	
+	    if (! defined $newkey) {
+		CertNanny::Logging->error("Could not convert new key");
+		return;
+	    }
+	    
 
-
-    # get unencrypted new key in PEM format
-    my $newkey = $self->convertkey(
-	KEYFILE   => $keyfile,
-	KEYPASS   => $pin,
-	KEYFORMAT => 'PEM',
-	KEYTYPE   => 'OpenSSL',
-	OUTFORMAT => 'PEM',
-	OUTTYPE   => 'OpenSSL',
-	# no pin
-	);
-
-    if (! defined $newkey) {
-	CertNanny::Logging->error("Could not convert new key");
-	return;
-    }
-
-    # write new PEM encoded key to temp file
-    my $requestkeyfile = $self->gettmpfile();
-    CertNanny::Logging->debug("requestkeyfile: $requestkeyfile");
-    chmod 0600, $requestkeyfile;
-
-    if (! CertNanny::Util->write_file(
-	FILENAME => $requestkeyfile,
-	CONTENT  => $newkey->{KEYDATA},
-	FORCE    => 1,
-	)) {
-	CertNanny::Logging->error("Could not write unencrypted copy of new file to temp file");
-	return;
-    }
-
-    my @cmd;
+	    # write new PEM encoded key to temp file
+	    $requestkeyfile = $self->gettmpfile();
+	    CertNanny::Logging->debug("requestkeyfile: $requestkeyfile");
+	    chmod 0600, $requestkeyfile;
+	
+	    if (! CertNanny::Util->write_file(
+		FILENAME => $requestkeyfile,
+		CONTENT  => $newkey->{KEYDATA},
+		FORCE    => 1,
+		)) {
+		CertNanny::Logging->error("Could not write unencrypted copy of new file to temp file");
+		return;
+	    }
+	} else {
+		$requestkeyfile = $self->{OPTIONS}->{ENTRY}->{location};
+	}
 
     my @autoapprove = ();
     my $oldkeyfile;
     my $oldcertfile;
     if ($scepsignaturekey =~ /(old|existing)/i) {
-		# get existing private key from keystore
-		my $oldkey = $self->getkey();
-		if (! defined $oldkey) {
-		    CertNanny::Logging->error("Could not get old key from certificate instance");
-		    return;
-		}
-	
-		# convert private key to unencrypted PEM format
-		my $oldkey_pem_unencrypted = $self->convertkey(
-		    %{$oldkey},
-		    OUTFORMAT => 'PEM',
-		    OUTTYPE   => 'OpenSSL',
-		    OUTPASS   => '',
-		    );
-	
-		if (! defined $oldkey_pem_unencrypted) {
-		    CertNanny::Logging->error("Could not convert (old) private key");
-		    return;
-		}
-	
-	 	$oldkeyfile = $self->gettmpfile();
-	        chmod 0600, $oldkeyfile;
-	
-		if (! CertNanny::Util->write_file(
-			  FILENAME => $oldkeyfile,
-			  CONTENT  => $oldkey_pem_unencrypted->{KEYDATA},
-			  FORCE    => 1,
-		    )) {
-		    CertNanny::Logging->error("Could not write temporary key file (old key)");
-		    return;
-		}
-	
+    	unless($self->isHSM()) {
+			# get existing private key from keystore
+			my $oldkey = $self->getkey();
+			if (! defined $oldkey) {
+			    CertNanny::Logging->error("Could not get old key from certificate instance");
+			    return;
+			}
+		
+			# convert private key to unencrypted PEM format
+			my $oldkey_pem_unencrypted = $self->convertkey(
+			    %{$oldkey},
+			    OUTFORMAT => 'PEM',
+			    OUTTYPE   => 'OpenSSL',
+			    OUTPASS   => '',
+			    );
+		
+			if (! defined $oldkey_pem_unencrypted) {
+			    CertNanny::Logging->error("Could not convert (old) private key");
+			    return;
+			}
+		
+		 	$oldkeyfile = $self->gettmpfile();
+		        chmod 0600, $oldkeyfile;
+		
+			if (! CertNanny::Util->write_file(
+				  FILENAME => $oldkeyfile,
+				  CONTENT  => $oldkey_pem_unencrypted->{KEYDATA},
+				  FORCE    => 1,
+			    )) {
+			    CertNanny::Logging->error("Could not write temporary key file (old key)");
+			    return;
+			}
+    	} else {
+    		$oldkeyfile = $self->{OPTIONS}->{ENTRY}->{location};
+    	}
+		
 		$oldcertfile = $self->gettmpfile();
 		if (! CertNanny::Util->write_file(
 			  FILENAME => $oldcertfile,
@@ -1720,6 +1733,12 @@ sub get_enroller {
 	}
 	
 	return $self->{OPTIONS}->{ENTRY}->{ENROLLER};
+}
+
+sub isHSM {
+	my $self = shift;
+	
+	return defined $self->{OPTIONS}->{ENTRY}->{hsm};
 }
 
 
