@@ -37,8 +37,8 @@ sub new {
     }
 	
 	
-	$self->{OPTIONS}->{sscep}->{Verbose} = "True" if $config->get("loglevel") >= 5;
-	$self->{OPTIONS}->{sscep}->{Debug} = "True" if $config->get("loglevel") >= 6;
+	$self->{OPTIONS}->{sscep}->{Verbose} = "true" if $config->get("loglevel") >= 5;
+	$self->{OPTIONS}->{sscep}->{Debug} = "true" if $config->get("loglevel") >= 6;
 	
 	$self->{certdir} = $entry_options->{scepcertdir};
 	if(! defined $self->{certdir}) {	
@@ -46,8 +46,13 @@ sub new {
 	    return;
 	}
 	$self->{entryname} = $entryname;
-	$self->{cmd} = $config->get('cmd.sscep');
+	$self->{cmd} = $config->get('cmd.sscep', 'FILE');
 	$self->{config_filename} = File::Spec->catfile($self->{certdir}, $self->{entryname}."_sscep.cnf");
+	
+	if(defined $self->{OPTIONS}->{sscep}->{engine}) {
+		my $engine_section = $self->{OPTIONS}->{sscep}->{engine};
+		$self->{OPTIONS}->{$engine_section}->{engine_usage} = "both";
+	}
 	
 	return $self;
 }
@@ -92,13 +97,10 @@ sub execute {
 	);
 	
 	my $cmd = join(' ', @cmd);
-	CertNanny::Logging->debug("Exec: $cmd");
-	`$cmd`;
-	if ($? != 0) {
-	    CertNanny::Logging->error("Could not retrieve CA certs");
-	    return;
-	}
-	
+	CertNanny::Logging->debug("Exec: $cmd in ".getcwd());
+	print `$cmd`;
+	#exec($cmd);
+	#return 0;#TODO: Remove
 	return $?;
 }
 # Enroll needs
@@ -119,8 +121,6 @@ sub enroll {
             $options{$section}->{$key} = File::Spec->abs2rel($value);
         }
 	}
-	$self->readConfig(\%options);
-	$self->writeConfigFile();
 
 	CertNanny::Logging->info("Sending request");
 
