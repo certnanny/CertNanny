@@ -672,3 +672,252 @@ sub gettmpfile
 }
 
 1;
+
+=head1 NAME
+
+CertNanny::Util - Utility functions for CertNanny.
+
+=head1 SYNOPSIS
+
+    CertNanny::Util->getcertinfo();
+    CertNanny::Util->write_file();
+    ...
+
+=head1 DESCRIPTION
+
+Provides utility functions for CertNanny. Some functions should be called without any object/instance, some are called via class or instance. On functions that are called via class/instance it does not matter which is used, there is always a singleton instance which will be used.
+
+=head1 FUNCTIONS
+
+=head2 Function List
+
+=over 4
+
+C<new()>
+
+C<getInstance()>
+
+C<run_command()>
+
+C<timestamp()>
+
+C<isodatetoepoch()>
+
+C<expanddate()>
+
+C<printableisodate()>
+
+C<read_file()>
+
+C<write_file()>
+
+C<getcertinfo()>
+
+C<getcsrinfo()>
+
+C<parsecertdata()>
+
+C<gettmpfile()>
+
+=back
+
+=head2 Function Descriptions
+
+=over 4
+
+=item new()
+
+Should not be called directly. Will be uncallable in a future version. Instead call C<getInstance()>. Normally you do not need to call for any instance at all. Just make calls like CertNanny::Util->functionname().
+
+=item getInstance()
+
+Returns a singleton instance of this class. Can be called, but normally does not need to be.
+
+=item run_command($command)
+
+Called globally, do not call it via class or instance. Runs a command  and returns its exit code. Prints the output to STDOUT (in CertNanny context this is most likely the logfile).
+
+=over 4
+
+=item $command
+
+The command to execute
+
+=back
+
+=item timestamp()
+
+Returns the current time in ISO (UTC) timestamp format. Called globally.
+
+=item isodatetoepoch($time)
+
+Convert an ISO date to a Unix timestamp (seconds since the Epoch). Returns Unix timestamp.
+
+=over 4
+
+=item $time
+
+Time in ISO format (YYYYMMDDHHMMSS)
+
+=back
+
+=item expanddate($time)
+
+Expand time format controls (subset as specified by date(1)). Always uses current time.
+
+=over 4
+
+=item %y last two digits of year (00..99)
+
+=item %Y year (1970...)
+
+=item %m month (01..12)
+
+=item %d day of month (01..31)
+
+=item %H hour (00..23)
+
+=item %M minute (00..59)
+
+=item %S second (00..59)
+
+=back
+
+=over 4
+
+=item $time
+
+Format string of expected time format.
+
+=back
+
+=item printableisodate($isodate)
+
+Return a printable represantation of a compacted ISO date.
+
+=over 4
+
+=item $isodate
+
+ISO Date, format YYYYMMDDHHMMSS
+
+=back
+
+=item read_file($filename)
+Read (slurp) file from disk.
+
+=over 4
+
+=item $filename
+
+The filename to read.
+
+=back
+
+=item write_file(%args)
+
+Write file to disk. Returns false if file already existss unless $args{FORCE} is set. In this case the method will overwrite the specified file.
+
+=over 4
+
+=item $args{FILENAME}
+
+The name of the file to write.
+
+=item $args{CONTENT}
+
+The data to write.
+
+=item $args{FORCE}
+
+If set, will overwrite existing file.
+
+=back
+
+=item getcertinfo(%args)
+
+Parse DER/PEM encoded X.509v3 certificate and return certificate information in a hash ref.
+Prerequisites: requires external openssl executable.
+Returns hash reference containing the certificate infomration or undef if conflicts occur.
+Returned hash reference contains the following values:
+
+=over 4
+
+=item Version => <cert version, optional> Values: 2, 3
+
+=item SubjectName => <cert subject common name>
+
+=item IssuerName => <cert issuer common name>
+
+=item SerialNumber => <cert serial number> Format: xx:xx:xx... (hex, upper case)
+
+=item Modulus => <cert modulus> Format: hex
+
+=item NotBefore => <cert validity> Format: YYYYDDMMHHMMSS
+
+=item NotAfter  => <cert validity> Format: YYYYDDMMHHMMSS
+
+=item PublicKey => <cert public key> Format: Base64 encoded (PEM)
+
+=item Certificate => <certifcate> Format: Base64 encoded (PEM)
+
+=item BasicConstraints => <cert basic constraints> Text (free style)
+
+=item KeyUsage => <cert key usage> Format: Text (free style)
+
+=item CertificateFingerprint => <cert SHA1 fingerprint> Format: xx:xx:xx... (hex, upper case)
+
+=back
+
+optional:
+
+=over 4
+
+=item SubjectAlternativeName => <cert alternative name>
+ 
+=item IssuerAlternativeName => <issuer alternative name>
+
+=item SubjectKeyIdentifier => <X509v3 Subject Key Identifier>
+
+=item AuthorityKeyIdentifier => <X509v3 Authority Key Identifier>
+
+=item CRLDistributionPoints => <X509v3 CRL Distribution Points>
+
+=back
+
+=over 4
+
+=item $args{CERTDATA}
+
+Directly contains certificate data. Conflicts with $args{CERTFILE}.
+
+=item $args{CERTFILE}
+
+Filename to a certificate. Conflicts with $args{CERTDATA}.
+
+=item $args{CERTFORMAT}
+
+Optional argument for data format. Options are all formats understood by OpenSSL (currently: PEM/DER). Defaults to DER.
+
+=back
+
+=item getcsrinfo()
+
+Format is the same a with C<getcertinfo()> but does not provide all the information since values like NotAfter are not set until issuance.
+
+=item parsecertdata($fh)
+
+Internal function that uses openssl output to retrieve csr/cert information. Can be used externally, but is not intended for use and only works with specific params.
+
+=over 4
+
+=item $fh
+
+Filehandle to the output that should be parsed. See C<getcertinfo> and C<getcsrinfo> for usage exmaples.
+
+=back
+
+=item gettmpfile()
+
+Returns filename for a temporary file. All requested files get deleted automatically upon destruction of the object.
+NOTE: this is UNSAFE (beware of race conditions). We cannot use a file handle here because we are calling external programs to use these temporary files.
