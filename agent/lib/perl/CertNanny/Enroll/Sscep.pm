@@ -609,6 +609,8 @@ C<readConfig()>
 
 C<setOption()>
 
+C<writeConfigFile()>
+
 =back
 
 =head2 Function Descriptions
@@ -693,3 +695,7 @@ Refer to the sscep documentation and example configuration fine (.cnf extension)
 =item setOption( $key, $value, $section)
 
 Function to modify single options. Sets the value $value for key $key in section $section. All three paramters are required for this to work. Refer to the sscep documentation for information on key, value and section.
+
+=item writeConfigFile()
+
+Writes the current state of configuration to an sscep configuration file. It accesses the $self->{OPTIONS} hash and uses the keys as section names and then iterates over any contained hash and uses the $key, $value pair as configuration key and value in the file.
