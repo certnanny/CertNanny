@@ -306,30 +306,12 @@ sub getcertinfo
            CERTFORMAT => 'DER',
            @_,         # argument pair list
            );
-    
-
-    my $certinfo = {};
     my %month = (
          Jan => 1, Feb => 2,  Mar => 3,  Apr => 4,
          May => 5, Jun => 6,  Jul => 7,  Aug => 8,
          Sep => 9, Oct => 10, Nov => 11, Dec => 12 );
-
-    my %mapping = (
-           'serial' => 'SerialNumber',
-           'subject' => 'SubjectName',
-           'issuer' => 'IssuerName',
-           'notBefore' => 'NotBefore',
-           'notAfter' => 'NotAfter',
-           'SHA1 Fingerprint' => 'CertificateFingerprint',
-           'PUBLIC KEY' => 'PublicKey',
-           'CERTIFICATE' => 'Certificate',
-           'ISSUERALTNAME' => 'IssuerAlternativeName',
-           'SUBJECTALTNAME' => 'SubjectAlternativeName',
-           'BASICCONSTRAINTS' => 'BasicConstraints',
-           'SUBJECTKEYIDENTIFIER' => 'SubjectKeyIdentifier',
-           'AUTHORITYKEYIDENTIFIER' => 'AuthorityKeyIdentifier',
-           'CRLDISTRIBUTIONPOINTS' => 'CRLDistributionPoints',
-           );
+    my $certinfo = {};
+   
     
 
     # sanity checks
@@ -407,95 +389,230 @@ sub getcertinfo
         return;
     }
 
-    my $state = "";
-    my @purposes;
-    while (<$fh>)
-    {
-    chomp;
-    tr/\r\n//d;
-
-    $state = "PURPOSE" if (/^Certificate purposes:/);
-    $state = "PUBLIC KEY" if (/^-----BEGIN PUBLIC KEY-----/);
-    $state = "CERTIFICATE" if (/^-----BEGIN CERTIFICATE-----/);
-    $state = "SUBJECTALTNAME" if (/X509v3 Subject Alternative Name:/);
-    $state = "ISSUERALTNAME" if (/X509v3 Issuer Alternative Name:/);
-    $state = "BASICCONSTRAINTS" if (/X509v3 Basic Constraints:/);
-    $state = "SUBJECTKEYIDENTIFIER" if (/X509v3 Subject Key Identifier:/);
-    $state = "AUTHORITYKEYIDENTIFIER" if (/X509v3 Authority Key Identifier:/);
-    $state = "CRLDISTRIBUTIONPOINTS" if (/X509v3 CRL Distribution Points:/);
-
-    if ($state eq "PURPOSE")
-    {
-        my ($purpose, $bool) = (/(.*?)\s*:\s*(Yes|No)/);
-        next unless defined $purpose;
-        push (@purposes, $purpose) if ($bool eq "Yes");
-
-        # NOTE: state machine will leave PURPOSE state on the assumption
-        # that 'OCSP helper CA' is the last cert purpose printed out
-        # by OpenCA. It would be best to have OpenSSL print out
-        # purpose information, just to be sure.
-        $state = "" if (/^OCSP helper CA :/);
-        next;
-    }
-    # Base64 encoded sections
-    if ($state =~ /^(PUBLIC KEY|CERTIFICATE)$/)
-    {
-        my $key = $state;
-        $key = $mapping{$key} if (exists $mapping{$key});
-
-        $certinfo->{$key} .= "\n" if (exists $certinfo->{$key});
-        $certinfo->{$key} .= $_ unless (/^-----/);
-
-        $state = "" if (/^-----END $state-----/);
-        next;
-    }
-
-    # X.509v3 extension one-liners
-    if ($state =~ /^(SUBJECTALTNAME|ISSUERALTNAME|BASICCONSTRAINTS|SUBJECTKEYIDENTIFIER|AUTHORITYKEYIDENTIFIER|CRLDISTRIBUTIONPOINTS)$/)
-    {
-        next if (/X509v3 .*:/);
-        my $key = $state;
-        $key = $mapping{$key} if (exists $mapping{$key});
-        # remove trailing and leading whitespace
-        s/^\s*//;
-        s/\s*$//;
-        $certinfo->{$key} = $_ unless ($_ eq "<EMPTY>");
-        
-        # alternative line consists of only one line 
-        $state = "";
-        next;
-    }
-    
-    if (/(Version:|subject=|issuer=|serial=|notBefore=|notAfter=|SHA1 Fingerprint=)\s*(.*)/)
-    {
-        my $key = $1;
-        my $value = $2;
-        # remove trailing garbage
-        $key =~ s/[ :=]+$//;
-        # apply key mapping
-        $key = $mapping{$key} if (exists $mapping{$key});
-
-        # store value
-        $certinfo->{$key} = $value;
-    }
-    }
+    $certinfo = $self->parsecertdata(\$fh);
     close $fh;
     unlink $outfile;
 
-    # compose key usage text field
-    $certinfo->{KeyUsage} = join(", ", @purposes);
-    
+    ####
+    # rewrite dates from human readable to ISO notation
+    foreach my $var (qw(NotBefore NotAfter))
+    {
+	    my ($mon, $day, $hh, $mm, $ss, $year, $tz) =
+	        $certinfo->{$var} =~ /(\S+)\s+(\d+)\s+(\d+):(\d+):(\d+)\s+(\d+)\s*(\S*)/;
+	    my $dmon = $month{$mon};
+	    if (! defined $dmon)
+	    {
+	        CertNanny::Logging->error("getcertinfo(): could not parse month '$mon' in date '$certinfo->{$var}' returned by OpenSSL");
+	        return;
+	    }
+	    
+	    $certinfo->{$var} = sprintf("%04d%02d%02d%02d%02d%02d",
+                    $year, $dmon, $day, $hh, $mm, $ss);
+    }
+
     # sanity checks
-    foreach my $var qw(Version SerialNumber SubjectName IssuerName NotBefore NotAfter CertificateFingerprint)
+    foreach my $var (qw(Version SerialNumber SubjectName IssuerName NotBefore NotAfter CertificateFingerprint Modulus))
     {
-    if (! exists $certinfo->{$var})
+	    if (! exists $certinfo->{$var})
+	    {
+	        CertNanny::Logging->error("getcertinfo(): Could not determine field '$var' from X.509 certificate");
+	        return;
+	    }
+    }   
+    
+    return $certinfo;
+}
+
+sub getcsrinfo {
+	shift;
+	my $self = CertNanny::Util->getInstance();
+	my %options = (
+           CERTFORMAT => 'PEM',
+           @_,         # argument pair list
+           );
+           
+	 # sanity checks
+    if (! (defined $options{CERTFILE} or defined $options{CERTDATA}))
     {
-        CertNanny::Logging->error("getcertinfo(): Could not determine field '$var' from X.509 certificate");
+    	CertNanny::Logging->error("getcsrinfo(): No input data specified");
+    	return;
+    }
+    
+	if ((defined $options{CERTFILE} and defined $options{CERTDATA}))
+    {
+    	CertNanny::Logging->error("getcsrinfo(): Ambigous input data specified");
+    	return;
+    }
+    
+    my $outfile = $self->gettmpfile();
+	my $openssl = $self->{OPTIONS}->{"openssl_shell"};
+	my @input = ();
+    if (defined $options{CERTFILE}) {
+    	@input = ('-in', qq("$options{CERTFILE}"));
+    }
+    #C:\Users\tob130\Work\eclipse\CertNanny\agent\lib\state>openssl req -in capi.csr -inform PEM -modulus -subject -text
+	my @cmd = (
+		qq("$openssl"),
+		'req',
+		@input,
+		'-inform',
+		$options{CERTFORMAT},
+		'-modulus',
+		'-subject',
+		'-text',
+        '>',
+        qq("$outfile")
+	);
+	
+	CertNanny::Logging->log({ MSG => "Execute: " . join(" ", @cmd),
+         PRIO => 'debug' });    
+    my $fh;
+    if (!open $fh, "|" . join(' ', @cmd))
+    {
+        CertNanny::Logging->error("getcertinfo(): open error");
+    unlink $outfile;
+    return;
+
+    }
+
+    binmode $fh;
+    if (defined $options{CERTDATA}) {
+    print $fh $options{CERTDATA};
+    }
+
+    close $fh;
+    
+    if ($? != 0)
+    {
+        CertNanny::Logging->error("getcertinfo(): Error ASN.1 decoding certificate");
+    unlink $outfile;
+    return;
+    }
+
+    open $fh, '<', $outfile;
+    if (! $fh)
+    {
+        CertNanny::Logging->error("getcertinfo(): Error analysing ASN.1 decoded certificate");
+    unlink $outfile;
         return;
     }
+    
+    my $csrinfo = $self->parsecertdata(\$fh);
+    close $fh;
+    unlink $outfile;
+    
+    # sanity checks
+    foreach my $var (qw(Version SubjectName Modulus))
+    {
+	    if (! exists $csrinfo->{$var})
+	    {
+	        CertNanny::Logging->error("getcsrinfo(): Could not determine field '$var' from certificate signing request.	");
+	        return;
+	    }
+    } 
+    
+    return $csrinfo;
+}
+
+sub parsecertdata {
+	shift;
+	my $self = CertNanny::Util->getInstance();
+	my $fh = ${shift @_};
+	my $certinfo = {};
+	my $state = "";
+    my @purposes;
+
+    my %mapping = (
+           'serial' => 'SerialNumber',
+           'subject' => 'SubjectName',
+           'issuer' => 'IssuerName',
+           'notBefore' => 'NotBefore',
+           'notAfter' => 'NotAfter',
+           'SHA1 Fingerprint' => 'CertificateFingerprint',
+           'PUBLIC KEY' => 'PublicKey',
+           'CERTIFICATE' => 'Certificate',
+           'ISSUERALTNAME' => 'IssuerAlternativeName',
+           'SUBJECTALTNAME' => 'SubjectAlternativeName',
+           'BASICCONSTRAINTS' => 'BasicConstraints',
+           'SUBJECTKEYIDENTIFIER' => 'SubjectKeyIdentifier',
+           'AUTHORITYKEYIDENTIFIER' => 'AuthorityKeyIdentifier',
+           'CRLDISTRIBUTIONPOINTS' => 'CRLDistributionPoints',
+           'Modulus' => 'Modulus',
+           );
+    while (<$fh>)
+    {
+	    chomp;
+	    tr/\r\n//d;
+	
+	    $state = "PURPOSE" if (/^Certificate purposes:/);
+	    $state = "PUBLIC KEY" if (/^-----BEGIN PUBLIC KEY-----/);
+	    $state = "CERTIFICATE" if (/^-----BEGIN CERTIFICATE-----/);
+	    $state = "SUBJECTALTNAME" if (/X509v3 Subject Alternative Name:/);
+	    $state = "ISSUERALTNAME" if (/X509v3 Issuer Alternative Name:/);
+	    $state = "BASICCONSTRAINTS" if (/X509v3 Basic Constraints:/);
+	    $state = "SUBJECTKEYIDENTIFIER" if (/X509v3 Subject Key Identifier:/);
+	    $state = "AUTHORITYKEYIDENTIFIER" if (/X509v3 Authority Key Identifier:/);
+	    $state = "CRLDISTRIBUTIONPOINTS" if (/X509v3 CRL Distribution Points:/);
+	
+	    if ($state eq "PURPOSE")
+	    {
+	        my ($purpose, $bool) = (/(.*?)\s*:\s*(Yes|No)/);
+	        next unless defined $purpose;
+	        push (@purposes, $purpose) if ($bool eq "Yes");
+	
+	        # NOTE: state machine will leave PURPOSE state on the assumption
+	        # that 'OCSP helper CA' is the last cert purpose printed out
+	        # by OpenCA. It would be best to have OpenSSL print out
+	        # purpose information, just to be sure.
+	        $state = "" if (/^OCSP helper CA :/);
+	        next;
+	    }
+	    # Base64 encoded sections
+	    if ($state =~ /^(PUBLIC KEY|CERTIFICATE)$/)
+	    {
+	        my $key = $state;
+	        $key = $mapping{$key} if (exists $mapping{$key});
+	
+	        $certinfo->{$key} .= "\n" if (exists $certinfo->{$key});
+	        $certinfo->{$key} .= $_ unless (/^-----/);
+	
+	        $state = "" if (/^-----END $state-----/);
+	        next;
+	    }
+
+	    # X.509v3 extension one-liners
+	    if ($state =~ /^(SUBJECTALTNAME|ISSUERALTNAME|BASICCONSTRAINTS|SUBJECTKEYIDENTIFIER|AUTHORITYKEYIDENTIFIER|CRLDISTRIBUTIONPOINTS)$/)
+	    {
+	        next if (/X509v3 .*:/);
+	        my $key = $state;
+	        $key = $mapping{$key} if (exists $mapping{$key});
+	        # remove trailing and leading whitespace
+	        s/^\s*//;
+	        s/\s*$//;
+	        $certinfo->{$key} = $_ unless ($_ eq "<EMPTY>");
+	        
+	        # alternative line consists of only one line 
+	        $state = "";
+	        next;
+	    }
+    
+	    if (/(Version:|subject=|issuer=|serial=|notBefore=|notAfter=|SHA1 Fingerprint=|Modulus=)\s*(.*)/)
+	    {
+	        my $key = $1;
+	        my $value = $2;
+	        # remove trailing garbage
+	        $key =~ s/[ :=]+$//;
+	        # apply key mapping
+	        $key = $mapping{$key} if (exists $mapping{$key});
+	
+	        # store value
+	        $certinfo->{$key} = $value;
+	    }
     }
-
-
+    
+	# compose key usage text field
+    $certinfo->{KeyUsage} = join(", ", @purposes);
+    
     ####
     # Postprocessing, rewrite certain fields
 
@@ -523,33 +640,17 @@ sub getcertinfo
 
     ####
     # reverse DN order returned by OpenSSL
-    foreach my $var qw(SubjectName IssuerName)
+    foreach my $var (qw(SubjectName IssuerName))
     {
     $certinfo->{$var} = join(", ", 
                  reverse split(/[\/,]\s*/, $certinfo->{$var}));
     # remove trailing garbage
     $certinfo->{$var} =~ s/[, ]+$//;
     }
-
-    ####
-    # rewrite dates from human readable to ISO notation
-    foreach my $var qw(NotBefore NotAfter)
-    {
-    my ($mon, $day, $hh, $mm, $ss, $year, $tz) =
-        $certinfo->{$var} =~ /(\S+)\s+(\d+)\s+(\d+):(\d+):(\d+)\s+(\d+)\s*(\S*)/;
-    my $dmon = $month{$mon};
-    if (! defined $dmon)
-    {
-        CertNanny::Logging->error("getcertinfo(): could not parse month '$mon' in date '$certinfo->{$var}' returned by OpenSSL");
-        return;
-    }
-    
-    $certinfo->{$var} = sprintf("%04d%02d%02d%02d%02d%02d",
-                    $year, $dmon, $day, $hh, $mm, $ss);
-    }
     
     return $certinfo;
 }
+
 
 # NOTE: this is UNSAFE (beware of race conditions). We cannot use a file
 # handle here because we are calling external programs to use these
