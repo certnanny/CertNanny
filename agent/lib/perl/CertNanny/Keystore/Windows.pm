@@ -1,6 +1,6 @@
 #
 # CertNanny - Automatic renewal for X509v3 certificates using SCEP
-# 2005, 2006 Martin Bartosch <m.bartosch@cynops.de>
+# 2005-02 Martin Bartosch <m.bartosch@cynops.de>
 #
 # This software is distributed under the GNU General Public License - see the
 # accompanying LICENSE file for more details.
@@ -8,112 +8,23 @@
 
 package CertNanny::Keystore::Windows;
 
-use base qw(Exporter CertNanny::Keystore);
-# You may wish to base your class on the OpenSSL keystore instead if
-# you deal with PKCS#8 or PKCS#12 in your implementation or if you would
-# like to use the key and request generation of the OpenSSL keystore.
-#use base qw(Exporter CertNanny::OpenSSL);
+use base qw(Exporter CertNanny::Keystore::OpenSSL);
 
 use strict;
-use vars qw($VERSION);
+use vars qw(@ISA @EXPORT @EXPORT_OK %EXPORT_TAGS $VERSION);
 use Exporter;
 use Carp;
-use English;
+
+use IO::File;
+use File::Spec;
+use File::Copy;
 use Data::Dumper;
-use Win32::OLE;
-use Win32::OLE::Variant;
-use Win32::OLE::Const;
+use CertNanny::Util;
+use Cwd;
 
-# CAPICOM constant definitions
-my $const = Win32::OLE::Const->Load('CAPICOM');
-$const->{XECR_PKCS10_V1_5} = 0x4;
-$const->{CRYPT_EXPORTABLE} = 0x00000001;
-$const->{AT_KEYEXCHANGE} = 1;
-$const->{AT_SIGNATURE} = 2;
+$VERSION = 0.01;
 
-my %capicomlocation = (
-	memory => $const->{CAPICOM_MEMORY_STORE},
-	machine => $const->{CAPICOM_LOCAL_MACHINE_STORE},
-	user => $const->{CAPICOM_CURRENT_USER_STORE},
-	ad => $const->{CAPICOM_ACTIVE_DIRECTORY_USER_STORE},
-	sc => $const->{CAPICOM_SMART_CARD_USER_STORE},
-);
-
-my %certlocation = (
-        user => 1 << 16,
-	machine => 2 << 16,
-	service => 4 << 16,
-	services => 5 << 16,
-	users => 6 << 16,
-);	
-
-$VERSION = 0.10;
-
-
-###########################################################################
-# Some useful code snippets
-#
-# Log debug information:
-# $self->debug("My debug level is " . $self->loglevel());
-#
-# Log informational message:
-# $self->info("Some informational message");
-#
-# Get a temporary file name (automatically cleaned up after termination)
-# my $tmpfile = $self->gettmpfile();
-#
-# Build file paths from directory components (DON'T simply concatenate
-# them, path separators differ between platforms!):
-# my $file = File::Spec->catfile('', 'var', 'tmp', 'foobar');
-# (On Unix this results in /var/tmp/foobar)
-#
-# Read file contents to a scalar:
-# my $content = $self->read_file($filename);
-# if (! defined $content) {
-#   $self->seterror("...");
-#   return;
-# }
-#
-# Write contents of a scalar variable to a file:
-# if (! $self->write_file(
-#   FILENAME => $filename,
-#   CONTENT  => $myvariable,
-#   FORCE    => 1,           # existing files will not be overwritten otherwise
-# )) {
-#   $self->seterror("...");
-#   return;
-# }
-#
-# Key conversion: (see CertNanny::Keystore::convertkey()), example:
-# my $newkey = $self->convertkey(
-#   KEYFILE => $keyfile,
-#   KEYFORMAT => 'PEM',
-#   KEYTYPE   => 'OpenSSL',
-#   KEYPASS   => $pin,
-#   OUTFORMAT => 'PKCS8',
-#   OUTTYPE   => 'DER',
-#   OUTPASS   => $pin,
-# );
-# if (! defined $newkey) ...
-#
-# Certificate conversion: (see CertNanny::Keystore::convertcert()), example:
-# my $newcert = $self->convertcert(
-#   CERTDATA => $data,
-#   CERTFORMAT => 'DER',
-#   OUTFORMAT => 'PEM',
-# );
-# if (! defined $newcert) ...
-#
-# Atomic file installation (see CertNanny::Keystore::installfile()), example:
-# if (! $self->installfile(
-#   { FILENAME => $destfile1, CONTENT => data1, DESCRIPTION => 'file1...' },
-#   { FILENAME => $destfile2, CONTENT => data2, DESCRIPTION => 'file2...' },
-# )) ...
-#
-
-
-
-# constructor
+#implement new?
 sub new
 {
     my $proto = shift;
@@ -155,506 +66,404 @@ sub new
     
     # sample sanity checks for configuration settings
      foreach my $entry (qw( location )) {
- 	if (! defined $self->{OPTIONS}->{ENTRY}->{$entry} ) {
- 	    croak("keystore.$entry $self->{OPTIONS}->{ENTRY}->{$entry} not defined.");
- 	    return;
- 	}
-     }
+		if (! defined $self->{OPTIONS}->{ENTRY}->{$entry} ) {
+			croak("keystore.$entry $self->{OPTIONS}->{ENTRY}->{$entry} not defined.");
+			return;
+		}
+	}
     
-    Win32::OLE->Option ('Warn' => 3);
-    
-    $self->{OPTIONS}->{ENTRY}->{storename} ||= 'MY';
+    #$self->{OPTIONS}->{ENTRY}->{storename} ||= 'MY';
     $self->{OPTIONS}->{ENTRY}->{storelocation} ||= 'machine';
-
-    $self->{STORE}=$self->openstore( $self->{OPTIONS}->{ENTRY}->{storename},$self->{OPTIONS}->{ENTRY}->{storelocation});
-    # the rest should remain untouched
-
-    # get previous renewal status
-    $self->retrieve_state() || return;
-
-    # check if we can write to the file
-    $self->store_state() || croak "Could not write state file $self->{STATE}->{FILE}";
+    
+    $self->{OPTIONS}->{ENTRY}->{enroll}->{sscep}->{engine} = "sscep_engine";
+    $self->{OPTIONS}->{ENTRY}->{enroll}->{sscep_engine}->{engine_id} = "capi";
+    $self->{OPTIONS}->{ENTRY}->{enroll}->{sscep_engine}->{dynamic_path} = "capi";
+    
+    $self->CertreqReadTemplate();
+    if($self->{OPTIONS}->{ENTRY}->{storelocation} eq "machine") {
+        $self->{OPTIONS}->{ENTRY}->{certreq}->{NewRequest}->{MachineKeySet} = "TRUE";
+        $self->{OPTIONS}->{ENTRY}->{enroll}->{sscep_engine_capi}->{storelocation} = "LOCAL_MACHINE";
+    }
 
     # instantiate keystore
     return $self;
 }
 
+sub getcert()
+{
+	my $self = shift;
+	my $certdata = "";
+	CertNanny::Logging->debug("Called getcert() for Windows");
+	my $serial;
+	my $returned_data = "";
+	# delete any old certificates, just to be sure
+	foreach my $cert (glob File::Spec->catfile($self->{OPTIONS}->{ENTRY}->{statedir}, 'Blob*.crt')) {
+    	unlink $cert;
+    }
+	my $derfile_tmp = $self->CertutilWriteCerts(( SERIAL => $serial ));
+	unless(defined($derfile_tmp)) {
+		CertNanny::Logging->debug("No serial was defined before so all certs were dumped and are now parsed");
+		my $olddir = getcwd();
+		chdir $self->{OPTIONS}->{ENTRY}->{statedir};
+		my @certs = glob "Blob*.crt";
+		my $active_cert;
+		foreach my $certfilename (@certs) {
+			my $certinfo = $self->getcertinfo( CERTFILE => $certfilename );
+			CertNanny::Logging->debug("Parsing certificate with filname $certfilename and subjectname $certinfo->{SubjectName}");
+			my $notbefore = CertNanny::Util::isodatetoepoch($certinfo->{NotBefore});
+			my $notafter = CertNanny::Util::isodatetoepoch($certinfo->{NotAfter});
+			my $now = time;
+			CertNanny::Logging->debug("Searching for $self->{OPTIONS}->{ENTRY}->{location} in $certinfo->{SubjectName} and NotAfter $notafter where current time is $now");
+			CertNanny::Logging->debug("Result of index: ". index($certinfo->{SubjectName}, $self->{OPTIONS}->{ENTRY}->{location}));
+			if (index($certinfo->{SubjectName}, $self->{OPTIONS}->{ENTRY}->{location}) != -1 && $notafter > $now) {
+				CertNanny::Logging->debug("Found something!");
+				my $active_notafter = CertNanny::Util::isodatetoepoch($active_cert->{NotAfter}) if (defined($active_cert));
+				if(!defined($active_cert) || $active_notafter < $notafter) {
+					$active_cert = $certinfo;
+					$serial = $certinfo->{SerialNumber};
+					$serial =~ s/://g;
+					CertNanny::Logging->debug("The current certificate is the newest and thus will be used from hereon");
+				}
+			}
+		}
+		chdir $olddir;
+		if(!defined($serial)) {
+			CertNanny::Logging->error("Could not retrieve a valid certificate from the keystore");
+			return;
+		}
+		$derfile_tmp = $self->CertutilWriteCerts(( SERIAL => $serial ));
+	}
+	my @cmd;
+	my $cmd;
+	my $openssl = $self->{OPTIONS}->{CONFIG}->get('cmd.openssl', 'FILE');
+	@cmd = (qq("$openssl"), 'x509', '-in', qq("$derfile_tmp"), '-inform', 'DER');
+	$cmd = join(" ", @cmd);
+	CertNanny::Logging->debug("Execute: $cmd");
+	$certdata  = `$cmd`;
+	CertNanny::Logging->debug("Dumping resulting certificate in PEM format:\n$certdata");
+	return { CERTDATA => $certdata,
+	      CERTFORMAT => 'PEM'};
+}
 
-# you may add additional destruction code here but be sure to retain
-# the call to the parent destructor
-sub DESTROY {
+sub CertutilWriteCerts()
+{
+	my $self = shift;
+	my %args = (@_,);
+	$args{OPTIONS} = ['-split'];
+	push($args{OPTIONS}, '-user') if $self->{OPTIONS}->{ENTRY}->{storelocation} eq "user";
+	$args{COMMAND} = '-store';
+	$args{OUTFILE} = $self->gettmpfile() if defined $args{SERIAL};
+	CertNanny::Logging->debug("Calling certutil to retrieve certificates.");
+	my $outfile_tmp = $self->CertUtilCmd(%args);
+	return $outfile_tmp;
+}
+
+sub CertUtilDeleteCert() {
+	my $self = shift;
+	my %args = (@_,);
+	$args{OPTIONS} = [];
+	push($args{OPTIONS}, '-user') if $self->{OPTIONS}->{ENTRY}->{storelocation} eq "user";
+	$args{COMMAND} = '-delstore';
+	my $serial = $args{SERIAL};
+	my $store = $args{STORE} || "My";
+	unless($serial and $store) {
+	    CertNanny::Logging->error("A deletion was requested, but either no serial or no storename was provided.");
+	    return;
+	}
+	CertNanny::Logging->debug("Deleting ceritifcate with serial $serial from store $store");
+	$self->CertUtilCmd(%args);
+	return !$?;
+}
+
+sub CertUtilCmd() {
+	my $self = shift;
+	my %args = (@_,);
+	my $serial = $args{SERIAL} if defined $args{SERIAL};
+	my $store = $args{STORE} || "My";
+	my $outfile_tmp = $args{OUTFILE} if defined $args{OUTFILE};
+	
+	CertNanny::Logging->debug("Serial is $serial.") if defined($serial);
+	
+	my @cmd;
+	push(@cmd, 'certutil');
+	foreach my $option (@{$args{OPTIONS}}) {
+		push(@cmd, $option);
+	}
+	push(@cmd, $args{COMMAND});
+	push(@cmd, qq("$store")); # NOTE: It is *mandatory* to have double quotes here!
+	push(@cmd, $serial) if defined $serial;
+	push(@cmd, $outfile_tmp) if defined $outfile_tmp;
+	my $cmd = join(" ", @cmd);
+	my $olddir = getcwd();
+	chdir ($args{TARGETDIR} ||$self->{OPTIONS}->{ENTRY}->{statedir});
+	my @certs = glob "Blob*.crt";
+	foreach my $cert (@certs) {
+		unlink $cert;
+	}
+	CertNanny::Logging->debug("Execute: $cmd.");
+	my $cmd_output = `$cmd`;
+	chdir $olddir;
+	CertNanny::Logging->debug("Dumping output of above command:\n $cmd_output");
+	CertNanny::Logging->debug("Output was written to $outfile_tmp") if defined($outfile_tmp);
+	return $outfile_tmp;
+}
+
+
+sub createrequest()
+{
+	my $self = shift;
+    my %args = ( 
+        @_,         # argument pair list
+    );
+	
+    $self->{OPTIONS}->{ENTRY}->{certreq}->{NewRequest}->{Subject} = qq("$self->{CERT}->{INFO}->{SubjectName}");
+	my $inf_file_out = $self->CertreqWriteConfig();
+	my $result;
+	
+	my $requestfile = $self->{OPTIONS}->{ENTRYNAME} . ".csr";
+	$result->{REQUESTFILE} = File::Spec->catfile($self->{OPTIONS}->{ENTRY}->{statedir}, $requestfile);
+	
+	unless($self->checkRequestSanity()){
+	    CertNanny::Logging->error("createrequest(): Sanitycheck could not resolve all problems. Please fix manually.");
+	    return;
+	}
+	
+	# if the file exists, the sanity check has checked that everything is just fine...
+	unless (-e $result->{REQUESTFILE}) { 
+		my @cmd = ('certreq', '-new', qq("$inf_file_out"), qq("$result->{REQUESTFILE}"));
+		my $cmd = join(' ', @cmd);
+		`$cmd`;
+		if($? != 0) {
+			CertNanny::Logging->error("createrequest(): Executing certreq cmd error: $cmd");
+			return;
+		}
+	}
+	
+	return $result;
+}
+
+sub CertreqWriteConfig() {
     my $self = shift;
-    # check for an overridden destructor...
-    if ($self->{STORE}) {
-	eval { $self->{STORE}->Close() };
-	if ($@) {
-	    chomp($@);
-	    $self->debug("Ignoring store close error: [$@]\n");
+    my %args = ( @_, );
+    
+    my $inf_file_out = $self->gettmpfile();
+    open(my $configfile, ">", $inf_file_out) or die "Cannot write $inf_file_out";
+	
+	foreach my $section ( keys  $self->{OPTIONS}->{ENTRY}->{certreq}) {
+		print $configfile "[$section]\n";
+        while (my ($key, $value) = each($self->{OPTIONS}->{ENTRY}->{certreq}->{$section})) {
+        	if(-e $value and $^O eq "MSWin32") {
+	        	#on Windows paths have a backslash, so in the string it is \\.
+	        	#In the config it must keep the doubled backslash so the actual 
+	        	#string would contain \\\\. Yes this is ridiculous...
+				$value =~ s/\\/\\\\/g;        		
+        	}
+        	
+        	if($key eq "Subject") {
+        	    $value =~ s/,\s+(\w+=)/,$1/g;
+        	}
+            print $configfile "$key=$value\n";
         }
     }
-    $self->SUPER::DESTROY if $self->can("SUPER::DESTROY");
+    
+    close $configfile;
+    
+    return $inf_file_out;	
 }
 
-
-
-
-# This method should extract the certificate from the instance keystore
-# and return a hash ref:
-# CERTFILE => file containing the cert **OR**
-# CERTDATA => string containg the cert data
-# CERTFORMAT => 'PEM' or 'DER'
-# or undef on error
-sub getcert {
+sub CertreqReadTemplate() {
     my $self = shift;
     
-    # you might want to access keystore configuration here
-         
-    my $cert;
-
-    eval { $cert = $self->getcertobject( $self->{STORE} ) };
-
-    if ($@) {
-	chomp($@);
-	my $storelocation = $self->{OPTIONS}->{ENTRY}->{storelocation};
-	my $storename = $self->{OPTIONS}->{ENTRY}->{storename};
-	$self->seterror("store $storelocation/$storename: $@");
-	return;
-    }
-   
-    my $certdata = 
-    	"-----BEGIN CERTIFICATE-----\n" . 
-    	$cert->Export($const->{CAPICOM_ENCODE_BASE64}) . 
-	"-----END CERTIFICATE-----\n";
-    
-    my $instancecert;
-
-    # either set CERTFILE ***OR*** CERTDATA, not both!!!
-     $instancecert = {
-# 	CERTFILE   => $filename,     # if the cert is stored on disk
- 	CERTDATA   => $certdata,     # if the cert is available in a scalar
- 	CERTFORMAT => 'PEM',         # or 'DER'...
-     };
+    my $inf_file_in = $self->{OPTIONS}->{CONFIG}->get('path.certreqinf', 'FILE');
+    open INF_FILE_IN, "<", $inf_file_in
+		or CertNanny::Logging->error("CertreqReadTemplate(): Could not open input file: $inf_file_in");
+	my $section;
+	while(<INF_FILE_IN>) {
+	    chomp;
+	    my $line = $_;
+	    if($line =~ m/\[([\w]+)\]/) {
+	        $section = $1;
+	        next;
+	    }
 	    
-    return $instancecert;
-}
-
-
-
-# This method should return the keystore's private key.
-# It is expected to return a hash ref containing the unencrypted 
-# private key:
-# hashref (as expected by convertkey()), containing:
-# KEYDATA => string containg the private key OR
-# KEYFILE => file containing the key data
-# KEYFORMAT => 'PEM' or 'DER'
-# KEYTYPE => format (e. g. 'PKCS8' or 'OpenSSL'
-# KEYPASS => key pass phrase (only if protected by pass phrase)
-# or undef on error
-sub getkey {
-    my $self = shift;
-
-    my $keydata;
-    eval { $keydata = $self->getkeydata($self->{STORE}) };
-    if ($@)
-    {
-	chomp($@);
-	my $storelocation = $self->{OPTIONS}->{ENTRY}->{location};
-	my $storename = $self->{OPTIONS}->{ENTRY}->{storename};
-	$self->seterror("store $storelocation/$storename: $@");
-        return;
-    }    
-
-    my $key;
-
-    #everything in front of the first five - in the private key will be deleted
-    $keydata =~ s{.*(-----BEGIN)}{$1}xms;
-
-    # either set KEYFILE ***OR*** KEYDATA, not both!!!
-     $key = {
- 	KEYDATA => $keydata,        # if the key is contained in a scalar OR
-# 	KEYFILE => $keyfile,        # if the key is contained in a file
-# 	KEYTYPE => 'OpenSSL',       # or 'PKCS8'
- 	KEYFORMAT => 'PEM'          # or 'DER'
-# 	KEYPASS => $pin,
-     };
-
-    return $key;
-}
-
-
-
-# This method should generate a new private key and certificate request.
-sub createrequest {
-    my $self = shift;
-     
-    # NOTE: you might want to use OpenSSL request generation, see suggestion
-    # above.
-  
-    # step 1: generate private key or new keystore
-      
-    my $storelocation = $self->{OPTIONS}->{ENTRY}->{storelocation};
-    my $enroll = Win32::OLE->new ('CEnroll.CEnroll') or die;
-    if (!$enroll) {
-	    $self->seterror("CEnroll.CEnroll is not installed");
-	    return;
-    }
-    my $cert;
-    eval { $cert = $self->getcertobject( $self->{STORE} ) };
-    if ($@) {
-	chomp($@);
-	my $storelocation = $self->{OPTIONS}->{ENTRY}->{storelocation};
-	my $storename = $self->{OPTIONS}->{ENTRY}->{storename};
-	$self->seterror("store $storelocation/$storename: $@");
-	return;
-    }
-    my $privkey = $cert->{PrivateKey};
-    if (!$privkey) {
-	    $self->seterror("cannot access PrivateKey");
-	    return;
-    }
-    $enroll->{ProviderName} = $privkey->{ProviderName};
-    $enroll->{ProviderType} = $privkey->{ProviderType};
-    $enroll->{RequestStoreFlags} = $certlocation{lc($storelocation)};
-    $enroll->{KeySpec} = $privkey->{KeySpec};
-    my $keysize = $cert->{PublicKey}->{Length};
-    $enroll->{GenKeyFlags} = $const->{CRYPT_EXPORTABLE} | ($keysize << 16);
-    my $extensions = $cert->{Extensions};
-    if ($extensions) {
-	$extensions = Win32::OLE::Enum->new($extensions);
-	my $sanoid = '2.5.29.17'; # subjectAltName
-	while (defined (my $ext = $extensions->Next)) {
-		next if ($ext->{OID}->{Value} ne $sanoid);
-		$self->debug("adding subjectAltName extension");
-		$enroll->addExtensionToRequest($ext->{IsCritical},$sanoid,
-					       $ext->{EncodedData}->{Value});
-		last;
+	    # skip if not valid
+	    next if not defined $section; # need to have an active section
+	    next if $line =~ m/^;.*/; # line is a comment, skip it
+	    next if $line =~ m/^\s*$/; # line is empty, skip it
+	    
+	    $line =~ m/^(\w+)=(.*)$/;
+	    $self->{OPTIONS}->{ENTRY}->{certreq}->{$section}->{$1} = $2;
 	}
-    }
-
-    #print "STOREFLAGS: $enroll->{CAStoreFlags}\n";
-    my $requestfile = $self->{OPTIONS}->{ENTRYNAME} . ".csr";
-       
-    #If the .csr file already exists, the file will be deleted to avoid 
-    #messages on the screen
-    if(-e "$self->{OPTIONS}->{ENTRY}->{statedir}/".$requestfile) # FIXME catfile bzw. $requestfile (s.u.) verwenden
-    {
-       unlink("$self->{OPTIONS}->{ENTRY}->{statedir}/".$requestfile); # FIXME catfile
-    }
-   
-    $requestfile =  
-	File::Spec->catfile($self->{OPTIONS}->{ENTRY}->{statedir},
-			    $requestfile);
-    #########################################################################
-    my $location = $self->{OPTIONS}->{ENTRY}->{location};
-    #array
-    my @tmpcn;
-    #split the string after all , and write the new strings in an array
-    @tmpcn=split(/(?<!\\),\s*/,$location);
-    #change the order of the array
-    @tmpcn = reverse(@tmpcn);
-    #replace the , and write the string to $location
-    $location = join(',',@tmpcn);
-    #########################################################################
-    #createFileRequest has no return value
-    $enroll->createFileRequest($const->{XECR_PKCS10_V1_5},$location,"",
-	    	$requestfile);
-    # generate a PKCS#10 PEM encoded request file
-    #keyfile aus request holen, dazu muss location nicht mehr von MY sondern von request geholt werden
-    my $storename = "REQUEST";
-    
-    my $requeststore = $self->openstore($storename, $storelocation);
-    
-    my $keydata;
-    eval { $keydata = $self->getkeydata($requeststore) };
-    if ($@)
-    {
-	chomp($@);
-	$self->seterror("store $storelocation/$storename: $@");
-        return;
-    }    
-  
-    eval { $requeststore->Close() };
-    if ($@) {
-	chomp($@);
-	$self->debug("Ignoring store close error: [$@]");
-    }
-    
-    my $keyfile = $self->{OPTIONS}->{ENTRYNAME} . ".key";
-    $keyfile =  
-	File::Spec->catfile($self->{OPTIONS}->{ENTRY}->{statedir},
-			    $keyfile);
-    #create a keyfile out of the  
-    if (! $self->write_file(
-	FILENAME => $keyfile,
-	CONTENT  => $keydata,
-	FORCE    => 1,
-	)) {
-	$self->seterror("Could not create file $keyfile");
-	return;
-    }
-
-    return({ REQUESTFILE => $requestfile,
-	     KEYFILE     => $keyfile,
-	   });
+	
+	close INF_FILE_IN;
 }
 
-# This method is called once the new certificate has been received from
-# the SCEP server. Its responsibility is to create a new keystore containing
-# the new key, certificate, CA certificate keychain and collection of Root
-# certificates configured for CertNanny.
-# A true return code indicates that the keystore was installed properly.
-sub installcert {
-    my $self = shift;
-    
+sub getStoreCerts() {
+	my $self = shift;
+	my $store = shift;
+	
+	$self->CertutilWriteCerts((STORE => $store));
+	my $olddir = getcwd();
+	chdir $self->{OPTIONS}->{ENTRY}->{statedir};
+	my @certs = glob "Blob*.crt";
+	my @certinfos;
+	foreach my $cert (@certs) {
+		my $certinfo = $self->getcertinfo( CERTFILE => $cert );
+		push(@certinfos, $certinfo);
+	}
+	chdir $olddir;
+	
+	
+	return @certinfos;
+}
+
+# check if both a csr AND a key exist AND check if they match
+# this functions cleans up all irregularities
+# this means, after this function was executed, either a valid csr + key exist
+# or both were removed. Thus the existence of a CSR indicated that everything is fine
+sub checkRequestSanity() {
+	my $self = shift;
+	# Steps:
+	CertNanny::Logging->debug("Checking request sanity.");
+	# 1. read all keys from REQUEST store
+	my @certs = $self->getStoreCerts("REQUEST");
+	# 2. read csr
+	my $csrfile = File::Spec->catfile($self->{OPTIONS}->{ENTRY}->{statedir}, $self->{OPTIONS}->{ENTRYNAME} . ".csr");
+	# 3. if csr does not exist
+	unless(-e $csrfile) {
+		CertNanny::Logging->debug("No CSR was found under $csrfile for keystore " . $self->{OPTIONS}->{ENTRYNAME} . ". Checking if there is a pending request in keystore that matched Certificate subject " . $self->{OPTIONS}->{ENTRY}->{SubjectName} . ".");
+		# 3.1. if object with same subject name as current cert exists
+		my @delete_certs;
+		foreach my $cert (@certs) {
+			if((index $self->{CERT}->{INFO}->{SubjectName}, $cert->{SubjectName}) != -1) {
+				push(@delete_certs, $cert);
+			}
+		}
+		
+		if(@delete_certs) {
+			# 3.1.1 delete the objects
+			CertNanny::Logging->info("There is at least one old pending request in the keystore although no CSR was found for it. All pending requests that have the same subject as the current ceritficate will be deleted.");
+			foreach my $cert (@delete_certs) {
+				my $serial = $cert->{SerialNumber};
+				$serial =~ s/://g;
+				unless($self->CertUtilDeleteCert(( SERIAL => $serial, STORE => "REQUEST"))) {
+				    CertNanny::Logging->error("Could not delete certificate with serial $serial from store REQUEST");
+				    return;
+				}
+			}
+						
+		}
+		return 1;
+
+	} 
+	
+	# 4. if csr exists
+	if(-e $csrfile) {
+		# 4.1 if no key in REQUEST
+		unless(@certs) {
+		    CertNanny::Logging->info("There is no pending request in the keystore so the current csr will be deleted.");
+			# 4.1.1 delete the csr
+			unless(unlink $csrfile) {
+			    CertNanny::Logging->error("Could not delete csr $csrfile. Please remove manually.");
+			    return;
+			}
+			return 1;
+		}
+		
+		# 4.2 if csr does not match REQUEST
+		my $csr = CertNanny::Util->getcsrinfo(( CERTFILE => $csrfile ));
+		my $request_key;
+		my @delete_certs;
+		foreach my $cert (@certs) {
+			if(index($cert->{SubjectName}, $csr->{SubjectName}) != -1) {
+				if($cert->{Modulus} eq $csr->{Modulus}) {
+					$request_key = $cert;
+				} else {
+					push(@delete_certs, $cert);
+				}
+			}
+		}
+		
+		unless($request_key) {
+		    my $subject = $csr->{SubjectName};
+		  CertNanny::Logging->info("The existing csr does not match any currently pending request in the keystore so the csr and all pending requests with subject $subject will be deleted.");   
+		}
+		unless( defined $request_key ){
+			# 4.2.1 delete the csr
+			unless(unlink $csrfile) {
+			    CertNanny::Logging->error("Could not delete csr $csrfile. Please remove manually.");
+			    return;
+			}
+		}
+		
+		# 4.2.2 delete the object
+		foreach my $cert (@delete_certs) {
+			my $serial = $cert->{SerialNumber};
+			$serial =~ s/://g;
+			CertNanny::Logging->debug("Deleting certificate with serial $serial");
+			unless($self->CertUtilDeleteCert(( SERIAL => $serial, STORE => "REQUEST"))) {
+			    CertNanny::Logging->error("Could not delete certificate with serial $serial from store REQUEST");
+			    return;
+			}
+		}
+	}
+	
+	return 1;
+}
+
+sub installcert()
+{
+	# convert cert to pkcs#12
+	# execute import_cert.exe import test100-cert.pfx
+	my $self = shift;
     my %args = ( 
-		 @_,         # argument pair list
-		 );
-
-    # please see examples in other keystores on ideas how to do this
-    my $enroll = Win32::OLE->new ('CEnroll.CEnroll') or die;
-    my $storelocation = $self->{OPTIONS}->{ENTRY}->{storelocation};
-    my $cert;
-    eval { $cert = $self->getcertobject( $self->{STORE} ) };
-    if ($@) {
-	chomp($@);
-	my $storelocation = $self->{OPTIONS}->{ENTRY}->{storelocation};
-	my $storename = $self->{OPTIONS}->{ENTRY}->{storename};
-	$self->seterror("store $storelocation/$storename: $@");
-	return;
-    }
-    my $privkey = $cert->{PrivateKey};
-    if (!$privkey) {
-	    $self->seterror("cannot access PrivateKey");
-	    return;
-    }
-    $enroll->{RequestStoreFlags}=$certlocation{lc($storelocation)};
-    $enroll->{ProviderName} = $privkey->{ProviderName};
-    $enroll->{ProviderType} = $privkey->{ProviderType};
-    $enroll->{KeySpec} = $privkey->{KeySpec};
-    my $openssl = $self->{OPTIONS}->{CONFIG}->get('cmd.openssl', 'FILE');
-       
-    if (! defined $openssl) {
-	$self->seterror("No openssl shell specified");
-	return;
-    }
-
-    my $p7bfilename =  $self->{OPTIONS}->{ENTRYNAME} . "-cert.p7b"; 
-     $p7bfilename =  
-	File::Spec->catfile($self->{OPTIONS}->{ENTRY}->{statedir},
-			    $p7bfilename);
-    my $pemfilename = $self->{OPTIONS}->{ENTRYNAME} . "-cert.pem";
-     $pemfilename =  
-	File::Spec->catfile($self->{OPTIONS}->{ENTRY}->{statedir},
-			    $pemfilename);
-    if(system("\"$openssl\" crl2pkcs7 -nocrl -out \"$p7bfilename\" -certfile \"$pemfilename\" ") != 0){
-   
-    $self->seterror("\"$p7bfilename\" could not be created ($!)");
-	return;
-       }    
-    local $/=undef;
-    
-    if($?!=0)
-    {
-      $self->seterror("pem could not be converted.");
-	return;
-    } 
-      
-    #install certificate in cert mgr
-    eval { $enroll->acceptFilePKCS7($p7bfilename) };
-
-    if ($@) {
-	chomp($@);
-	$self->seterror("Could not install new keystore ($@)");
-	return;
-    }
-    
-    # only on success:
-     
-    if(-e $p7bfilename)
-    {
-       unlink($p7bfilename);
-    }
-
-    my $count = $self->deleteoldcerts();
-
-    if($count == 0)
-    {
-       $self->importrequest();
-    }
-       
-    return 1;
+        @_,         # argument pair list
+    );
+	my $ret = 1;
+	
+	#my $keyfile = $self->{STATE}->{DATA}->{RENEWAL}->{REQUEST}->{KEYFILE};
+	my $certfile = $args{CERTFILE};
+	my @cmd = ('certreq', '-accept', qq("$certfile"));
+	my $cmd = join(" ", @cmd);
+	CertNanny::Logging->debug("Execute: $cmd");
+	my $cmd_output = `$cmd`;
+	CertNanny::Logging->debug("certreq output:\n$cmd_output");
+	if ($? != 0) {
+		CertNanny::Logging->error("installcert(): Certificate could not be imported. Output of command $cmd was:\n$cmd_output");
+		return;
+	}
+	
+	# if everything was successful, we need to execute cleanup
+	my $requestfile = $self->{STATE}->{DATA}->{RENEWAL}->{REQUEST}->{REQUESTFILE};
+	# delete request, otherwise certnanny thinks we have a pending request...
+	if(-e $requestfile) {
+		unless(unlink $requestfile) {
+			CertNanny::Logging->error("installcert(): Could not delete the old csr. Since the certificate was already installed, this is *critical*. Delete it manually or the next renewal will fail.");
+		}
+	}
+	
+	# TODO delete the old certificate (or archive it?)
+	my $newcert_info = CertNanny::Util->getcertinfo(( CERTFILE => $certfile, CERTFORMAT => 'PEM' ));
+	CertNanny::Logging->info("Deleting old certificate from keystore");
+	my @store_certs = $self->getStoreCerts();
+	foreach my $storecert (@store_certs) {
+	    my $newcert_subject = $newcert_info->{SubjectName};
+	    my $newcert_serial = $newcert_info->{SerialNumber};
+	    my $storecert_subject = $storecert->{SubjectName};
+	    my $storecert_serial = $storecert->{SerialNumber};
+	    if( $storecert_subject eq $newcert_subject && $storecert_serial ne $newcert_serial) {
+	        my $delserial = $storecert_serial;
+	        $delserial =~ s/://g;
+	        CertNanny::Logging->debug("Deleting certificate with serial $delserial");
+	        unless($self->CertUtilDeleteCert((SERIAL => $delserial))) {
+	            CertNanny::Logging->error("Could not delete the old certificate. The next update will fail if this is not fixed!");
+	            $ret = undef;
+	        }
+	    }
+	}
+	
+	return $ret;	
 }
 
-sub deleteoldcerts {
-    my $self = shift;
-    my $store =$self->{STORE};
-    my $certs = $store->Certificates;
-       
-    my $thumbprint = $self->{CERT}->{INFO}->{CertificateFingerprint};
-    $thumbprint =~ s/://g;
-    my $certstoremove;
-    eval {
-
-         $certstoremove = 
-	 	$certs->Find($const->{CAPICOM_CERTIFICATE_FIND_SHA1_HASH},
-			$thumbprint);
-    };
-    if ($@) {
-	chomp($@);
-	my $storelocation = $self->{OPTIONS}->{ENTRY}->{storelocation};
-	my $storename = $self->{OPTIONS}->{ENTRY}->{storename};
-	$self->seterror("deleteoldcerts: can't find certificate/request with has $thumbprint in $storelocation/$storename: $@");
-	return 0;
-    }	
-    my $count = $certstoremove->Count;
-    
-    for(my $i=1;$i<=$count; $i++)
-    {
-       $store->Remove($certstoremove->Item($i));
-    }
-    return 1;
-   
-}
-
-#This method searches through the certificate store to find the matching certificate.
-#First the number of certificates in this store is saved in $certcount. The SubjectName of every
-#certificate in the store to the location in the config file. If 0 or more than 1 certificate
-#was found the method stops with an error.
-#If only one certificate was found, this one will be returned.
-sub getcertobject {
-    my $self = shift;
-    my $store = shift;
-   
-    my $location = $self->{OPTIONS}->{ENTRY}->{location};
-    $location =~ s/(?<!\\)((\\\\)*),\s*/$1,/g;
-  
-    #my $issuerregex = $self->{OPTIONS}->{ENTRY}->{issuerregex};
-    
-    my $certs = $store->Certificates;
-    my $count = 0;
-    my $cert;
-    my $matchedcert;
-
-    #go through all certificates in the store
-    my $enum = Win32::OLE::Enum->new($certs);
-    while (defined( $cert = $enum->Next)) {
-       my $subjectname=$cert->SubjectName;
-       #my $issuername=$cert->IssuerName;
-       
-       #Because the subject names in the certificates from the certificate store are formated in a different way
-       #the subject names from the config file. The blanks after the seperating "," need to be deleted. 
-       $subjectname =~ s/(?<!\\)((\\\\)*),\s*/$1,/g;
-       #$issuername =~ s/(?<!\\)((\\\\)*),\s*/$1,/g;
-      
-       #if ($subjectname eq $location && (!$issuername || $issuername =~ m/^$issuerregex$/)) { 
-       if($subjectname eq $location) {
-         $count++;
-	 $matchedcert = $cert;
-       }
-    }
-    $enum->Reset;
-
-    die "certificate/request not found ($location)\n"
-	if ($count == 0);
-
-    die "found multiple certificates/requests ($location)\n"
-	if ($count > 1);
-    
-    return $matchedcert;
-}	
-
-#Opens a certificate store with maximum allowed rights.
-sub openstore {
-
-    my $self = shift;
-    my $store_name = shift;
-    my $store_location_string = shift;
-    	
-    #my $store_name = $self->{OPTIONS}->{ENTRY}->{storename} || 'MY';
-    my $store_location = $capicomlocation{lc($store_location_string)};
-   
-    my $store_mode = $const->{CAPICOM_STORE_OPEN_MAXIMUM_ALLOWED};
-  
-    #ist Capicom installiert?
-    my $store = Win32::OLE->new ('CAPICOM.Store');
-   
-    #Open() has no return value
-    $store->Open ($store_location, $store_name, $store_mode);
-    
-    return $store;    
-}
-
-#
-sub getkeydata {
-
-    my $self = shift;
-    my $store = shift;
-
-    my $cert=$self->getcertobject($store) or return;
-    
-    #create .p12 file
-    my $filename = $self->{OPTIONS}->{ENTRYNAME} . ".p12";
-    $filename =  
-	File::Spec->catfile($self->{OPTIONS}->{ENTRY}->{statedir},
-			    $filename);
-
-    Win32::OLE->Option ('Warn' => 3); # FIXME global setting changed locally
-    
-    #save the certificate in the .p12 file as pfx
-    eval { 
-       $cert->Save($filename,"",$const->{CAPICOM_CERTIFICATE_SAVE_AS_PFX});
-    };
-    if ($@) {
-	unlink $filename;
-	chomp($@);
-	die "PKCS#12 export: $@\n";
-    }
-   
-    my $openssl = $self->{OPTIONS}->{CONFIG}->get('cmd.openssl', 'FILE');
-   
-    #create pkcs12 file via OpenSSL
-    if (!open(OPENSSL,  "\"$openssl\" pkcs12 -in \"$filename\" -nocerts -passin pass: -nodes |")) {
-   
-	die("\"filename\" could not be opened ($!)\n");
-    }    
-    
-    #the OpenSSL output is saved in $keyfile
-    local $/;
-    my $keydata = <OPENSSL>;
-    
-    close(OPENSSL);
-
-    #delete the created .p12 file
-    #if(-e $filename)
-    #{
-    #   unlink($filename);
-    #}
-
-    die("pkcs12 could not be converted.\n")
-	if ($? != 0);
-
-    return $keydata;
-}
-
-sub importrequest {
-    my $self = shift;
-
-    my $storename = "REQUEST";
-    my $storelocation = $self->{OPTIONS}->{ENTRY}->{storelocation}; 
-    my $requeststore = $self->openstore($storename, $storelocation);
-    
-    my $filename = $self->{OPTIONS}->{ENTRYNAME} . ".pfx";
-    $filename =  
-	File::Spec->catfile($self->{OPTIONS}->{ENTRY}->{statedir},
-			    $filename);
-    
-    $requeststore->Load($filename,"",$const->{CAPICOM_KEY_STORAGE_EXPORTABLE});
-        
-    eval { $requeststore->Close() };
-    if ($@) {
-	chomp($@);
-	$self->debug("Ignoring store close error: [$@]\n");
-    }
-}
 
 1;
