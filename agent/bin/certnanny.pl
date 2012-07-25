@@ -50,6 +50,7 @@ GetOptions(\%config,
 	      cfg|cfgfile|conf|config=s
 			win_user=s
 			win_password=s
+		  sleep=i
 	      )) or pod2usage(-msg => $msg, -verbose => 0);
 
 pod2usage(-exitstatus => 0, -verbose => 2) if $config{man};
@@ -60,6 +61,7 @@ die "Could not read config file $config{cfg}. Stopped"
     unless (-r $config{cfg});
 
 my $monitor = CertNanny->getInstance(CONFIG => $config{cfg});
+$monitor->setOption("sleep", $config{sleep} || 300);
 
 foreach my $cmd (@ARGV) {
 	if ($OSNAME eq 'MSWin32') {
