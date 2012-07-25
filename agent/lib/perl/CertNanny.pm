@@ -213,7 +213,9 @@ sub do_renew
     $rc = $keystore->checkvalidity($autorenew);
     if (! $rc) { 
 	# schedule automatic renewal
-	CertNanny::Logging->log({MSG => "Scheduling renewal"});
+	my $rndwaittime = int(rand($self->{"sleep"}));
+	CertNanny::Logging->log({MSG => "Scheduling renewal but randomly waiting $rndwaittime seconds to ease stress on the PKI"});
+	sleep $rndwaittime;
 	$keystore->{INSTANCE}->renew();
     }
 
@@ -222,6 +224,16 @@ sub do_renew
 	CertNanny::Logging->log({MSG => "Certificate is valid for less than $warnexpiry days",PRIO => 'notice'});
 	$keystore->warnexpiry();
     }
+    return 1;
+}
+
+sub setOption {
+    my $self = shift;
+    my $key = shift;
+    my $value = shift;
+    
+    $self->{$key} = $value;
+    
     return 1;
 }
 
