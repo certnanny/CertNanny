@@ -91,17 +91,22 @@ sub execute {
 	my $operation = shift;
 	
 	my @cmd = (qq("$self->{cmd}"),
-           "$operation",
+           $operation,
            '-f',
            qq("$self->{config_filename}")
 	);
 	
 	my $cmd = join(' ', @cmd);
 	CertNanny::Logging->debug("Exec: $cmd in ".getcwd());
-	print `$cmd`;
-	#exec($cmd);
-	#return 0;#TODO: Remove
-	return $?;
+	open FH, "$cmd |" or die "Couldn't execute $cmd: $!\n"; 
+	while(defined(my $line = <FH>)) {
+	    chomp($line);
+	    print "$line\n";
+	}
+	close FH;
+	my $exitval = $? >> 8;
+	CertNanny::Logging->debug("sscep returned $exitval\n");
+	return $exitval;
 }
 # Enroll needs
 # PrivateKeyFile
