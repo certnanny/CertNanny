@@ -61,7 +61,8 @@ die "Could not read config file $config{cfg}. Stopped"
     unless (-r $config{cfg});
 
 my $monitor = CertNanny->getInstance(CONFIG => $config{cfg});
-$monitor->setOption("sleep", $config{sleep} || 300);
+$config{sleep} = 300 if !defined $config{sleep};
+$monitor->setOption("sleep", $config{sleep});
 
 foreach my $cmd (@ARGV) {
 	if ($OSNAME eq 'MSWin32') {
@@ -70,7 +71,7 @@ foreach my $cmd (@ARGV) {
 		if ($cmd eq "install") {
 			my $cfgpath = $config{cfg};
 			my $servicepath= File::Spec->catfile($FindBin::Bin, $FindBin::Script);
-			
+	
 			my $ret = Win32::Daemon::CreateService({
 				machine =>  '',
 				name    =>  $servicename,
@@ -79,7 +80,7 @@ foreach my $cmd (@ARGV) {
 				user    =>  $config{win_user} || "",
 				pwd     =>  $config{win_password} || "",
 				description => 'Automatic certificate renewal',
-				parameters =>qq{"$servicepath" --cfg "$cfgpath"},
+				parameters =>qq{"$servicepath" --cfg "$cfgpath" --sleep $config{sleep}},
 			});
 			
 			if ($ret) {
