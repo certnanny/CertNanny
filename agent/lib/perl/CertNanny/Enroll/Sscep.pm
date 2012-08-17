@@ -289,7 +289,7 @@ sub enroll {
 		eval { alarm 120 };    # eval not supported in perl 5.7.1 on win32
 		$self->readConfig(\%options);
 		$self->writeConfigFile();
-		$rc = $self->execute("enroll") / 256;
+		$rc = $self->execute("enroll");
 		eval { alarm 0 };      # eval not supported in perl 5.7.1 on win32
 		CertNanny::Logging->info("Return code: $rc");
 	};
