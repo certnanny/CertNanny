@@ -1476,7 +1476,7 @@ sub sendrequest {
     }
 
     my $requestfile = $self->{STATE}->{DATA}->{RENEWAL}->{REQUEST}->{REQUESTFILE};
-    my $keyfile = $self->{STATE}->{DATA}->{RENEWAL}->{REQUEST}->{KEYFILE};
+    my $requestkeyfile = $self->{STATE}->{DATA}->{RENEWAL}->{REQUEST}->{KEYFILE};
     my $pin = $self->{PIN} || $self->{OPTIONS}->{ENTRY}->{pin};
     my $sscep = $self->{OPTIONS}->{CONFIG}->get('cmd.sscep');
     my $scepurl = $self->{OPTIONS}->{ENTRY}->{scepurl};
@@ -1497,7 +1497,7 @@ sub sendrequest {
     
     
     CertNanny::Logging->debug("request: $requestfile");
-    CertNanny::Logging->debug("keyfile: $keyfile");
+    CertNanny::Logging->debug("keyfile: $requestkeyfile");
     CertNanny::Logging->debug("sscep: $sscep");
     CertNanny::Logging->debug("scepurl: $scepurl");
     CertNanny::Logging->debug("scepsignaturekey: $scepsignaturekey");
@@ -1506,11 +1506,10 @@ sub sendrequest {
     CertNanny::Logging->debug("newcertfile: $newcertfile");
     CertNanny::Logging->debug("openssl: $openssl");
 	my $newkey;
-	my $requestkeyfile;
 	unless($self->hasEngine()) {
 	    # get unencrypted new key in PEM format
 	    $newkey = $self->convertkey(
-		KEYFILE   => $keyfile,
+		KEYFILE   => $requestkeyfile,
 		KEYPASS   => $pin,
 		KEYFORMAT => 'PEM',
 		KEYTYPE   => 'OpenSSL',
@@ -1544,41 +1543,44 @@ sub sendrequest {
     my $oldkeyfile;
     my $oldcertfile;
     if ($scepsignaturekey =~ /(old|existing)/i) {
-    	unless($self->isHSM()) {
-			# get existing private key from keystore
-			my $oldkey = $self->getkey();
-			if (! defined $oldkey) {
-			    CertNanny::Logging->error("Could not get old key from certificate instance");
-			    return;
-			}
+		# get existing private key from keystore
+		my $oldkey = $self->getkey();
+		if (! defined $oldkey) {
+		    CertNanny::Logging->error("Could not get old key from certificate instance");
+		    return;
+		}
 		
-			# convert private key to unencrypted PEM format
-			my $oldkey_pem_unencrypted = $self->convertkey(
-			    %{$oldkey},
-			    OUTFORMAT => 'PEM',
-			    OUTTYPE   => 'OpenSSL',
-			    OUTPASS   => '',
-			    );
-		
-			if (! defined $oldkey_pem_unencrypted) {
-			    CertNanny::Logging->error("Could not convert (old) private key");
-			    return;
-			}
-		
-		 	$oldkeyfile = $self->gettmpfile();
-		        chmod 0600, $oldkeyfile;
-		
-			if (! CertNanny::Util->write_file(
-				  FILENAME => $oldkeyfile,
-				  CONTENT  => $oldkey_pem_unencrypted->{KEYDATA},
-				  FORCE    => 1,
-			    )) {
-			    CertNanny::Logging->error("Could not write temporary key file (old key)");
-			    return;
-			}
-    	} else {
-    		$oldkeyfile = $self->{OPTIONS}->{ENTRY}->{location};
-    	}
+		unless($self->hasEngine()) {
+    		# convert private key to unencrypted PEM format
+    		# only necessary if no engine support is available
+    		# otherwise the keystore or engine is responsible for returning
+    		# the correct format
+    		my $oldkey_pem_unencrypted = $self->convertkey(
+    		    %{$oldkey},
+    		    OUTFORMAT => 'PEM',
+    		    OUTTYPE   => 'OpenSSL',
+    		    OUTPASS   => '',
+    		    );
+    	
+    		if (! defined $oldkey_pem_unencrypted) {
+    		    CertNanny::Logging->error("Could not convert (old) private key");
+    		    return;
+    		}
+    	
+    	 	$oldkeyfile = $self->gettmpfile();
+    	        chmod 0600, $oldkeyfile;
+    	
+    		if (! CertNanny::Util->write_file(
+    			  FILENAME => $oldkeyfile,
+    			  CONTENT  => $oldkey_pem_unencrypted->{KEYDATA},
+    			  FORCE    => 1,
+    		    )) {
+    		    CertNanny::Logging->error("Could not write temporary key file (old key)");
+    		    return;
+    		}
+		} else {
+		    my $oldkeyfile = $oldkey;
+		}
 		
 		$oldcertfile = $self->gettmpfile();
 		if (! CertNanny::Util->write_file(
