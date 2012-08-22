@@ -63,7 +63,7 @@ sub new
     }
     if (!defined $entry->{keypin}) {
     	$entry->{keypin} = $entry->{pin};
-	$self->info("keystore.$entryname.keypin not defined, defaulting to keystore.$entryname.pin");
+	CertNanny::Logging->info("keystore.$entryname.keypin not defined, defaulting to keystore.$entryname.pin");
 	# TODO check that keypin works if we are doing "renew"
     }
     if (!defined $entry->{alias}) {
@@ -84,14 +84,14 @@ sub new
 	    return;
 	}
 	($entry->{alias}) = $keys[0] =~ m{^([^,]*)};
-	$self->info("Using $entry->{alias} as default for keystore.$entryname.alias.");
+	CertNanny::Logging->info("Using $entry->{alias} as default for keystore.$entryname.alias.");
 	if (!defined $entry->{keyalg}) {
 	    $entry->{keyalg} = 'RSA';
-	    $self->info("Using $entry->{keyalg} as default for keystore.$entryname.keyalg");
+	    CertNanny::Logging->info("Using $entry->{keyalg} as default for keystore.$entryname.keyalg");
 	}
 	if (!defined $entry->{sigalg} && uc($entry->{keyalg}) eq 'RSA') {
 	    $entry->{sigalg} = 'SHA1withRSA';
-	    $self->info("Using $entry->{sigalg} as default for keystore.$entryname.sigalg");
+	    CertNanny::Logging->info("Using $entry->{sigalg} as default for keystore.$entryname.sigalg");
 	}
     }
     # the rest should remain untouched
@@ -177,6 +177,7 @@ sub getcert {
 
 # This method should return the keystore's private key.
 # It is expected to return a hash ref containing the unencrypted 
+# Only called WITHOUT engine
 # private key:
 # hashref (as expected by convertkey()), containing:
 # KEYDATA => string containg the private key OR
@@ -188,12 +189,14 @@ sub getcert {
 sub getkey {
     my $self = shift;
     my $keystore = shift; # defaults to $entry->{location}, see below
+    my $alias = shift; # defaults to $entry->{alias}, see below
 
     my $options = $self->{OPTIONS};
     my $entry = $options->{ENTRY};
     my $config = $options->{CONFIG};
 
     $keystore ||= $entry->{location};
+    $alias ||= $entry->{alias};
 
     my $pathjavalib = $config->get("path.libjava", "FILE");
     my $extractkey_jar = File::Spec->catfile($pathjavalib,'ExtractKey.jar');
@@ -208,10 +211,10 @@ sub getkey {
     	$classpath = "$ENV{CLASSPATH}$sep$classpath";
     }
 
-    $self->info("Extracting key $entry->{alias} from $keystore");
+    CertNanny::Logging->info("Extracting key $alias from $keystore");
     my @cmd = $self->keytoolcmd($keystore,
     	-keypass => qq{"$entry->{keypin}"},
-	-key => qq{"$entry->{alias}"});
+	-key => qq{"$alias"});
     shift @cmd; # remove keytool
     unshift @cmd, qq{"$options->{java}"}, -cp => qq{"$classpath"}, 
     	'de.cynops.java.crypto.keystore.ExtractKey';
@@ -243,91 +246,99 @@ sub tmpkeystorename {
 
 sub createrequest {
     my $self = shift;
-
     my $options = $self->{OPTIONS};
     my $entry = $options->{ENTRY};
     my $entryname = $options->{ENTRYNAME};
-    my $config = $options->{CONFIG};
-
-    # step 1: generate private key or new keystore
-    my $DN  = $self->{CERT}->{INFO}->{SubjectName};
-
-    # SubjectAltName: format is 'DNS:foo.example.com DNS:bar.example.com'
-    #my $SAN = $self->{CERT}->{INFO}->{SubjectAlternativeName}; # may be undef
-
-    my $tmpkeystore = $self->tmpkeystorename();
-	;
+    my $location = $entry->{location};
+    # get a new key (it's either created or the alias is just returned) 
+    my $newalias = $self->getnewkey();
+    my @cmd;
     
-    # clean up
-    unlink $tmpkeystore;
-    $self->info("Creating keystore $tmpkeystore");
-    $self->info("Generating new key with alias $entry->{alias} for $DN");
-    my @cmd = $self->keytoolcmd($tmpkeystore, '-genkey',
-    	-keypass => qq{"$entry->{keypin}"},
-	-alias => qq{"$entry->{alias}"},
-	-dname => qq{"$DN"},
-	);
-    push(@cmd, -keyalg => $entry->{keyalg}) if ($entry->{keyalg});
-    push(@cmd, -sigalg => $entry->{sigalg}) if ($entry->{sigalg});
-    push(@cmd, -keysize => $entry->{keysize}) if ($entry->{keysize});
-    $self->log({MSG => "Execute: " . join(' ',hidepin(@cmd)), PRIO => 'debug'});
-    my $data = `@cmd`;
-    if ($?) {
-    	chomp($data);
-	$self->seterror("createrequest(): keytool -genkey failed ($data)");
-	return;
+    # okay, we have a new key, let's create a request for it
+    my $requestfile = File::Spec->catfile($entry->{statedir}, $entryname . "-csr.pem");
+    CertNanny::Logging->info("Creating certificate request $requestfile");
+    @cmd = $self->keytoolcmd($location, '-certreq', -alias => qq{"$newalias"}, -file => qq{"$requestfile"});
+    CertNanny::Logging->debug("Execute: " . join(' ', hidepin(@cmd)));
+    if(run_command(join(' ', @cmd)) != 0) {
+        CertNanny::Logging->error("createrequest(): keytool -certreq failed. See above output for details");
+        return;
     }
-    my $key = $self->getkey($tmpkeystore) or return;
-    $key->{OUTTYPE} = 'OpenSSL';
-    $key->{OUTFORMAT} = 'PEM';
-    #$key->{OUTPASS} = $entry->{keypin}; # cannot PKCS#8 plain -> OpenSSL encrypted not supported by convertkey/openssl -> do it in 2 steps
-    $key = $self->convertkey(%$key);
-    if (!$key) {
-    	$self->seterror("createrequest(): Could not convert key");
-	return;
+    
+    # decide whether we need to expor the key (and to that if it's required)
+    my $keyfile;
+    unless($self->hasEngine()) {
+        # okay no engine, export the key
+        my $key = $self->getkey($location, $newalias) or return;
+        $key->{OUTTYPE} = 'OpenSSL';
+        $key->{OUTFORMAT} = 'PEM';
+        $key = $self->convertkey(%$key);
+        if(!$key) {
+            CertNanny::Logging->error("createrequest(): Could not convert key");
+            return;
+        }
+        
+        $key->{OUTTYPE} = 'OpenSSL';
+        $key->{OUTFORMAT} = 'PEM';
+        $key->{OUTPASS} = $entry->{keypin};
+        $key = $self->convertkey(%$key);
+        if(!$key) {
+            CertNanny::Logging->error("createrequest(): Could not convert key");
+            return;
+        }
+        my $keyfile = File::Spec->catfile($entry->{statedir}, $entryname . "-key.pem");
+        if(!CertNanny::Util->write_file(FILENAME => $keyfile, CONTENT => $key->{KEYDATA}, FORCE => 1)) {
+            CertNanny::Logging->error("createreqest(): Could not write key file");
+            return;
+        }        
+        chmod 0600, $keyfile;
+        
+    } else {
+        # okay we have an engine, create the correct keyfile variable
+        $keyfile = "${location}?alias=${newalias}";
     }
-    $key->{OUTTYPE} = 'OpenSSL';
-    $key->{OUTFORMAT} = 'PEM';
-    $key->{OUTPASS} = $entry->{keypin};
-    $key = $self->convertkey(%$key);
-    if (!$key) {
-    	$self->seterror("createrequest(): Could not convert key");
-	return;
-    }
-    my $keyfile = 
-	File::Spec->catfile($entry->{statedir}, $entryname . "-key.pem");
-    if (!$self->write_file(FILENAME => $keyfile, CONTENT => $key->{KEYDATA}, 
-    		FORCE => 1)) {
-	$self->seterror("createreqest(): Could not write key file");
-	return;
-    }
-    chmod 0600, $keyfile;
-
-    # step 2: generate certificate request for existing DN (and SubjectAltName)
-    # generate a PKCS#10 PEM encoded request file
-    my $requestfile = 
-	File::Spec->catfile($entry->{statedir}, $entryname . "-csr.pem");
-    $self->info("Creating certificate request $requestfile");
-    @cmd = $self->keytoolcmd($tmpkeystore, '-certreq',
-        -keypass => qq{"$entry->{keypin}"},
-	-alias => qq{"$entry->{alias}"},
-	-file => qq{"$requestfile"},
-	);
-    push(@cmd, -sigalg => $entry->{sigalg}) if ($entry->{sigalg});
-    $self->log({MSG => "Execute: " . join(' ',hidepin(@cmd)), PRIO => 'debug'});
-    $data = `@cmd`;
-    if ($?) {
-    	chomp($data);
-	$self->seterror("createrequest(): keytool -certreq failed ($data)");
-	return;
-    }
-
-    return { REQUESTFILE => $requestfile,
-	     KEYFILE     => $keyfile,
-	   };
+    
+    return { 
+        REQUESTFILE => $requestfile, 
+        KEYFILE => $keyfile,
+    };
+    
 }
 
-
+# Generates a new key in the current keystore,
+# but only if it has not already done that, i.e. a key
+# from a previous run is reused!
+sub getnewkey {
+    my $self = shift;
+    my $alias = $self->{ENTRY}->{alias};
+    my $newalias = "${alias}-new";
+    my $location = $self->{ENTRY}->{location};
+    my @cmd;
+    
+    #first check if key  already exists
+    push(@cmd, '-alias');
+    push(@cmd, qq{"$newalias"});
+    push(@cmd, '-list');
+    @cmd = $self->keytoolcmd($location, @cmd);
+    CertNanny::Logging->debug("Execute: " . join(' ', hidepin(@cmd)));
+    if(run_command(join(" ", @cmd)) != 0) {
+        # we need to generate a new one since we don't already have one
+        CertNanny::Logging->info("getnewkey(): Creating new key with alias $newalias");
+        @cmd = ('-genkeypair', );
+        push(@cmd, '-alias');
+        push(@cmd, qq{"$newalias"});
+        my $DN  = $self->{CERT}->{INFO}->{SubjectName};
+        push(@cmd, '-dname');
+        push(@cmd, qq{"$DN"});
+        CertNanny::Logging->debug("Execute: " . join(' ', hidepin(@cmd)));
+        if(run_command(join(' ', @cmd)) != 0) {
+            CertNanny::Logging->error("getnewkey(): Could not create the new key, see above output for details");
+            return;  
+        }
+    }
+    
+    return $newalias;
+       
+}
 
 # This method is called once the new certificate has been received from
 # the SCEP server. Its responsibility is to create a new keystore containing
@@ -336,28 +347,33 @@ sub createrequest {
 # A true return code indicates that the keystore was installed properly.
 sub installcert {
     my $self = shift;
-    my %args = ( 
-		 @_,         # argument pair list
-		 );
+    my %args = ( @_,);
     my $options = $self->{OPTIONS};
     my $entry = $options->{ENTRY};
-    my $config = $options->{CONFIG};
-    my $tmpkeystore = $self->tmpkeystorename();
-
+    my $location = $entry->{location};
+    my @cmd;
+    # change old key's alias to something meaningful
+    my $alias = $entry->{alias};
+    my $timestamp = time();
+    my $backupalias = "old-${alias}-${timestamp}";
+    if(!$self->changealias($alias, $backupalias)) {
+        CertNanny::Logging->error("Could not change old key's alias from $alias to $backupalias. Cannot proceed with certificate installation.");
+        return;
+    }
+    
+    # check that all root certificates that exist are in the keystore
     # all trusted root ca certificates...
     my @trustedcerts = @{$self->{STATE}->{DATA}->{ROOTCACERTS}};
     
     # ... plus all certificates from the ca key chain minus its root cert
-    push(@trustedcerts, 
-         @{$self->{STATE}->{DATA}->{CERTCHAIN}}[1..$#{$self->{STATE}->{DATA}->{CERTCHAIN}}]);
-    my @cmd;
+    push(@trustedcerts, @{$self->{STATE}->{DATA}->{CERTCHAIN}}[1..$#{$self->{STATE}->{DATA}->{CERTCHAIN}}]);
     foreach my $caentry (@trustedcerts) {
         my @rdn = split(/(?<!\\),\s*/, $caentry->{CERTINFO}->{SubjectName});
         my $cn = $rdn[0];
         $cn =~ s/^CN=//;
     
     
-        $self->info("Adding certificate '$caentry->{CERTINFO}->{SubjectName}' from file $caentry->{CERTFILE}");
+        CertNanny::Logging->info("Adding certificate '$caentry->{CERTINFO}->{SubjectName}' from file $caentry->{CERTFILE}");
     
         # rewrite certificate into pem format
         my $cacert = $self->convertcert(OUTFORMAT => 'PEM',
@@ -377,64 +393,79 @@ sub installcert {
     	    $self->seterror("installcert(): Could not write temporary ca file");
     	    return;
         }
-    
-    
-        @cmd = $self->keytoolcmd($tmpkeystore,
-		'-import','-noprompt',
-		-file => qq("$cacertfile"),
-		-alias => qq("$cn"));
-    
-        $self->log({MSG => "execute: " . join(" ", hidepin(@cmd)), PRIO => 'debug' });
         
-        if (system(join(' ', @cmd)) != 0) {
-    	    unlink $cacertfile;
-    	    $self->seterror("could not add certificate to keystore");
-    	    return;
+        if(!$self->importcert($cacertfile, $cn)) {
+            CertNanny::Logging->info("Could not install certificate '$cn', probably already present. Not critical");
         }
-        unlink $cacertfile;
     }
-    $self->info("Adding $self->{CERT}->{INFO}->{SubjectName}");
-    @cmd = $self->keytoolcmd($tmpkeystore,
-		'-import','-noprompt',
-		-alias => qq{"$entry->{alias}"},
-		-file => qq("$args{CERTFILE}"));
-    $self->log({MSG => "execute: " . join(" ", hidepin(@cmd)), PRIO => 'debug' });
-    if (system(join(' ', @cmd)) != 0) {
-        $self->seterror("could not add certificate to keystore");
-        return;
+    
+         
+         
+    
+    # rename the new key to the old key's alias
+    my $newkeyalias = $self->getnewkey();
+    if(!$self->changealias($newkeyalias, $alias)) {
+        CertNanny::Logging->error("Could not rename new key to old key's alias from $newkeyalias to $alias. Rolling back previous renaming to get back the old store");
+        if(!$self->changealias($backupalias, $alias)) {
+            CertNanny::Logging->error("Could not even rename the old key back to its previous name. Something is seriously wrong. Keystore might be broken, please investigate!");
+            return;
+        }
     }
-
-    # now replace the old keystore with the new one
-    if (! -r $tmpkeystore) {
-	$self->seterror("Could not access new prototype keystore file $tmpkeystore");
-	return;
+    
+    # install the new cert with the old alias
+    if(!$self->importcert($args{CERTFILE}, $alias)) {
+        CertNanny::Logging->error("Could not import the new certificate. Currently active key has no valid certificate. Rolling back previous renaming to get back working store.");
+        if(!$self->changealias($alias, $newkeyalias)) {
+            CertNanny::Logging->error("Could not rename the new key back to its previous alias. Thus cannot restore old key's alias. Keystore might be broken, please investigate!");
+            return;
+        }
+        if(!$self->changealias($backupalias, $alias)) {
+            CertNanny::Logging->error("Could not rename the old key back to its previous name. Keystore might be broken, please investigate!");
+            return;
+        }
     }
-
-    $self->info("Installing Java keystore");
-    my $data = $self->read_file($tmpkeystore);
-    if (!defined($data)) {
-    	 $self->seterror("Could read new keystore file $tmpkeystore");
-	 return;
-    }
-	
-    my @newkeystore = (
-	     {
-		 DESCRIPTION => "Java keystore",
-		 FILENAME    => $entry->{location},
-		 CONTENT     => $data,
-	     });
-
-    ######################################################################
-    # try to write the new keystore 
-
-    if (! $self->installfile(@newkeystore)) {
-	$self->seterror("Could not install new keystore");
-	return;
-    }
-
-    unlink $tmpkeystore;
     
     return 1;
+}
+
+# Imports certificate to keystore
+# first argument is the file to import
+# second argument is the alias with which to import
+sub importcert {
+    my $self = shift;
+    my $certfile = shift;
+    my $alias = shift;
+    my $location = $self->{OPTIONS}->{ENTRY}->{location};
+    
+    my @cmd = $self->keytoolcmd($location, '-import', '-noprompt', -alias => qq{"$alias"}, -file => qq{"$certfile"});
+    CertNanny::Logging->info("Importing certificate with alias $alias");
+    CertNanny::Logging->debug("Execute: " . join(' ', hidepin(@cmd)));
+    if(run_command(join(' ', @cmd)) == 0) {
+        return 1;
+    } else {
+        return 0;
+    }
+}
+
+sub changealias {
+    my $self = shift;
+    my $alias = shift;
+    my $destalias = shift;
+    my $location = $self->{OPTIONS}->{ENTRY}->{location};
+    my @cmd = ('-changealias', );
+    push(@cmd, '-alias');
+    push(@cmd, qq{"$alias"});
+    push(@cmd, '-destalias');
+    push(@cmd, qq{"$destalias"});
+    @cmd = $self->keytooldcmd($location, @cmd);
+    CertNanny::Logging->debug("Execute: " . join(' ', hidepin(@cmd)));
+    if(run_command(join(' ', @cmd)) != 0) {
+        CertNanny::Logging->error("Could not change alias from $alias to $destalias");
+        return;
+    } else {
+        return 1;
+    }
+    
 }
 
 1;
