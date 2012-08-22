@@ -444,7 +444,18 @@ sub installcert()
 		}
 	}
 	
-	# TODO delete the old certificate (or archive it?)
+	if(!$self->deleteoldcerts($certfile)) {
+	    return 0;
+	}
+	
+	return $ret;	
+}
+
+sub deleteoldcerts() {
+    # TODO delete the old certificate (or archive it?)
+    my $self = shift;
+    my $certfile = shift;
+    my $ret = 1;
 	my $newcert_info = CertNanny::Util->getcertinfo(( CERTFILE => $certfile, CERTFORMAT => 'PEM' ));
 	CertNanny::Logging->info("Deleting old certificate from keystore");
 	my @store_certs = $self->getStoreCerts();
@@ -464,12 +475,20 @@ sub installcert()
 	    }
 	}
 	
-	return $ret;	
+	return $ret;
 }
 
 # always returns 1 as this will not work without an engine!
 sub hasEngine() {
     return 1;
+}
+
+# Because it supports engines, this is easy.
+# It returns its location value which is okay for the capi engine 
+sub getkey() {
+    my $self = shift;
+    
+    return $self->{OPTIONS}->{ENTRY}->{location};
 }
 
 
