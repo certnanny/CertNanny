@@ -75,9 +75,10 @@ sub new
     #$self->{OPTIONS}->{ENTRY}->{storename} ||= 'MY';
     $self->{OPTIONS}->{ENTRY}->{storelocation} ||= 'machine';
     
-    $self->{OPTIONS}->{ENTRY}->{enroll}->{sscep}->{engine} = "sscep_engine";
-    $self->{OPTIONS}->{ENTRY}->{enroll}->{sscep_engine}->{engine_id} = "capi";
-    $self->{OPTIONS}->{ENTRY}->{enroll}->{sscep_engine}->{dynamic_path} = "capi";
+    my $engine_section = $self->getDefaultEngineSection();
+    $self->{OPTIONS}->{ENTRY}->{enroll}->{sscep}->{engine} = $engine_section;
+    $self->{OPTIONS}->{ENTRY}->{enroll}->{$engine_section}->{engine_id} = "capi";
+    $self->{OPTIONS}->{ENTRY}->{enroll}->{$engine_section}->{dynamic_path} = $self->{OPTIONS}->{ENTRY}->{hsm}->{dynamic_path};
     
     $self->CertreqReadTemplate();
     if($self->{OPTIONS}->{ENTRY}->{storelocation} eq "machine") {
@@ -222,6 +223,7 @@ sub createrequest()
 	
 	my $requestfile = $self->{OPTIONS}->{ENTRYNAME} . ".csr";
 	$result->{REQUESTFILE} = File::Spec->catfile($self->{OPTIONS}->{ENTRY}->{statedir}, $requestfile);
+	$result->{KEYFILE} = $self->{OPTIONS}->{ENTRY}->{location};
 	
 	unless($self->checkRequestSanity()){
 	    CertNanny::Logging->error("createrequest(): Sanitycheck could not resolve all problems. Please fix manually.");
@@ -463,6 +465,11 @@ sub installcert()
 	}
 	
 	return $ret;	
+}
+
+# always returns 1 as this will not work without an engine!
+sub hasEngine() {
+    return 1;
 }
 
 
