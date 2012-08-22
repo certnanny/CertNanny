@@ -671,6 +671,39 @@ sub gettmpfile
     return ($tmpfile);
 }
 
+sub staticEngine     {
+    shift;
+    my $self = CertNanny::Util->getInstance();
+    my $engine_id = shift;
+    
+    unless(defined $engine_id) {
+        CertNanny::Logging->error("No engine_id passed to staticEngine() as first argument!");
+        die;
+    }
+    
+    my @cmd;
+    my $openssl = $self->{OPTIONS}->{openssl_shell};
+    push(@cmd, $openssl);
+    push(@cmd, 'engine');
+    print "Engine ID before clean: $engine_id\n";
+    $engine_id =~ s/[^A-Za-z0-9]*//g;
+    print "Engine ID after clean: $engine_id\n";
+    push(@cmd, $engine_id);
+    push(@cmd, '-t');
+    
+    my $cmd = join(' ', @cmd);
+    print "Command is $cmd\n";
+    my $output = "";
+    open FH, "$cmd |" or die "Couldn't execute $cmd: $!\n"; 
+	while(defined(my $line = <FH>)) {
+	    chomp($line);
+	    $output .= $line;
+	}
+	close FH;
+	print "Output is $output\n";
+	return $output=~m/\(cs\).*\[ available \]/s;
+}
+
 1;
 
 =head1 NAME
@@ -718,6 +751,8 @@ C<getcsrinfo()>
 C<parsecertdata()>
 
 C<gettmpfile()>
+
+C<staticEngine()>
 
 =back
 
@@ -921,3 +956,16 @@ Filehandle to the output that should be parsed. See C<getcertinfo> and C<getcsri
 
 Returns filename for a temporary file. All requested files get deleted automatically upon destruction of the object.
 NOTE: this is UNSAFE (beware of race conditions). We cannot use a file handle here because we are calling external programs to use these temporary files.
+
+=item staticEngine($engine_id)
+
+Checks whether the engine was compiled into OpenSSL statically by checking if it is available to OpenSSL. This will also report true if the engine is already made available dynamically.
+Returns true if the engine is available, false otherwise.
+
+=over 4
+
+=item $engine_id
+
+The engine_id which should be checked.
+
+=back
