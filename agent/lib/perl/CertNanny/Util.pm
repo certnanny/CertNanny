@@ -82,7 +82,7 @@ sub run_command
 	};
 	close($PROGRAM);
 	print $output; #TODO Logging
-	return $?;
+	return $? >> 8;
 }
 
 # returns current time as ISO timestamp (UTC)
