@@ -1507,7 +1507,7 @@ sub sendrequest {
     CertNanny::Logging->debug("openssl: $openssl");
 	my $newkey;
 	my $requestkeyfile;
-	unless($self->isHSM()) {
+	unless($self->hasEngine()) {
 	    # get unencrypted new key in PEM format
 	    $newkey = $self->convertkey(
 		KEYFILE   => $keyfile,
@@ -1538,8 +1538,6 @@ sub sendrequest {
 		CertNanny::Logging->error("Could not write unencrypted copy of new file to temp file");
 		return;
 	    }
-	} else {
-		$requestkeyfile = $self->{OPTIONS}->{ENTRY}->{location};
 	}
 
     my @autoapprove = ();
@@ -1735,11 +1733,16 @@ sub get_enroller {
 	return $self->{OPTIONS}->{ENTRY}->{ENROLLER};
 }
 
-sub isHSM {
+sub hasEngine {
 	my $self = shift;
 	
 	return defined $self->{OPTIONS}->{ENTRY}->{hsm};
 }
 
+sub getDefaultEngineSection {
+    my $self = shift;
+    
+    return $self->{OPTIONS}->{ENTRY}->{enroll}->{sscep}->{engine} || 'engine_section';
+}
 
 1;
