@@ -89,7 +89,7 @@ sub installcert {
 	    return;
     }
 	
-	my $result = $self->deleteoldcerts();
+	my $result = $self->deleteoldcerts($certfile);
 	
 	# read IIS Webserver InstanceName(s) from config
 	my @instanceidentifier_array = split(/, */ ,$self->{OPTIONS}->{ENTRY}->{instanceidentifier});
