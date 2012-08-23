@@ -44,14 +44,14 @@ sub installcert {
     my $certfile = $args{CERTFILE}; 
     my $label = $self->{CERT}->{LABEL};
     
-    $self->info("Creating prototype PKCS#12 from certfile $certfile, keyfile $keyfile, label $label");
+    CertNanny::Logging->info("Creating prototype PKCS#12 from certfile $certfile, keyfile $keyfile, label $label");
 
 	# create random PW via OpenSSL
 	my $openssl = $self->{OPTIONS}->{CONFIG}->get('cmd.openssl', 'FILE');
    
     my $open_result = open(my $OPENSSL, "\"$openssl\" rand -base64 15 |");
 	if (! $open_result) {
-		$self->seterror("Could not open OpenSSL for random PIN generation");
+		CertNanny::Logging->error("Could not open OpenSSL for random PIN generation");
 		return;
     }    
     
@@ -64,7 +64,7 @@ sub installcert {
     close($OPENSSL);
 	
 	if (! $randpin) {
-		$self->seterror("No random PIN generated");
+		CertNanny::Logging->error("No random PIN generated");
 	}
 	
 	$self->{PIN} = $randpin;
@@ -77,15 +77,15 @@ sub installcert {
 	);
     
     if (! defined $pkcs12file) {
-	    $self->seterror("Could not create prototype PKCS#12 from received certificate");
+	    CertNanny::Logging->error("Could not create prototype PKCS#12 from received certificate");
 	    return;
     }
-    $self->info("Created prototype PKCS#12 file $pkcs12file");
+    CertNanny::Logging->info("Created prototype PKCS#12 file $pkcs12file");
 
     # initialize IIS.CertObj
 	my $certobj = Win32::OLE->new ('IIS.CertObj');
 	if (! defined $certobj) {
-	    $self->seterror("Could not create IIS.CertObj");
+	    CertNanny::Logging->error("Could not create IIS.CertObj");
 	    return;
     }
 	
@@ -99,7 +99,7 @@ sub installcert {
 	# go through all instances using the same certificate
 	foreach $instanceidentifier (@instanceidentifier_array) {
 		$certobj->SetProperty('InstanceName', 'w3svc/' . $instanceidentifier);
-		$self->info("Using InstanceName w3svc/$instanceidentifier");
+		CertNanny::Logging->info("Using InstanceName w3svc/$instanceidentifier");
 
 		 if($result == 1) {
 			# import the new certificate into IIS
@@ -128,16 +128,16 @@ sub installcert {
 	my $old_thumbprint = $self->{CERT}->{INFO}->{CertificateFingerprint};
     $old_thumbprint =~ s/://g;
 
-	$self->info("Thumbprint of old certificate: $old_thumbprint");
+	CertNanny::Logging->info("Thumbprint of old certificate: $old_thumbprint");
 	
 	my $new_cert = $self->getcertobject( $self->{STORE} );
 	
 	my $new_thumbprint = $new_cert->thumbprint();
 	
-	$self->info("Thumbprint of new certificate: $new_thumbprint");
+	CertNanny::Logging->info("Thumbprint of new certificate: $new_thumbprint");
 	
 	if ($old_thumbprint eq $new_thumbprint) {
-		$self->seterror("Installation failed, old certificate is still in place.");
+		CertNanny::Logging->error("Installation failed, old certificate is still in place.");
 		return;
 	}
 	
