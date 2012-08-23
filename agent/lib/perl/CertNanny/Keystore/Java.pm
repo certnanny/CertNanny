@@ -68,7 +68,7 @@ sub new
     }
     if (!defined $entry->{alias}) {
     	my @cmd = $self->keytoolcmd($entry->{location},'-list');
-	$self->log({MSG => "Execute: " . join(' ',hidepin(@cmd)), PRIO => 'debug'});
+	CertNanny::Logging->debug("Execute: " . join(' ',hidepin(@cmd)));
     	my @keys = `@cmd`;
     	@keys = grep m{, keyEntry,$},@keys;
 	if ($?) {
@@ -159,12 +159,12 @@ sub getcert {
 
     my @cmd = $self->keytoolcmd($entry->{location},
     	'-export', '-rfc', -alias => qq{"$entry->{alias}"});
-    $self->log({MSG => "Execute: " . join(' ',hidepin(@cmd)), PRIO => 'debug'});
+    CertNanny::Logging->debug("Execute: " . join(' ',hidepin(@cmd)));
     my $certdata = `@cmd`;
     if ($?) {
     	chomp($certdata);
-	$self->seterror("getcert(): keytool -export failed ($certdata)");
-	return;
+    	CertNanny::Logging->error("getcert(): keytool -export failed ($certdata)");
+	    return;
     }
 
     return {
@@ -201,7 +201,7 @@ sub getkey {
     my $pathjavalib = $config->get("path.libjava", "FILE");
     my $extractkey_jar = File::Spec->catfile($pathjavalib,'ExtractKey.jar');
     if (! -r $extractkey_jar) {
-	$self->seterror("getkey(): could not locate ExtractKey.jar file");
+	CertNanny::Logging->error("getkey(): could not locate ExtractKey.jar file");
 	return;
     }
 
@@ -219,11 +219,11 @@ sub getkey {
     unshift @cmd, qq{"$options->{java}"}, -cp => qq{"$classpath"}, 
     	'de.cynops.java.crypto.keystore.ExtractKey';
 
-    $self->log({MSG => "Execute: " . join(' ',hidepin(@cmd)), PRIO => 'debug'});
+    CertNanny::Logging->debug("Execute: " . join(' ',hidepin(@cmd)));
     my $data = `@cmd`;
     if ($?) {
     	chomp($data);
-	$self->seterror("getkey(): keytool -export failed ($data)");
+	CertNanny::Logging->error("getkey(): keytool -export failed ($data)");
 	return;
     }
 
@@ -383,14 +383,14 @@ sub installcert {
         
         if (! defined $cacert)
         {
-    	    $self->seterror("installcert(): Could not convert certificate $caentry->{CERTFILE}");
+    	    CertNanny::Logging->error("installcert(): Could not convert certificate $caentry->{CERTFILE}");
     	return;
         }
     
         my $cacertfile = $self->gettmpfile();
         if (! $self->write_file(FILENAME => $cacertfile,
     			    CONTENT  => $cacert->{CERTDATA})) {
-    	    $self->seterror("installcert(): Could not write temporary ca file");
+    	    CertNanny::Logging->error("installcert(): Could not write temporary ca file");
     	    return;
         }
         
