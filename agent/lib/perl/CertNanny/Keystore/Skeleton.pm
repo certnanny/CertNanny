@@ -54,7 +54,7 @@ $VERSION = 0.10;
 # }
 #
 # Write contents of a scalar variable to a file:
-# if (! $self->write_file(
+# if (! CertNanny::Util->write_file(
 #   FILENAME => $filename,
 #   CONTENT  => $myvariable,
 #   FORCE    => 1,           # existing files will not be overwritten otherwise
