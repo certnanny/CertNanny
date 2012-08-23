@@ -79,7 +79,7 @@ sub getcert {
 
     my $openssl = $self->{OPTIONS}->{CONFIG}->get('cmd.openssl', 'FILE');
     if (! defined $openssl) {
-	$self->seterror("No openssl shell specified");
+	CertNanny::Logging->error("No openssl shell specified");
 	return;
     }
     
@@ -107,7 +107,7 @@ sub getcert {
     my $cmd = join(' ', @cmd);
     my $handle;
     if (! open $handle, "$cmd 2>/dev/null |") {
-	$self->seterror("could not run OpenSSL shell");
+	CertNanny::Logging->error("could not run OpenSSL shell");
 	delete $ENV{PIN};
 	return;
     }
@@ -144,7 +144,7 @@ sub getkey {
 
     my $openssl = $self->{OPTIONS}->{CONFIG}->get('cmd.openssl', 'FILE');
     if (! defined $openssl) {
-	$self->seterror("No openssl shell specified");
+	CertNanny::Logging->error("No openssl shell specified");
 	return;
     }
     
@@ -175,7 +175,7 @@ sub getkey {
     my $cmd = join(' ', @cmd);
     my $handle;
     if (! open $handle, "$cmd |") {
-	$self->seterror("could not run OpenSSL shell");
+	CertNanny::Logging->error("could not run OpenSSL shell");
 	delete $ENV{PIN};
 	return;
     }
@@ -236,7 +236,7 @@ sub installcert {
     my $certfile = $args{CERTFILE}; 
     my $label = $self->{CERT}->{LABEL};
     
-    $self->info("Creating prototype PKCS#12 from certfile $certfile, keyfile $keyfile, label $label");
+    CertNanny::Logging->info("Creating prototype PKCS#12 from certfile $certfile, keyfile $keyfile, label $label");
 
     # all trusted Root CA certificates...
     my @cachain = @{$self->{STATE}->{DATA}->{ROOTCACERTS}};
@@ -255,16 +255,16 @@ sub installcert {
     
     
     if (! defined $pkcs12file) {
-	$self->seterror("Could not create prototype PKCS#12 from received certificate");
+	CertNanny::Logging->error("Could not create prototype PKCS#12 from received certificate");
 	return;
     }
-    $self->info("Created prototype PKCS#12 file $pkcs12file");
+    CertNanny::Logging->info("Created prototype PKCS#12 file $pkcs12file");
 
 
     my $data = $self->read_file($pkcs12file);
     unlink $pkcs12file;
     if (! defined $data) {
-	$self->seterror("Could read new keystore file " . $pkcs12file);
+	CertNanny::Logging->error("Could read new keystore file " . $pkcs12file);
 	return;
     }
 
@@ -279,7 +279,7 @@ sub installcert {
     
 
     if (! $self->installfile(@newkeystore)) {   # if any error happened
-	$self->seterror("Could not install new keystore");
+	CertNanny::Logging->error("Could not install new keystore");
 	return;
     }
     
