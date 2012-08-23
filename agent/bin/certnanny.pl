@@ -963,7 +963,7 @@ Default: new
 
 Example: old
 
-=item keystore.LABEL.scepurl
+=item keystore.LABEL.enroll.sscep.URL
 
 URL of the SCEP Server to use
 

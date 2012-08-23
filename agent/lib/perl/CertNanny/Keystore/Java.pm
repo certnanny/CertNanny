@@ -15,6 +15,7 @@ use vars qw($VERSION);
 use Exporter;
 use Carp;
 use Data::Dumper;
+use CertNanny::Util;
 
 $VERSION = 0.10;
 
@@ -71,20 +72,22 @@ sub new
 	CertNanny::Logging->debug("Execute: " . join(' ',hidepin(@cmd)));
     	my @keys = `@cmd`;
     	@keys = grep m{, keyEntry,$},@keys;
-	if ($?) {
-	    croak("keystore $entry->{location} cannot be listed");
-	    return;
-	}
-	if (@keys == 0) {
-	    croak("keystore $entry->{location} does not contain a key");
-	    return;
-	}
-	if (@keys > 1) {
-	    croak("keystore $entry->{location} contains muliple keys, cannot determine alias. Please configure keystore.$entryname.alias.");
-	    return;
-	}
-	($entry->{alias}) = $keys[0] =~ m{^([^,]*)};
-	CertNanny::Logging->info("Using $entry->{alias} as default for keystore.$entryname.alias.");
+    	if ($?) {
+    	    croak("keystore $entry->{location} cannot be listed");
+    	    return;
+    	}
+    	if (@keys == 0) {
+    	    croak("keystore $entry->{location} does not contain a key");
+    	    return;
+    	}
+    	if (@keys > 1) {
+    	    croak("keystore $entry->{location} contains muliple keys, cannot determine alias. Please configure keystore.$entryname.alias.");
+    	    return;
+    	}
+    	($entry->{alias}) = $keys[0] =~ m{^([^,]*)};
+    	CertNanny::Logging->info("Using $entry->{alias} as default for keystore.$entryname.alias.");
+    }
+    
 	if (!defined $entry->{keyalg}) {
 	    $entry->{keyalg} = 'RSA';
 	    CertNanny::Logging->info("Using $entry->{keyalg} as default for keystore.$entryname.keyalg");
@@ -93,7 +96,6 @@ sub new
 	    $entry->{sigalg} = 'SHA1withRSA';
 	    CertNanny::Logging->info("Using $entry->{sigalg} as default for keystore.$entryname.sigalg");
 	}
-    }
     # the rest should remain untouched
 
     # get previous renewal status
@@ -126,10 +128,11 @@ sub keytoolcmd {
     my $options = $self->{OPTIONS};
     my $entry = $options->{ENTRY};
 
-    my @cmd = ($options->{keytool}, -storepass => qq{"$entry->{pin}"});
+    my @cmd = (qq("$options->{keytool}"), -storepass => qq{$entry->{pin}});
     push(@cmd, -provider => qq{"$entry->{provider}"}) if ($entry->{provider});
     push(@cmd, -storetype => qq{"$entry->{format}"}) if ($entry->{format});
     push(@cmd, -keystore => qq{"$location"}) if ($location);
+    push(@cmd, -keypass => qq($entry->{keypin})) if ($entry->{keypin});
     push(@cmd, @_);
     @cmd;
 }
@@ -213,7 +216,6 @@ sub getkey {
 
     CertNanny::Logging->info("Extracting key $alias from $keystore");
     my @cmd = $self->keytoolcmd($keystore,
-    	-keypass => qq{"$entry->{keypin}"},
 	-key => qq{"$alias"});
     shift @cmd; # remove keytool
     unshift @cmd, qq{"$options->{java}"}, -cp => qq{"$classpath"}, 
@@ -258,7 +260,7 @@ sub createrequest {
     my $requestfile = File::Spec->catfile($entry->{statedir}, $entryname . "-csr.pem");
     CertNanny::Logging->info("Creating certificate request $requestfile");
     @cmd = $self->keytoolcmd($location, '-certreq', -alias => qq{"$newalias"}, -file => qq{"$requestfile"});
-    CertNanny::Logging->debug("Execute: " . join(' ', hidepin(@cmd)));
+    CertNanny::Logging->debug("Execute: " . join(' ', (@cmd)));
     if(run_command(join(' ', @cmd)) != 0) {
         CertNanny::Logging->error("createrequest(): keytool -certreq failed. See above output for details");
         return;
@@ -273,7 +275,7 @@ sub createrequest {
         $key->{OUTFORMAT} = 'PEM';
         $key = $self->convertkey(%$key);
         if(!$key) {
-            CertNanny::Logging->error("createrequest(): Could not convert key");
+            CertNanny::Logging->error("createrequest(): Could not convert key.");
             return;
         }
         
@@ -309,9 +311,10 @@ sub createrequest {
 # from a previous run is reused!
 sub getnewkey {
     my $self = shift;
-    my $alias = $self->{ENTRY}->{alias};
+    my $entry = $self->{OPTIONS}->{ENTRY};
+    my $alias = $entry->{alias};
     my $newalias = "${alias}-new";
-    my $location = $self->{ENTRY}->{location};
+    my $location = $entry->{location};
     my @cmd;
     
     #first check if key  already exists
@@ -329,6 +332,11 @@ sub getnewkey {
         my $DN  = $self->{CERT}->{INFO}->{SubjectName};
         push(@cmd, '-dname');
         push(@cmd, qq{"$DN"});
+        push(@cmd, '-keyalg');
+        push(@cmd, "$entry->{keyalg}");
+        push(@cmd, '-sigalg');
+        push(@cmd, "$entry->{sigalg}");
+        @cmd = $self->keytoolcmd($location, @cmd);
         CertNanny::Logging->debug("Execute: " . join(' ', hidepin(@cmd)));
         if(run_command(join(' ', @cmd)) != 0) {
             CertNanny::Logging->error("getnewkey(): Could not create the new key, see above output for details");
