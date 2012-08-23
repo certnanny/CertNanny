@@ -126,7 +126,7 @@ sub getcert {
 
     my $certdata = CertNanny::Util->read_file($filename);
     if (! defined $certdata) {
-    	$self->seterror("getcert(): Could not read instance certificate file $filename");
+    	CertNanny::Logging->error("getcert(): Could not read instance certificate file $filename");
 	return;
     }
     
@@ -145,13 +145,13 @@ sub getkey {
     my $filename = $self->{OPTIONS}->{ENTRY}->{keyfile};
     my $openssl = $self->{OPTIONS}->{CONFIG}->get('cmd.openssl', 'FILE');
     if (! defined $openssl) {
-	$self->seterror("No openssl shell specified");
+	CertNanny::Logging->error("No openssl shell specified");
 	return;
     }
 
     my $keydata = CertNanny::Util->read_file($filename);
     if (! defined $keydata || ($keydata eq "")) {
-	$self->seterror("getkey(): Could not read private key");
+	CertNanny::Logging->error("getkey(): Could not read private key");
 	return;
     }
     
@@ -199,34 +199,34 @@ sub createpkcs12 {
 
     my $openssl = $self->{OPTIONS}->{CONFIG}->get('cmd.openssl', 'FILE');
     if (! defined $openssl) {
-	$self->seterror("No openssl shell specified");
+	CertNanny::Logging->error("No openssl shell specified");
 	return;
     }
 
     if (! defined $args{FILENAME}) {
-	$self->seterror("createpks12(): No output file name specified");
+	CertNanny::Logging->error("createpks12(): No output file name specified");
 	return;
     }
 
     if (! defined $args{CERTFILE}) {
-	$self->seterror("createpks12(): No certificate file specified");
+	CertNanny::Logging->error("createpks12(): No certificate file specified");
 	return;
     }
 
     if (! defined $args{KEYFILE}) {
-	$self->seterror("createpks12(): No key file specified");
+	CertNanny::Logging->error("createpks12(): No key file specified");
 	return;
     }
 
     CertNanny::Logging->debug("Certformat: $args{CERTFORMAT}");
 
     if (! defined $args{CERTFORMAT} or $args{CERTFORMAT} !~ /^(PEM|DER)$/) {
-	$self->seterror("createpks12(): Illegal certificate format specified");
+	CertNanny::Logging->error("createpks12(): Illegal certificate format specified");
 	return;
     }
 
     if (! defined $args{EXPORTPIN}) {
-	$self->seterror("createpks12(): No export PIN specified");
+	CertNanny::Logging->error("createpks12(): No export PIN specified");
 	return;
     }
 
@@ -256,7 +256,7 @@ sub createpkcs12 {
 		     PRIO => 'debug' });
 	
 	if (run_command(join(' ', @cmd)) != 0) {
-	    $self->seterror("Certificate format conversion failed");
+	    CertNanny::Logging->error("Certificate format conversion failed");
 	    return;
 	}
     }
@@ -288,7 +288,7 @@ sub createpkcs12 {
 	my $fh = new IO::File(">$cachainfile");
 	if (! $fh)
 	{
-	    $self->seterror("createpkcs12(): Could not create temporary CA chain file");
+	    CertNanny::Logging->error("createpkcs12(): Could not create temporary CA chain file");
 	    return;
 	}
 	
@@ -305,7 +305,7 @@ sub createpkcs12 {
 
 	    my $content = CertNanny::Util->read_file($file);
 	    if (! defined $content) {
-		$self->seterror("createpkcs12(): Could not read CA chain entry");
+		CertNanny::Logging->error("createpkcs12(): Could not read CA chain entry");
 		$fh->close;
 		unlink $cachainfile if (defined $cachainfile);
 		return;
@@ -338,7 +338,7 @@ sub createpkcs12 {
 		 PRIO => 'debug' });
 
     if (run_command(join(' ', @cmd)) != 0) {
-	$self->seterror("PKCS#12 export failed");
+	CertNanny::Logging->error("PKCS#12 export failed");
 	delete $ENV{PIN};
 	delete $ENV{EXPORTPIN};
 	unlink $certfile if ($args{CERTFORMAT} eq "DER");
@@ -377,7 +377,7 @@ sub generatekey {
     } else{
     	my $openssl = $self->{OPTIONS}->{CONFIG}->get('cmd.openssl', 'FILE');
     	if (! defined $openssl) {
-		$self->seterror("No openssl shell specified");
+		CertNanny::Logging->error("No openssl shell specified");
 		return;
     	}
 
@@ -408,7 +408,7 @@ sub generatekey {
 
 	    $ENV{PIN} = $pin;
 	    if (run_command(join(' ', @cmd)) != 0) {
-		$self->seterror("RSA key generation failed");
+		CertNanny::Logging->error("RSA key generation failed");
 		delete $ENV{PIN};
 		return;
    		}
@@ -427,7 +427,7 @@ sub createrequest {
     my $result = $self->generatekey();
     
     if (! defined $result) {
-	$self->seterror("Key generation failed");
+	CertNanny::Logging->error("Key generation failed");
 	return;
     }    
 
@@ -440,7 +440,7 @@ sub createrequest {
 
     my $openssl = $self->{OPTIONS}->{CONFIG}->get('cmd.openssl', 'FILE');
     if (! defined $openssl) {
-	$self->seterror("No openssl shell specified");
+	CertNanny::Logging->error("No openssl shell specified");
 	return;
     }
 
@@ -466,7 +466,7 @@ sub createrequest {
     my $fh = new IO::File(">$tmpconfigfile");
     if (! $fh)
     {
-    	$self->seterror("createrequest(): Could not create temporary OpenSSL config file");
+    	CertNanny::Logging->error("createrequest(): Could not create temporary OpenSSL config file");
     	return;
     }
     print $fh "[ req ]\n";
@@ -520,7 +520,7 @@ sub createrequest {
 
     $ENV{PIN} = $pin;
     if (run_command(join(' ', @cmd)) != 0) {
-	$self->seterror("Request creation failed");
+	CertNanny::Logging->error("Request creation failed");
 	delete $ENV{PIN};
 	unlink $tmpconfigfile;
 	return;
@@ -559,7 +559,7 @@ sub installcert {
 	);
 
     if (! defined $newkey) {
-	$self->seterror("Could not read/convert new key");
+	CertNanny::Logging->error("Could not read/convert new key");
 	return;
     }
 
@@ -580,7 +580,7 @@ sub installcert {
 	);
 
     if (! defined $newcert) {
-	$self->seterror("Could not read/convert new certificate");
+	CertNanny::Logging->error("Could not read/convert new certificate");
 	return;
     }
 
@@ -623,7 +623,7 @@ sub installcert {
 		     CONTENT     => $cacert->{CERTDATA},
 		 });
 	} else {
-	    $self->seterror("Could not convert CA certificate for level $ii");
+	    CertNanny::Logging->error("Could not convert CA certificate for level $ii");
 	    return;
 	}
 	$ii++;
@@ -636,7 +636,7 @@ sub installcert {
 	my $fh = new IO::File(">" . $self->{OPTIONS}->{ENTRY}->{rootcacertbundle});
 	if (! $fh)
 	{
-	    $self->seterror("installcert(): Could not create Root CA certificate bundle file");
+	    CertNanny::Logging->error("installcert(): Could not create Root CA certificate bundle file");
 	    return;
 	}
 
@@ -648,7 +648,7 @@ sub installcert {
 	    
 	    if (! defined $cert)
 	    {
-		$self->seterror("installcert(): Could not convert root certificate $entry->{CERTFILE}");
+		CertNanny::Logging->error("installcert(): Could not convert root certificate $entry->{CERTFILE}");
 		return;
 	    }
 
@@ -683,7 +683,7 @@ sub installcert {
 
 	# sanity check
 	if (! -d $dir || ! -w $dir) {
-	    $self->seterror("installcert(): Root CA certificate target directory $dir does not exist or is not writable");
+	    CertNanny::Logging->error("installcert(): Root CA certificate target directory $dir does not exist or is not writable");
 	    return;
 	}
 
@@ -696,7 +696,7 @@ sub installcert {
 	    
 	    if (! defined $cert)
 	    {
-		$self->seterror("installcert(): Could not convert root certificate $entry->{CERTFILE}");
+		CertNanny::Logging->error("installcert(): Could not convert root certificate $entry->{CERTFILE}");
 		return;
 	    }
 
@@ -714,7 +714,7 @@ sub installcert {
 		      CONTENT  => $cert->{CERTDATA},
 		      FORCE    => 1,
 		)) {
-		$self->seterror("installcert(): Could not write root certificate $filename");
+		CertNanny::Logging->error("installcert(): Could not write root certificate $filename");
 		return;
 	    }
 
@@ -726,7 +726,7 @@ sub installcert {
     # try to write the new keystore 
 
     if (! $self->installfile(@newkeystore)) {
-	$self->seterror("Could not install new keystore");
+	CertNanny::Logging->error("Could not install new keystore");
 	return;
     }
 	   
