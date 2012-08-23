@@ -16,6 +16,7 @@ use Exporter;
 use Carp;
 use Data::Dumper;
 use CertNanny::Util;
+use Cwd;
 
 $VERSION = 0.10;
 
@@ -266,7 +267,7 @@ sub createrequest {
         return;
     }
     
-    # decide whether we need to expor the key (and to that if it's required)
+    # decide whether we need to export the key (and do that if it's required)
     my $keyfile;
     unless($self->hasEngine()) {
         # okay no engine, export the key
@@ -287,7 +288,7 @@ sub createrequest {
             CertNanny::Logging->error("createrequest(): Could not convert key");
             return;
         }
-        my $keyfile = File::Spec->catfile($entry->{statedir}, $entryname . "-key.pem");
+        $keyfile = File::Spec->catfile($entry->{statedir}, $entryname . "-key.pem");
         if(!CertNanny::Util->write_file(FILENAME => $keyfile, CONTENT => $key->{KEYDATA}, FORCE => 1)) {
             CertNanny::Logging->error("createreqest(): Could not write key file");
             return;
@@ -298,11 +299,12 @@ sub createrequest {
         # okay we have an engine, create the correct keyfile variable
         $keyfile = "${location}?alias=${newalias}";
     }
-    
-    return { 
+    my $ret ={ 
         REQUESTFILE => $requestfile, 
         KEYFILE => $keyfile,
-    };
+    }; 
+    
+    return $ret; 
     
 }
 
@@ -375,6 +377,8 @@ sub installcert {
     
     # ... plus all certificates from the ca key chain minus its root cert
     push(@trustedcerts, @{$self->{STATE}->{DATA}->{CERTCHAIN}}[1..$#{$self->{STATE}->{DATA}->{CERTCHAIN}}]);
+    my $olddir = getcwd();
+	chdir ($args{TARGETDIR} ||$self->{OPTIONS}->{ENTRY}->{statedir});
     foreach my $caentry (@trustedcerts) {
         my @rdn = split(/(?<!\\),\s*/, $caentry->{CERTINFO}->{SubjectName});
         my $cn = $rdn[0];
@@ -396,7 +400,7 @@ sub installcert {
         }
     
         my $cacertfile = $self->gettmpfile();
-        if (! $self->write_file(FILENAME => $cacertfile,
+        if (! CertNanny::Util->write_file(FILENAME => $cacertfile,
     			    CONTENT  => $cacert->{CERTDATA})) {
     	    CertNanny::Logging->error("installcert(): Could not write temporary ca file");
     	    return;
@@ -406,6 +410,7 @@ sub installcert {
             CertNanny::Logging->info("Could not install certificate '$cn', probably already present. Not critical");
         }
     }
+    chdir $olddir;
     
          
          
@@ -465,7 +470,7 @@ sub changealias {
     push(@cmd, qq{"$alias"});
     push(@cmd, '-destalias');
     push(@cmd, qq{"$destalias"});
-    @cmd = $self->keytooldcmd($location, @cmd);
+    @cmd = $self->keytoolcmd($location, @cmd);
     CertNanny::Logging->debug("Execute: " . join(' ', hidepin(@cmd)));
     if(run_command(join(' ', @cmd)) != 0) {
         CertNanny::Logging->error("Could not change alias from $alias to $destalias");
