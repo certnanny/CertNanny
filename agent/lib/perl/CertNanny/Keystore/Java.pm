@@ -16,6 +16,7 @@ use Exporter;
 use Carp;
 use Data::Dumper;
 use CertNanny::Util;
+use File::Copy;
 use Cwd;
 
 $VERSION = 0.10;
@@ -160,8 +161,8 @@ sub getcert {
     
     my $options = $self->{OPTIONS};
     my $entry = $options->{ENTRY};
-
-    my @cmd = $self->keytoolcmd($entry->{location},
+    my $location = $self->getnewkeystore() || return;
+    my @cmd = $self->keytoolcmd($location,
     	'-export', '-rfc', -alias => qq{"$entry->{alias}"});
     CertNanny::Logging->debug("Execute: " . join(' ',hidepin(@cmd)));
     my $certdata = `@cmd`;
@@ -192,14 +193,14 @@ sub getcert {
 # or undef on error
 sub getkey {
     my $self = shift;
-    my $keystore = shift; # defaults to $entry->{location}, see below
+    my $keystore = shift; # defaults to $self->getnewkeystore(), see below
     my $alias = shift; # defaults to $entry->{alias}, see below
 
     my $options = $self->{OPTIONS};
     my $entry = $options->{ENTRY};
     my $config = $options->{CONFIG};
 
-    $keystore ||= $entry->{location};
+    $keystore ||= $self->getnewkeystore() || return;
     $alias ||= $entry->{alias};
 
     my $pathjavalib = $config->get("path.libjava", "FILE");
@@ -238,13 +239,18 @@ sub getkey {
     };
 }
 
-sub tmpkeystorename {
+sub getnewkeystore {
     my $self = shift;
-
-    my $options = $self->{OPTIONS};
-    my $entry = $options->{ENTRY};
-    File::Spec->catfile($entry->{statedir},
-    	"$self->{OPTIONS}->{ENTRYNAME}-tmpkeystore");
+    my $newkeystorelocation = File::Spec->catfile($self->{OPTIONS}->{ENTRY}->{statedir}, "$self->{OPTIONS}->{ENTRYNAME}-tmpkeystore");
+    # if not existent -> create new store as a copy of the current one
+    unless( -f $newkeystorelocation) {
+        if(!copy($self->{OPTIONS}->{ENTRY}->{location}, $newkeystorelocation)) {
+            CertNanny::Logging->error("getnewkeystore(): Could not copy current store to $newkeystorelocation");
+            return;
+        }
+    }
+    
+    return $newkeystorelocation;
 }
 
 sub createrequest {
@@ -252,9 +258,13 @@ sub createrequest {
     my $options = $self->{OPTIONS};
     my $entry = $options->{ENTRY};
     my $entryname = $options->{ENTRYNAME};
-    my $location = $entry->{location};
+    my $location = $self->getnewkeystore() || return;
     # get a new key (it's either created or the alias is just returned) 
     my $newalias = $self->getnewkey();
+    if(!$newalias) {
+        CertNanny::Logging->error("createrequest(): Could not create a new key in keystore $location");
+        return;
+    }
     my @cmd;
     
     # okay, we have a new key, let's create a request for it
@@ -316,7 +326,7 @@ sub getnewkey {
     my $entry = $self->{OPTIONS}->{ENTRY};
     my $alias = $entry->{alias};
     my $newalias = "${alias}-new";
-    my $location = $entry->{location};
+    my $location = $self->getnewkeystore() || return;
     my @cmd;
     
     #first check if key  already exists
@@ -360,7 +370,7 @@ sub installcert {
     my %args = ( @_,);
     my $options = $self->{OPTIONS};
     my $entry = $options->{ENTRY};
-    my $location = $entry->{location};
+    my $location = $self->getnewkeystore() || return;
     my @cmd;
     # change old key's alias to something meaningful
     my $alias = $entry->{alias};
@@ -436,6 +446,17 @@ sub installcert {
             CertNanny::Logging->error("Could not rename the old key back to its previous name. Keystore might be broken, please investigate!");
             return;
         }
+    }
+    
+    CertNanny::Logging->info("Keystore creation was successful, old keystore will now be backed up and new keystore installed in place.");
+    if(!move($entry->{location}, "$entry->{location}.backup")) {
+        CertNanny::Logging->error("Could not backup old keystore. New keystore not installed but present in " . $self->getnewkeystore() . ".");
+        return;
+    }
+    
+    if(!move($location, $entry->{location})) {
+        CertNanny::Logging->error("Could not install the new keystore into the old keystore's location. No keystore present at the moment!");
+        return;
     }
     
     return 1;
