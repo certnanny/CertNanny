@@ -647,7 +647,7 @@ sub installcert {
 	    }
 
 	    my $cacertfile = $self->gettmpfile();
-	    if (! $self->write_file(FILENAME => $cacertfile,
+	    if (! CertNanny::Util->write_file(FILENAME => $cacertfile,
 				    CONTENT  => $cacert->{CERTDATA},
 		)) {
 		CertNanny::Logging->error("installcert(): Could not write temporary CA file");
