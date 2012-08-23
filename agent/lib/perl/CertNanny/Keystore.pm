@@ -1420,7 +1420,7 @@ sub executehook {
 	}
 	
 	CertNanny::Logging->info("Exec: $hook");
-	return run_command($hook) / 256;
+	return run_command($hook);
     }
 }
 
@@ -1479,7 +1479,7 @@ sub sendrequest {
     my $requestkeyfile = $self->{STATE}->{DATA}->{RENEWAL}->{REQUEST}->{KEYFILE};
     my $pin = $self->{PIN} || $self->{OPTIONS}->{ENTRY}->{pin};
     my $sscep = $self->{OPTIONS}->{CONFIG}->get('cmd.sscep');
-    my $scepurl = $self->{OPTIONS}->{ENTRY}->{scepurl};
+    my $scepurl = $self->{OPTIONS}->{ENTRY}->{enroll}->{sscep}->{URL};
     my $scepsignaturekey = $self->{OPTIONS}->{ENTRY}->{scepsignaturekey};
     my $scepchecksubjectname = 
     	$self->{OPTIONS}->{ENTRY}->{scepchecksubjectname} || 'no';
@@ -1653,7 +1653,7 @@ sub sendrequest {
     eval {
 	local $SIG{ALRM} = sub { die "alarm\n" }; # NB: \n required
 	eval { alarm 120 }; # eval not supported in perl 5.7.1 on win32
-	$rc = run_command(join(' ', @cmd)) / 256;
+	$rc = run_command(join(' ', @cmd));
 	eval { alarm 0 }; # eval not supported in perl 5.7.1 on win32
 	CertNanny::Logging->info("Return code: $rc");
     };
