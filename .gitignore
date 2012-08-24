@@ -1,4 +1,3 @@
-agent/etc/*.cfg
 agent/lib/certs
 agent/lib/rootcerts
 agent/lib/state
