@@ -51,6 +51,7 @@ GetOptions(\%config,
 	      cfg|cfgfile|conf|config=s
 			win_user=s
 			win_password=s
+		  sleep=i
 	      )) or pod2usage(-msg => $msg, -verbose => 0);
 
 pod2usage(-exitstatus => 0, -verbose => 2) if $config{man};
@@ -61,6 +62,8 @@ die "Could not read config file $config{cfg}. Stopped"
     unless (-r $config{cfg});
 
 my $monitor = CertNanny->new(CONFIG => $config{cfg});
+$config{sleep} = 300 if !defined $config{sleep};
+$monitor->setOption("sleep", $config{sleep});
 
 foreach my $cmd (@ARGV) {
 	if ($OSNAME eq 'MSWin32') {
@@ -77,7 +80,7 @@ foreach my $cmd (@ARGV) {
 			if($executable_name ne $servicepath) {
 			    $params_str = qq{"$servicepath"};
 			}
-			$params_str = qq{$params_str --cfg "$cfgpath"};
+			$params_str = qq{$params_str --cfg "$cfgpath" --sleep $config{sleep}};
 			my $ret = Win32::Daemon::CreateService({
 				machine =>  '',
 				name    =>  $servicename,
@@ -973,7 +976,7 @@ Default: new
 
 Example: old
 
-=item keystore.LABEL.scepurl
+=item keystore.LABEL.enroll.sscep.URL
 
 URL of the SCEP Server to use
 
