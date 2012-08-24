@@ -201,7 +201,7 @@ sub unstash
     my $self = shift;
     my $stashfile = shift;
 
-    my $content = $self->read_file($stashfile);
+    my $content = CertNanny::Util->read_file($stashfile);
     if (! defined $content)
     {
     	CertNanny::Logging->error("unstash(): Could not open input file $stashfile");
@@ -355,7 +355,7 @@ sub getkey {
 	return;
     }
 
-    my $keydata = $self->read_file($p8file);
+    my $keydata = CertNanny::Util->read_file($p8file);
     unlink $p8file;
 
     if ((! defined $keydata) or ($keydata eq "")) {
@@ -420,7 +420,7 @@ sub getcert {
     }
 
     # read certificate from file and remove temp file
-    my $content = $self->read_file($certfile);
+    my $content = CertNanny::Util->read_file($certfile);
     unlink $certfile;
     if (! defined $content)
     {
@@ -755,7 +755,7 @@ sub installcert {
     my @newkeystore = ();
     foreach my $ext (qw(.crl .rdb .kdb .sth)) {
 	
-	my $data = $self->read_file($newkeystorebase . $ext);
+	my $data = CertNanny::Util->read_file($newkeystorebase . $ext);
 	if (! defined $data) {
 	    CertNanny::Logging->error("Could read new keystore file " . $newkeystorebase . $ext);
 	    return;

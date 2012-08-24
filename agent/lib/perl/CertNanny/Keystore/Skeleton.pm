@@ -47,7 +47,7 @@ $VERSION = 0.10;
 # (On Unix this results in /var/tmp/foobar)
 #
 # Read file contents to a scalar:
-# my $content = $self->read_file($filename);
+# my $content = CertNanny::Util->read_file($filename);
 # if (! defined $content) {
 #   CertNanny::Logging->error("...");
 #   return;
