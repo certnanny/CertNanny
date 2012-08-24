@@ -80,7 +80,10 @@ sub new
     $self->{OPTIONS}->{ENTRY}->{enroll}->{$engine_section}->{engine_id} = "capi";
     $self->{OPTIONS}->{ENTRY}->{enroll}->{$engine_section}->{dynamic_path} = $self->{OPTIONS}->{ENTRY}->{hsm}->{dynamic_path};
     
-    $self->CertreqReadTemplate();
+    if(!$self->CertreqReadTemplate()) {
+        CertNanny::Logging->error("new(): Could not read template file for certreq.");
+        return;
+    }
     if($self->{OPTIONS}->{ENTRY}->{storelocation} eq "machine") {
         $self->{OPTIONS}->{ENTRY}->{certreq}->{NewRequest}->{MachineKeySet} = "TRUE";
         $self->{OPTIONS}->{ENTRY}->{enroll}->{sscep_engine_capi}->{storelocation} = "LOCAL_MACHINE";
@@ -234,6 +237,7 @@ sub createrequest()
 	unless (-e $result->{REQUESTFILE}) { 
 		my @cmd = ('certreq', '-new', qq("$inf_file_out"), qq("$result->{REQUESTFILE}"));
 		my $cmd = join(' ', @cmd);
+		CertNanny::Logging->debug("Execute: $cmd");
 		`$cmd`;
 		if($? != 0) {
 			CertNanny::Logging->error("createrequest(): Executing certreq cmd error: $cmd");
@@ -276,7 +280,11 @@ sub CertreqWriteConfig() {
 sub CertreqReadTemplate() {
     my $self = shift;
     
-    my $inf_file_in = $self->{OPTIONS}->{CONFIG}->get('path.certreqinf', 'FILE');
+    my $inf_file_in = $self->{OPTIONS}->{ENTRY}->{certreqinf};
+    if(!$inf_file_in or ! -e $inf_file_in) {
+        CertNanny::Logging->error("CertreqReadTemplate(): Could not find certreq template file in the following path: $inf_file_in, please check your certreqinf setting for the keystore!");
+        return;
+    }
     open INF_FILE_IN, "<", $inf_file_in
 		or CertNanny::Logging->error("CertreqReadTemplate(): Could not open input file: $inf_file_in");
 	my $section;
