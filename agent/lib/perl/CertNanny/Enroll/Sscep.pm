@@ -231,7 +231,8 @@ sub getCA {
 	    my @cacerts = ();
 	    $ii = 1;
 	
-	    my $certfile = $config->{sscep}->{CACertFile} . "-$ii";
+	    my $certfile = File::Spec->catfile($self->{certdir}, $config->{sscep}->{CACertFile} . "-$ii");
+	    CertNanny::Logging->debug("getCA(): Adding certfile to stack: $certfile");
 	    while (-r $certfile) {
 	        my $certformat = 'PEM'; # always returned by sscep
 	        my $certinfo = CertNanny::Util->getcertinfo(CERTFILE => $certfile,
@@ -244,7 +245,7 @@ sub getCA {
 	                  });
 	        }
 	        $ii++;
-	        $certfile = $config->{sscep}->{CACertFile} . "-$ii";
+	        $certfile = File::Spec->catfile($self->{certdir}, $config->{sscep}->{CACertFile} . "-$ii");
 	    }
 	    
 	    $self->{certs}->{CACERTS} = \@cacerts;

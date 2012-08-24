@@ -106,7 +106,7 @@ sub getcert {
 
     my $cmd = join(' ', @cmd);
     my $handle;
-    if (! open $handle, "$cmd 2>/dev/null |") {
+    if (! open $handle, "$cmd |") {
 	CertNanny::Logging->error("could not run OpenSSL shell");
 	delete $ENV{PIN};
 	return;
@@ -261,7 +261,7 @@ sub installcert {
     CertNanny::Logging->info("Created prototype PKCS#12 file $pkcs12file");
 
 
-    my $data = $self->read_file($pkcs12file);
+    my $data = CertNanny::Util->read_file($pkcs12file);
     unlink $pkcs12file;
     if (! defined $data) {
 	CertNanny::Logging->error("Could read new keystore file " . $pkcs12file);
