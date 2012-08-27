@@ -1535,6 +1535,9 @@ sub executehook {
 
 	$args{'__LOCATION__'} = $self->{INSTANCE}->{OPTIONS}->{ENTRY}->{location} || $self->{OPTIONS}->{ENTRY}->{location};
 	$args{'__ENTRY__'}    =  $self->{INSTANCE}->{OPTIONS}->{ENTRYNAME} || $self->{OPTIONS}->{ENTRYNAME};
+	# TODO: Test Subject/Serial Hook!
+	$args{'__SUBJECT__'}  = $self->{CERT}->{INFO}->{SubjectName} || 'UnknownSubject';
+	$args{'__SERIAL__'}   = $self->{CERT}->{INFO}->{SerialNumber} || 'UnknownSerial';
 
 	# replace values passed to this function
 	foreach my $key (keys %args) {
