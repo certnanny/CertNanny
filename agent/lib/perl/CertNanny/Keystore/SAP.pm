@@ -95,12 +95,14 @@ sub new
         $self->info("keystore.$entryname.p12_data_tag no specified, will use default 'P12DATA'");
         $p12_data_tag = 'P12DATA';
     }
+    $entry->{p12_data_tag} = $p12_data_tag;
     
     my $p12_pwd_tag = $entry->{p12_pwd_tag};
     if(!$p12_pwd_tag) {
         $self->info("keystore.$entryname.p12_pwd_tag no specified, will use default 'PWD'");
         $p12_pwd_tag = 'PWD';
     }
+    $entry->{p12_pwd_tag} = $p12_pwd_tag;
     
     my $p12_xml = $self->read_file($p12_xml_file);
     if(!$p12_xml) {
@@ -109,7 +111,7 @@ sub new
     }
     $self->{PKCS12}->{XML} = $p12_xml;
     #$p12_xml =~ m/.*?\<$p12_data_tag\>([A-Za-z0-9\+\/=]+)\<\/$p12_data_tag\>.*?\<$p12_pwd_tag\>(.*)?\<\/$p12_pwd_tag\>.*/s;
-    $p12_xml =~ m/.*?<P12DATA>([\w\d\s+=\/]+?)<\/P12DATA>.*?<PWD>(.*?)<\/PWD>.*?/s;
+    $p12_xml =~ m/.*?<$p12_data_tag>([\w\d\s+=\/]+?)<\/$p12_data_tag>.*?<$p12_pwd_tag>(.*?)<\/$p12_pwd_tag>.*?/s;
     if(! $p12_xml ) {
         $self->seterror("Could not parse XML file. Incorrect format");
         return;
@@ -211,11 +213,14 @@ sub installcert {
     my $p12_config = $self->{PKCS12};
     my $new_p12_xml = $p12_config->{XML};
     my $old_data = MIME::Base64::encode($p12_config->{DATA});
-    $new_p12_xml =~ s/$old_data/$data/s;
+    my $p12_data_tag = $self->{OPTIONS}->{ENTRY}->{p12_data_tag};
+    my $p12_pwd_tag = $self->{OPTIONS}->{ENTRY}->{p12_pwd_tag};
+    $new_p12_xml =~ s/<$p12_data_tag>([\w\d\s+=\/]+?)<\/$p12_data_tag>/<$p12_data_tag>$data<\/$p12_data_tag>/s;
     
     # create a temporary file which then will be moved over to the correct dir
     my $tmp_dir = $self->{OPTIONS}->{CONFIG}->get('path.tmpdir', 'FILE');
     my $xml_filename = $p12_config->{XMLFILENAME};
+    # This is the TEMPORARY file we store the keystore in
     my $new_p12_xml_file = File::Spec->catfile($tmp_dir, $xml_filename);
     if(!$self->write_file((FILENAME => $new_p12_xml_file, CONTENT => $new_p12_xml, FORCE => 1))) {
         $self->seterror("Could not create temporary file to store PKCS12 XML file");
@@ -226,6 +231,7 @@ sub installcert {
     my $out_dir = $p12_config->{OUTDIR}; 
     my $old_xml_file = File::Spec->catfile($out_dir, $xml_filename);
     my $in_dir = $p12_config->{INDIR};
+    # This is the location for the NEW XML
     my $new_xml_file = File::Spec->catfile($in_dir, $xml_filename);
     if(! unlink $old_xml_file) {
         $self->seterror("Could not delete old XML file. Will continue to prevent loss of renewed certificate.");
