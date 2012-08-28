@@ -183,7 +183,7 @@ sub convertcert {
 	);
 
     # sanity checks
-    foreach my $key qw( CERTFORMAT OUTFORMAT ) {
+    foreach my $key (qw( CERTFORMAT OUTFORMAT )) {
 	if ($options{$key} !~ m{ \A (?: DER | PEM ) \z }xms) {
 	    $self->seterror("convertcert(): Incorrect $key: $options{$key}");
 	    return;
@@ -264,14 +264,14 @@ sub convertkey {
 	);
 
     # sanity checks
-    foreach my $key qw( KEYFORMAT OUTFORMAT ) {
+    foreach my $key (qw( KEYFORMAT OUTFORMAT )) {
 	if ($options{$key} !~ m{ \A (?: DER | PEM ) \z }xms) {
 	    $self->seterror("convertkey(): Incorrect $key: $options{$key}");
 	    return;
 	}
     }
 
-    foreach my $key qw( KEYTYPE OUTTYPE ) {
+    foreach my $key (qw( KEYTYPE OUTTYPE )) {
 	if ($options{$key} !~ m{ \A (?: OpenSSL | PKCS8 ) \z }xms) {
 	    $self->seterror("convertkey(): Incorrect $key: $options{$key}");
 	    return;
@@ -1082,7 +1082,7 @@ sub getcertinfo
     $certinfo->{KeyUsage} = join(", ", @purposes);
     
     # sanity checks
-    foreach my $var qw(Version SerialNumber SubjectName IssuerName NotBefore NotAfter CertificateFingerprint)
+    foreach my $var (qw(Version SerialNumber SubjectName IssuerName NotBefore NotAfter CertificateFingerprint))
     {
 	if (! exists $certinfo->{$var})
 	{
@@ -1119,7 +1119,7 @@ sub getcertinfo
 
     ####
     # reverse DN order returned by OpenSSL
-    foreach my $var qw(SubjectName IssuerName)
+    foreach my $var (qw(SubjectName IssuerName))
     {
 	$certinfo->{$var} = join(", ", 
 				 reverse split(/[\/,]\s*/, $certinfo->{$var}));
@@ -1129,7 +1129,7 @@ sub getcertinfo
 
     ####
     # rewrite dates from human readable to ISO notation
-    foreach my $var qw(NotBefore NotAfter)
+    foreach my $var (qw(NotBefore NotAfter))
     {
 	my ($mon, $day, $hh, $mm, $ss, $year, $tz) =
 	    $certinfo->{$var} =~ /(\S+)\s+(\d+)\s+(\d+):(\d+):(\d+)\s+(\d+)\s*(\S*)/;
@@ -1223,7 +1223,7 @@ sub renew {
 	    $self->renewalstate(undef);
 
 	    # clean state entry
-	    foreach my $entry qw( CERTFILE KEYFILE REQUESTFILE ) {
+	    foreach my $entry (qw( CERTFILE KEYFILE REQUESTFILE )) {
 		unlink $self->{STATE}->{DATA}->{RENEWAL}->{REQUEST}->{$entry};
 	    }
 
