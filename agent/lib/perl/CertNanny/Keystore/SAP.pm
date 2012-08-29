@@ -43,50 +43,46 @@ sub new
     my $entryname = $self->{OPTIONS}->{ENTRYNAME};
     
     # check that both directories exist
-    my $out_dir;
-    my $in_dir;
+    my $sap_to_certnanny_dir;
+    my $certnanny_to_sap_dir;
     
-    $in_dir = $entry->{in_dir};
-    if(! $in_dir or ! -d $in_dir) {
-        $self->seterror("keystore.$entryname.in_dir is either missing or not a directory, please check.");
+    $certnanny_to_sap_dir = $entry->{certnanny_to_sap_dir};
+    if(! $certnanny_to_sap_dir or ! -d $certnanny_to_sap_dir) {
+        $self->seterror("keystore.$entryname.certnanny_to_sap_dir is either missing or not a directory, please check.");
         return;
     }
         
-    $out_dir = $entry->{out_dir};
-    if(! $out_dir or ! -d $out_dir) {
-        $self->seterror("keystore.$entryname.out_dir is either missing or not a directory, please check.");
+    $sap_to_certnanny_dir = $entry->{sap_to_certnanny_dir};
+    if(! $sap_to_certnanny_dir or ! -d $sap_to_certnanny_dir) {
+        $self->seterror("keystore.$entryname.sap_to_certnanny_dir is either missing or not a directory, please check.");
         return;
     }
     
     my $filename = $entry->{filename};
     if(! $filename) {
-        $self->info("keystore.$entryname.filename is not specified, will look into $out_dir to find a file");
-        opendir(DIR, $out_dir);
+        $self->info("keystore.$entryname.filename is not specified, will look into $sap_to_certnanny_dir to find a file");
+        opendir(DIR, $sap_to_certnanny_dir);
         my @files = grep ! /^\.{1,2}$/, readdir(DIR);
         closedir(DIR);
         if(@files > 1) {
-            $self->seterror("More than one file in $out_dir, cannot determine correct file. Please specify keystore.$entryname.filename.");
+            $self->seterror("More than one file in $sap_to_certnanny_dir, cannot determine correct file. Please specify keystore.$entryname.filename.");
             return;
         }
         
         $filename = $files[0];
     }
     $self->{PKCS12}->{XMLFILENAME} = $filename;
-    $self->{PKCS12}->{INDIR} = $in_dir;
-    $self->{PKCS12}->{OUTDIR} = $out_dir;
+    $self->{PKCS12}->{CERTNANNY_TO_SAP_DIR} = $certnanny_to_sap_dir;
+    $self->{PKCS12}->{SAP_TO_CERTNANNY_DIR} = $sap_to_certnanny_dir;
     
     my $p12_xml_file;
-    if( ! $filename or ! -r ($p12_xml_file = File::Spec->catfile($out_dir, $filename))) {
-        $self->info("No file present in $out_dir, no renewal required.");
+    if( ! $filename or ! -r ($p12_xml_file = File::Spec->catfile($sap_to_certnanny_dir, $filename))) {
+        $self->info("No file present in $sap_to_certnanny_dir, no renewal required.");
         return;
     }
     
-    
-    opendir(DIR, $in_dir);
-    my @files = grep ! /^\.{1,2}$/, readdir(DIR);
-    closedir(DIR);
-    if(@files) {
-        $self->info("There is still a file present from the last update. Will not continue");
+    if( -r File::Spec->catfile($certnanny_to_sap_dir, $filename)) {
+        $self->info("The renewed keystore was not imported yet. Will not continue");
         return;
     }
     
@@ -227,27 +223,27 @@ sub installcert {
         return;
     }
     
-    # temporary file written, before moving it to in_dir, remove old file from
-    my $out_dir = $p12_config->{OUTDIR}; 
-    my $old_xml_file = File::Spec->catfile($out_dir, $xml_filename);
-    my $in_dir = $p12_config->{INDIR};
+    # temporary file written, before moving it to certnanny_to_sap_dir, remove old file from
+    my $sap_to_certnanny_dir = $p12_config->{SAP_TO_CERTNANNY_DIR}; 
+    my $old_xml_file = File::Spec->catfile($sap_to_certnanny_dir, $xml_filename);
+    my $certnanny_to_sap_dir = $p12_config->{CERTNANNY_TO_SAP_DIR};
     # This is the location for the NEW XML
-    my $new_xml_file = File::Spec->catfile($in_dir, $xml_filename);
+    my $new_xml_file = File::Spec->catfile($certnanny_to_sap_dir, $xml_filename);
     if(! unlink $old_xml_file) {
         $self->seterror("Could not delete old XML file. Will continue to prevent loss of renewed certificate.");
     }
-    # temporary file written, move it to the in_dir
+    # temporary file written, move it to the certnanny_to_sap_dir
     if($^O eq "MSWin32") {
         if(!move($new_p12_xml_file, $new_xml_file)) {
             my $output = $!;
-            $self->seterror("Could not move temporary file to in_dir: $output");
+            $self->seterror("Could not move temporary file to $certnanny_to_sap_dir: $output");
             return;
         }
     } else {
         my $output = `mv $new_p12_xml_file $new_xml_file`;
         if($?) {
             chomp($output);
-            $self->seterror("Could not move temporary file to in_dir: $output");
+            $self->seterror("Could not move temporary file to $certnanny_to_sap_dir: $output");
             return;
         }
     }
