@@ -57,6 +57,13 @@ sub new
         $self->seterror("keystore.$entryname.sap_to_certnanny_dir is either missing or not a directory, please check.");
         return;
     }
+    # To enable hooks and to keep in line with
+    # the rest of CertNanny's stores, we set the 
+    # location to where the keystore *currently*
+    # can be found. Once a new keystore is created,
+    # we will set it to the directory the keystore
+    # was written.
+    $entry->{location} = $sap_to_certnanny_dir;
     
     my $filename = $entry->{filename};
     if(! $filename) {
@@ -247,6 +254,12 @@ sub installcert {
             return;
         }
     }
+    
+    # Certificate was successfully installed, so we can
+    # change the location to the path of the new keystore.
+    # This way, a hook will always a receive the expected 
+    # valid keystore path as a parameter.
+    $self->{OPTIONS}->{ENTRY}->{location} = $certnanny_to_sap_dir;
     
     # only on success:
     return 1;
