@@ -252,7 +252,7 @@ sub installcert {
             return;
         }
     } else {
-        my $output = `mv $new_p12_xml_file $new_xml_file`;
+        my $output = `mv "$new_p12_xml_file" "$new_xml_file"`;
         if($?) {
             chomp($output);
             $self->seterror("Could not move temporary file to $certnanny_to_sap_dir: $output");
