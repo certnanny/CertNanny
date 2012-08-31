@@ -76,7 +76,10 @@ sub new
             return;
         }
         
-        $filename = $files[0];
+        if(@files == 1) {
+            $self->seterror("No file in $sap_to_certnanny_dir, cannot determine correct file. Please specify keystore.$entryname.filename.");
+            return;
+        }
     }
     $self->{PKCS12}->{XMLFILENAME} = $filename;
     $self->{PKCS12}->{CERTNANNY_TO_SAP_DIR} = $certnanny_to_sap_dir;
@@ -85,11 +88,13 @@ sub new
     my $p12_xml_file;
     if( ! $filename or ! -r ($p12_xml_file = File::Spec->catfile($sap_to_certnanny_dir, $filename))) {
         $self->info("No file present in $sap_to_certnanny_dir, no renewal required.");
+        die("Aborting...");
         return;
     }
     
     if( -r File::Spec->catfile($certnanny_to_sap_dir, $filename)) {
         $self->info("The renewed keystore was not imported yet. Will not continue");
+        die("Aborting...");
         return;
     }
     
