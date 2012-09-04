@@ -518,9 +518,17 @@ sub log
 
     print STDERR "WARNING: log called with undefined priority '$prio'" unless exists $level{$prio};
     if ($level{$prio} <= $self->loglevel()) {
-
+    my ($seconds, $minutes, $hours, $day_of_month, $month, $year,
+	$wday, $yday, $isdst) = gmtime(time);
+	my $datestr = sprintf("%04d-%02d-%02d %02d:%02d:%02d", 
+		   $year + 1900, 
+		   $month + 1, 
+		   $day_of_month,
+		   $hours,
+		   $minutes,
+		   $seconds);;
 	# fallback to STDERR
-	print STDERR "LOG: [$prio] $entryname: $arg->{MSG}\n";
+	print STDERR "LOG: $datestr [$prio] $entryname: $arg->{MSG}\n";
 	
 	# call hook
 	#$self->executehook($self->{INSTANCE}->{OPTIONS}->{ENTRY}->{hook}->{log},
