@@ -1541,11 +1541,11 @@ sub executehook {
 	# assume it's an executable
 	$self->debug("Calling shell hook executable");
 
-	$args{'__LOCATION__'} = $self->{INSTANCE}->{OPTIONS}->{ENTRY}->{location} || $self->{OPTIONS}->{ENTRY}->{location};
+	$args{'__LOCATION__'} = qq("$self->{INSTANCE}->{OPTIONS}->{ENTRY}->{location}") || qq("$self->{OPTIONS}->{ENTRY}->{location}");
 	$args{'__ENTRY__'}    =  $self->{INSTANCE}->{OPTIONS}->{ENTRYNAME} || $self->{OPTIONS}->{ENTRYNAME};
 	# TODO: Test Subject/Serial Hook!
-	$args{'__SUBJECT__'}  = $self->{CERT}->{INFO}->{SubjectName} || 'UnknownSubject';
-	$args{'__SERIAL__'}   = $self->{CERT}->{INFO}->{SerialNumber} || 'UnknownSerial';
+	$args{'__SUBJECT__'}  = qq("$self->{CERT}->{INFO}->{SubjectName}") || 'UnknownSubject';
+	$args{'__SERIAL__'}   = qq("$self->{CERT}->{INFO}->{SerialNumber}") || 'UnknownSerial';
 
 	# replace values passed to this function
 	foreach my $key (keys %args) {
