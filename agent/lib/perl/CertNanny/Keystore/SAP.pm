@@ -63,7 +63,6 @@ sub new
     # can be found. Once a new keystore is created,
     # we will set it to the directory the keystore
     # was written.
-    $entry->{location} = $sap_to_certnanny_dir;
     
     my $filename = $entry->{filename};
     if(! $filename) {
@@ -81,6 +80,7 @@ sub new
             return;
         }
     }
+    $entry->{location} = File::Spec->catfile($sap_to_certnanny_dir, $filename);
     $self->{PKCS12}->{XMLFILENAME} = $filename;
     $self->{PKCS12}->{CERTNANNY_TO_SAP_DIR} = $certnanny_to_sap_dir;
     $self->{PKCS12}->{SAP_TO_CERTNANNY_DIR} = $sap_to_certnanny_dir;
@@ -264,7 +264,7 @@ sub installcert {
     # change the location to the path of the new keystore.
     # This way, a hook will always a receive the expected 
     # valid keystore path as a parameter.
-    $self->{OPTIONS}->{ENTRY}->{location} = $certnanny_to_sap_dir;
+    $self->{OPTIONS}->{ENTRY}->{location} = "$new_xml_file";
     
     # only on success:
     return 1;
