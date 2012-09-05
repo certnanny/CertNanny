@@ -71,16 +71,24 @@ foreach my $cmd (@ARGV) {
 		if ($cmd eq "install") {
 			my $cfgpath = $config{cfg};
 			my $servicepath= File::Spec->catfile($FindBin::Bin, $FindBin::Script);
-	
+			my $executable_name = $EXECUTABLE_NAME;
+			if($servicepath =~ /\w+\.exe/) {
+			    $executable_name = $servicepath;
+			}
+			my $params_str = "";
+			if($executable_name ne $servicepath) {
+			    $params_str = qq{"$servicepath"};
+			}
+			$params_str = qq{$params_str --cfg "$cfgpath"};
 			my $ret = Win32::Daemon::CreateService({
 				machine =>  '',
 				name    =>  $servicename,
 				display =>  $servicename,
-				path    =>  $EXECUTABLE_NAME,
+				path    =>  $executable_name,
 				user    =>  $config{win_user} || "",
 				pwd     =>  $config{win_password} || "",
 				description => 'Automatic certificate renewal',
-				parameters =>qq{"$servicepath" --cfg "$cfgpath" --sleep $config{sleep}},
+				parameters =>$params_str,
 			});
 			
 			if ($ret) {
