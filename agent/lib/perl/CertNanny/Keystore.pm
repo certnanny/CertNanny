@@ -1579,8 +1579,10 @@ sub sendrequest {
     		    return;
     		}
 		} else {
-		    my $oldkeyfile = $oldkey;
+		    $oldkeyfile = $oldkey;
 		}
+		
+		CertNanny::Logging->debug("Old keyfile: $oldkeyfile");
 		
 		$oldcertfile = $self->gettmpfile();
 		if (! CertNanny::Util->write_file(
@@ -1591,6 +1593,8 @@ sub sendrequest {
 		    CertNanny::Logging->error("Could not write temporary cert file (old certificate)");
 		    return;
 		}
+		
+		CertNanny::Logging->debug("Old certificate: $oldcertfile");
     }
 	
 	my %options = (
