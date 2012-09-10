@@ -98,6 +98,15 @@ sub new
 	return;
     }
 
+    # if we want to use an HSM    
+    if($self->{OPTIONS}->{ENTRY}->{hsm}->{type}) {
+        my $hsmtype = $self->{OPTIONS}->{ENTRY}->{hsm}->{type};
+        my $entry_options = $self->{OPTIONS}->{ENTRY};
+        my $config = $self->{OPTIONS}->{CONFIG};
+        my $entryname = $self->{OPTIONS}->{ENTRYNAME};
+        eval "\$self->{HSM} = new CertNanny::HSM::$hsmtype(\$entry_options, \$config, \$entryname)";
+    }
+
     # get previous renewal status
     $self->retrieve_state() || return;
 
@@ -367,13 +376,9 @@ sub generatekey {
 	my $enginetype = $self->{ENGINETYPE} || $self->{OPTIONS}->{ENTRY}->{enginetype} ||'none';
 	my $enginename = $self->{ENGINENAME} || $self->{OPTIONS}->{ENTRY}->{enginename} ||'none';
 	#TODO Doku!
-	if ($engine eq "yes" && $enginetype eq "hook"){
-		my $hook = $self->{INSTANCE}->{OPTIONS}->{ENTRY}->{hook}->{genkey}
-		  || $self->{OPTIONS}->{ENTRY}->{hook}->{genkey};
-	
-		$self->executehook($hook,
-		__SIZE__    => $bits,
-		__TMPFILE__ =>"$outfile");
+	if ($self->hasEngine()){
+	    my $hsm = $self->{HSM};
+	    $outfile = $hsm->genkey();
     } else{
     	my $openssl = $self->{OPTIONS}->{CONFIG}->get('cmd.openssl', 'FILE');
     	if (! defined $openssl) {
@@ -461,41 +466,37 @@ sub createrequest {
     # all other keys now indicate the total number of appearance
     map { delete $RDN_Count{$_} if ($RDN_Count{$_} == 1); } keys %RDN_Count;
 
+    
     # create OpenSSL config file
-    my $tmpconfigfile = $self->gettmpfile();
-    my $fh = new IO::File(">$tmpconfigfile");
-    if (! $fh)
-    {
-    	CertNanny::Logging->error("createrequest(): Could not create temporary OpenSSL config file");
-    	return;
-    }
-    print $fh "[ req ]\n";
-    print $fh "prompt = no\n";
-    print $fh "distinguished_name = req_distinguished_name\n";
+    my $config_options = {};
+    $config_options->{req}->{prompt} = "no";
+    $config_options->{req}->{distinguished_name} = "req_distinguished_name";
     
     # handle subject alt name
     if (exists $self->{CERT}->{INFO}->{SubjectAlternativeName}) {
-	print $fh "req_extensions = v3_ext\n";
+	   $config_options->{req}->{req_extensions} = "v3_ext";
     }
     
-    print $fh "[ req_distinguished_name ]\n";
+    my $rdnstr = "";
     foreach (reverse @RDN) {
 	my ($key, $value) = (/(.*?)=(.*)/);
 	if (exists $RDN_Count{$key}) {
-	    print $fh $RDN_Count{$key} . ".";
+	    $rdnstr = $RDN_Count{$key} . ".";
 	    $RDN_Count{$key}--;
 	}
-	print $fh $_ . "\n";
+	
+	$rdnstr .= $key; 
+	$config_options->{req_distinguished_name}->{$rdnstr} = $value;
     }
     
     if (exists $self->{CERT}->{INFO}->{SubjectAlternativeName}) {
-	my $san = $self->{CERT}->{INFO}->{SubjectAlternativeName};
-	$san =~ s{ IP\ Address: }{IP:}xmsg;
-	print $fh "[ v3_ext ]\n";
-	print $fh "subjectAltName = $san\n";
+    	my $san = $self->{CERT}->{INFO}->{SubjectAlternativeName};
+    	$san =~ s{ IP\ Address: }{IP:}xmsg;
+    	$config_options->{v3_ext}->{subjectAltName} = $san;
     }
     
-    $fh->close();
+    my $tmpconfigfile = CertNanny::Util->writeOpenSSLConfig($config_options);
+    
 
     # generate request
     my @cmd = (qq("$openssl"),
@@ -509,10 +510,16 @@ sub createrequest {
 	       '-key',
 	       qq("$result->{KEYFILE}"),
 	);
-	my $engine = $self->{ENGINE} || $self->{OPTIONS}->{ENTRY}->{engine} ||'no';
-	if ($engine eq "yes"){
-		push (@cmd, ('-engine', $self->{OPTIONS}->{ENTRY}->{enginename}));
+	
+	if($self->hasEngine()) {
+	    my $hsm = $self->{HSM};
+	    my $engine_id = $hsm->engineid();
+	    push(@cmd, ('-engine', $engine_id));
+	    if($hsm->keyform()) {
+	        push(@cmd, ('-keyform', $hsm->keyform()));
+	    }
 	}
+	
     push (@cmd, ('-passin', 'env:PIN')) unless $pin eq "";
 
     CertNanny::Logging->log({ MSG => "Execute: " . join(" ", @cmd),
@@ -548,15 +555,25 @@ sub installcert {
 
     ######################################################################
     ### private key...
-    my $newkey = $self->convertkey(
-	KEYFILE => $keyfile,
-	KEYFORMAT => 'PEM',
-	KEYTYPE   => 'OpenSSL',
-	KEYPASS   => $pin,
-	OUTFORMAT => $self->{KEYFORMAT},
-	OUTTYPE   => $self->{KEYTYPE},
-	OUTPASS   => $pin,
-	);
+    my $newkey;
+    unless($self->hasEngine()) {
+        $newkey = $self->convertkey(
+    	KEYFILE => $keyfile,
+    	KEYFORMAT => 'PEM',
+    	KEYTYPE   => 'OpenSSL',
+    	KEYPASS   => $pin,
+    	OUTFORMAT => $self->{KEYFORMAT},
+    	OUTTYPE   => $self->{KEYTYPE},
+    	OUTPASS   => $pin,
+    	);
+    } else {
+        my $keydata = CertNanny::Util->read_file($keyfile);
+        $newkey->{KEYDATA} = $keydata;
+        # the following data is probably not necessary, but we emulate convertkey here
+        $newkey->{KEYFORMAT} = $self->{KEYFORMAT};
+        $newkey->{KEYTYPE} = $self->{KEYTYPE};
+        $newkey->{KEYPASS} = $pin;
+    }
 
     if (! defined $newkey) {
 	CertNanny::Logging->error("Could not read/convert new key");
@@ -731,6 +748,11 @@ sub installcert {
     }
 	   
     return 1;
+}
+
+sub hasEngine {
+    my $self = shift;
+    return defined $self->{HSM};
 }
 
 

@@ -1,0 +1,174 @@
+#
+# CertNanny - Automatic renewal for X509v3 certificates using SCEP
+# 2011-05 Florian Ruechel <florian.ruechel@gmail.com>
+#
+# This software is distributed under the GNU General Public License - see the
+# accompanying LICENSE file for more details.
+#
+package CertNanny::HSM::Chil;
+use strict;
+use warnings;
+use base qw(Exporter);
+use CertNanny::Logging;
+use File::Spec;
+use vars qw( $VERSION );
+use Exporter;
+use Cwd;
+use CertNanny::Util;
+
+$VERSION = 0.10;
+
+my $INSTANCE;
+
+sub new() {
+    my $proto = shift;
+	my $class = ref($proto)  || $proto;
+	my $entry_options = shift;
+	my $hsm_options = $entry_options->{hsm};
+	my $config = shift;
+    my $entryname = shift;
+	my $self = {};
+	my @avail_keytypes = ("embed", "hwcrhk");
+	
+	bless $self, $class;
+	
+	#remove type, we know that here
+	delete $hsm_options->{type};
+	
+	
+	my $engine_section = $entry_options->{enroll}->{sscep}->{engine} || 'engine_section';
+    $entry_options->{enroll}->{sscep}->{engine} = $engine_section;
+    $entry_options->{enroll}->{$engine_section}->{engine_id} = $self->engineid();
+    $entry_options->{enroll}->{$engine_section}->{dynamic_path} = $self->{OPTIONS}->{ENTRY}->{hsm}->{dynamic_path};
+    
+    unless(defined $hsm_options->{generatekey} and -x $hsm_options->{generatekey}) {
+        CertNanny::Logging->error("No executable defined or found to generate a key for Chil HSM");
+        return;
+    }
+    
+    unless(defined $hsm_options->{keytype} and (grep $_ eq $hsm_options->{keytype}, @avail_keytypes)) {
+        CertNanny::Logging->error(qq("$hsm_options->{generatekey} is not an available keytype."));
+        return;
+    }
+    
+    
+    
+    $self->{hsm_options} = $hsm_options;
+    $self->{ENTRY} = $entry_options;
+    $self->{ENTRYNAME} = $entryname;
+    $self->{CONFIG} = $config;
+	
+	return $self;
+}
+
+sub getInstance() {
+	unless(defined $INSTANCE) {
+		my $proto = shift;
+		my %args = (
+			@_,		# argument pair list
+		);
+		$INSTANCE = CertNanny::HSM::Chil->new(%args);
+	}
+	
+	return $INSTANCE;
+}
+
+sub genkey() {
+    shift;
+    my $self = CertNanny::HSM::Chil->getInstance();
+    my $key;
+    my @generateopts = ();
+    foreach my $param (keys $self->{hsm_options}->{key}) {
+        push(@generateopts, qq("$param=$self->{hsm_options}->{key}->{$param}"));
+    }
+    
+    my @cmd;
+    push(@cmd, $self->{hsm_options}->{generatekey});
+    push(@cmd, '-b');
+    push(@cmd, $self->{hsm_options}->{keytype});
+    if($self->{hsm_options}->{keytype} eq "embed") {
+        my $keyfile = $self->{ENTRYNAME} . "-key.pem";
+        my $outfile = File::Spec->catfile($self->{ENTRY}->{statedir}, $keyfile);
+        push(@cmd, "embedsavefile=$outfile");
+        $key = $outfile;
+    } else {
+        #hwcrhk key
+        # TODO:
+        # WARNING! THIS CANNOT WORK RIGHT NOW
+        # IT WILL OVERWRITE THE OLD KEY OR FAIL!
+        # DO NOT USE LIKE THIS !!!
+        # How to fix this? - Need to have both keys active
+        # but on installation the new key must replace the old one.
+        # The old one should be archived if possible, else overwritten.
+        # How do applications do this, if they get a new certificate currently?
+        $key = $self->{ENTRY}->{location};
+        push(@cmd, "ident=$key");
+    }
+    push(@cmd, @generateopts);
+    
+    my $cmd = join(' ', @cmd);
+	CertNanny::Logging->debug("Execute: $cmd");
+	my $rc = run_command($cmd);
+	if($rc != 0) {
+	    CertNanny::Logging->error("Could not generate new key in HSM, see logging output.");
+	    return;
+	}
+	
+	# It may not actually be a file (see hwcrhk) but we stay in
+	# line with the terminology used in CertNanny.
+	return({ KEYFILE => $key });
+}
+
+sub keyform() {
+    my $self = shift;
+    if($self->{hsm_options}->{keytype} eq "hwcrhk") {
+        return "engine";
+    } else {
+        return;
+    }
+}
+
+sub engineid() {
+    my $self = shift;
+    return "chil";
+}
+
+
+1;
+
+=head1 NAME
+
+CertNanny::HSM::Chil - Interface for using Thales nShield/nCipher and all similar with CertNanny.
+
+=head1 SYNOPSIS
+
+my $hsm = new CertNanny::HSM::Chil();
+my $newkey = $hsm->genkey();
+
+=head1 DESCRIPTION
+
+Implements the CertNanny::HSM interface. Currently supports key generation.
+
+=head1 FUNCTIONS
+
+=head2 Function List
+
+=over 4
+
+C<new()>
+
+C<genkey()>
+
+=back
+
+=head2 Function Descriptions
+
+=over 4
+
+=item new()
+
+Create a new instance for an HSM. The implementation should provide all necessary information to use all implemented functions.
+
+=item genkey()
+
+Generate a new key within the HSM. The exact method may depend on the configuration and implementation.

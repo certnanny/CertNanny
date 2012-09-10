@@ -1579,7 +1579,7 @@ sub sendrequest {
     		    return;
     		}
 		} else {
-		    my $oldkeyfile = $oldkey;
+		    $oldkeyfile = $oldkey;
 		}
 		
 		$oldcertfile = $self->gettmpfile();
@@ -1610,54 +1610,6 @@ sub sendrequest {
 	my $enroller = $self->get_enroller();
 	$enroller->enroll(%options);
 
-=comment
-        @autoapprove = ('-K', 
-			qq("$oldkeyfile"),
-			'-O',
-			qq("$oldcertfile"),
-	    );
-    }
-    my @checksubjectname = ();
-    @checksubjectname = ('-C') if $scepchecksubjectname =~ /yes/i;
-    my @verbose = ();
-    push @verbose, '-v' if CertNanny::Logging->loglevel() >= 5;
-    push @verbose, '-d' if CertNanny::Logging->loglevel() >= 6;
-    @cmd = (qq("$sscep"),
-	    'enroll',
-	    '-u',
-	    qq($scepurl),
-	    '-c',
-	    qq("$scepracert"),
-	    '-r',
-	    qq("$requestfile"),
-	    '-k',
-	    qq("$requestkeyfile"),
-	    '-l',
-	    qq("$newcertfile"),
-	    @autoapprove,
-	    @checksubjectname,
-	    @verbose,
-	    '-t',
-	    '5',
-	    '-n',
-	    '1',
-	    );
-	    if(defined $self->{OPTIONS}->{CONFIG}->{ENTRY}->{enginename} || $self->{OPTIONS}->{ENTRY}->{enginename}){
-	    	push @cmd, '-g';
-	    	push @cmd,  "$self->{OPTIONS}->{CONFIG}->{ENTRY}->{enginename}" || "$self->{OPTIONS}->{ENTRY}->{enginename}";
-	    }  
-
-    CertNanny::Logging->debug("Exec: " . join(' ', @cmd));
-  
-    my $rc;
-    eval {
-	local $SIG{ALRM} = sub { die "alarm\n" }; # NB: \n required
-	eval { alarm 120 }; # eval not supported in perl 5.7.1 on win32
-	$rc = run_command(join(' ', @cmd));
-	eval { alarm 0 }; # eval not supported in perl 5.7.1 on win32
-	CertNanny::Logging->info("Return code: $rc");
-    };
-=cut  
     unlink $requestkeyfile;
     unlink $oldkeyfile if (defined $oldkeyfile);
     unlink $oldcertfile if (defined $oldcertfile);
