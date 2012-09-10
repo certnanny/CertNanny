@@ -53,6 +53,8 @@ C<genkey()>
 
 =item new()
 
+=item genkey()
+
 Create a new instance for an HSM. The implementation should provide all necessary information to use all implemented functions.
 
 =item genkey()
