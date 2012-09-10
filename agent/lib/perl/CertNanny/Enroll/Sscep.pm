@@ -7,6 +7,8 @@
 #
 package CertNanny::Enroll::Sscep;
 
+use strict;
+use warnings;
 use base qw(Exporter);
 use CertNanny::Logging;
 use File::Spec;
