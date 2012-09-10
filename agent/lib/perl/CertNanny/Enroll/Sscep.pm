@@ -73,11 +73,11 @@ sub setOption {
 
 sub readConfig {
 	my $self = shift;
-	my $config = shift;
+	my %config = shift;
 	
-	foreach my $section ( keys $config) {
+	foreach my $section ( keys %config) {
         next if $section eq "INHERIT";
-        while (my ($key, $value) = each($config->{$section})) {
+        while (my ($key, $value) = each(%{$config{$section}})) {
             next if $key eq "INHERIT";
             $self->{OPTIONS}->{$section}->{$key} = $value if $value;
         }
@@ -122,7 +122,7 @@ sub enroll {
 	my $olddir = getcwd();
 	chdir $self->{certdir};
 	foreach my $section (keys %options) {
-		while (my ($key, $value) = each($options{$section})) {
+		while (my ($key, $value) = each(%{$options{$section}})) {
             $options{$section}->{$key} = File::Spec->abs2rel($value);
         }
 	}
@@ -174,22 +174,11 @@ sub enroll {
 sub writeConfigFile {
 	my $self = shift;
 	
-	open(my $configfile, ">", $self->{config_filename}) or die "Cannot write $self->{config_filename}";
-	
-	foreach my $section ( keys $self->{OPTIONS}) {
-		print $configfile "[$section]\n";
-        while (my ($key, $value) = each($self->{OPTIONS}->{$section})) {
-        	if(-e $value and $^O eq "MSWin32") {
-	        	#on Windows paths have a backslash, so in the string it is \\.
-	        	#In the config it must keep the doubled backslash so the actual 
-	        	#string would contain \\\\. Yes this is ridiculous...
-				$value =~ s/\\/\\\\/g;        		
-        	}
-            print $configfile "$key=$value\n";
-        }
-    }
-    
-    close $configfile;
+	my $rc = CertNanny::Util->writeOpenSSLConfig($self->{OPTIONS}, $self->{config_filename});
+	unless($rc) {
+	    CertNanny::Logging->error("Could not write sscep config file.");
+	    return;
+	}
 	return 1;
 }
 

@@ -81,7 +81,7 @@ sub run_command
 		<$PROGRAM>;
 	};
 	close($PROGRAM);
-	print $output; #TODO Logging
+	CertNanny::Logging->debug("$output");
 	return $? >> 8;
 }
 
@@ -702,6 +702,31 @@ sub staticEngine     {
 	close FH;
 	print "Output is $output\n";
 	return $output=~m/\(cs\).*\[ available \]/s;
+}
+
+sub writeOpenSSLConfig {
+    shift;
+    my $self = CertNanny::Util->getInstance();
+
+    my $config_hash = shift;
+    my $config_filename = shift || $self->gettmpfile();
+    open(my $configfile, ">", $config_filename) or die "Cannot write $config_filename";
+	
+	foreach my $section ( keys %{$config_hash}) {
+		print $configfile "[$section]\n";
+        while (my ($key, $value) = each(%{$config_hash->{$section}})) {
+        	if(-e $value and $^O eq "MSWin32") {
+	        	#on Windows paths have a backslash, so in the string it is \\.
+	        	#In the config it must keep the doubled backslash so the actual 
+	        	#string would contain \\\\. Yes this is ridiculous...
+				$value =~ s/\\/\\\\/g;        		
+        	}
+            print $configfile "$key=$value\n";
+        }
+    }
+    
+    close $configfile;
+	return $config_filename;
 }
 
 1;

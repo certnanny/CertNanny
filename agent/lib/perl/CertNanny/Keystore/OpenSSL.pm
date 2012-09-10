@@ -104,6 +104,7 @@ sub new
         my $entry_options = $self->{OPTIONS}->{ENTRY};
         my $config = $self->{OPTIONS}->{CONFIG};
         my $entryname = $self->{OPTIONS}->{ENTRYNAME};
+        CertNanny::Logging->debug("Using HSM $hsmtype");
         eval "\$self->{HSM} = new CertNanny::HSM::$hsmtype(\$entry_options, \$config, \$entryname)";
     }
 
@@ -477,16 +478,17 @@ sub createrequest {
 	   $config_options->{req}->{req_extensions} = "v3_ext";
     }
     
-    my $rdnstr = "";
+    
     foreach (reverse @RDN) {
-	my ($key, $value) = (/(.*?)=(.*)/);
-	if (exists $RDN_Count{$key}) {
-	    $rdnstr = $RDN_Count{$key} . ".";
-	    $RDN_Count{$key}--;
-	}
-	
-	$rdnstr .= $key; 
-	$config_options->{req_distinguished_name}->{$rdnstr} = $value;
+        my $rdnstr = "";
+    	my ($key, $value) = (/(.*?)=(.*)/);
+    	if (exists $RDN_Count{$key}) {
+    	    $rdnstr = $RDN_Count{$key} . ".";
+    	    $RDN_Count{$key}--;
+    	}
+    	
+    	$rdnstr .= $key; 
+    	$config_options->{req_distinguished_name}->{$rdnstr} = $value;
     }
     
     if (exists $self->{CERT}->{INFO}->{SubjectAlternativeName}) {
@@ -496,7 +498,7 @@ sub createrequest {
     }
     
     my $tmpconfigfile = CertNanny::Util->writeOpenSSLConfig($config_options);
-    
+    CertNanny::Logging->debug("The following configuration was written to $tmpconfigfile:\n" . CertNanny::Util->read_file($tmpconfigfile));
 
     # generate request
     my @cmd = (qq("$openssl"),
