@@ -15,6 +15,7 @@ use vars qw( $VERSION );
 use Exporter;
 use Cwd;
 use CertNanny::Util;
+use Data::Dumper;
 
 $VERSION = 0.10;
 
@@ -52,8 +53,8 @@ sub new() {
     }
     
     
-    
     $self->{hsm_options} = $hsm_options;
+    CertNanny::Logging->debug("HSM configuration:" . Dumper($self->{hsm_options}));
     $self->{ENTRY} = $entry_options;
     $self->{ENTRYNAME} = $entryname;
     $self->{CONFIG} = $config;
@@ -64,10 +65,7 @@ sub new() {
 sub getInstance() {
 	unless(defined $INSTANCE) {
 		my $proto = shift;
-		my %args = (
-			@_,		# argument pair list
-		);
-		$INSTANCE = CertNanny::HSM::Chil->new(%args);
+		$INSTANCE = CertNanny::HSM::Chil->new(@_);
 	}
 	
 	return $INSTANCE;
@@ -78,7 +76,7 @@ sub genkey() {
     my $self = CertNanny::HSM::Chil->getInstance();
     my $key;
     my @generateopts = ();
-    foreach my $param (keys $self->{hsm_options}->{key}) {
+    foreach my $param (keys %{$self->{hsm_options}->{key}}) {
         push(@generateopts, qq("$param=$self->{hsm_options}->{key}->{$param}"));
     }
     
@@ -101,6 +99,8 @@ sub genkey() {
         # but on installation the new key must replace the old one.
         # The old one should be archived if possible, else overwritten.
         # How do applications do this, if they get a new certificate currently?
+        CertNanny::Logging->error("hwcrhk keys not implemented yet. Aborting...");
+        return;
         $key = $self->{ENTRY}->{location};
         push(@cmd, "ident=$key");
     }
@@ -116,7 +116,7 @@ sub genkey() {
 	
 	# It may not actually be a file (see hwcrhk) but we stay in
 	# line with the terminology used in CertNanny.
-	return({ KEYFILE => $key });
+	return($key);
 }
 
 sub keyform() {
@@ -131,6 +131,17 @@ sub keyform() {
 sub engineid() {
     my $self = shift;
     return "chil";
+}
+
+# too bad, OpenSSL csr generation does not work with this engine
+sub createrequest() {
+    my $self=shift;
+    my $result = shift;
+    my $keyfile = $result->{KEYFILE};
+    my $requestfile = $keyfile;
+    $requestfile =~ s/-key.pem$/-key_req.pem/;
+    $result->{REQUESTFILE} = $requestfile;
+    return $result;
 }
 
 
