@@ -48,7 +48,7 @@ sub new() {
     }
     
     unless(defined $hsm_options->{keytype} and (grep $_ eq $hsm_options->{keytype}, @avail_keytypes)) {
-        CertNanny::Logging->error(qq("$hsm_options->{generatekey} is not an available keytype."));
+        CertNanny::Logging->error(qq("$hsm_options->{keytype} is not an available keytype."));
         return;
     }
     
