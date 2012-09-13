@@ -105,7 +105,27 @@ sub new
         my $config = $self->{OPTIONS}->{CONFIG};
         my $entryname = $self->{OPTIONS}->{ENTRYNAME};
         CertNanny::Logging->debug("Using HSM $hsmtype");
-        eval "\$self->{HSM} = new CertNanny::HSM::$hsmtype(\$entry_options, \$config, \$entryname)";
+        eval "use CertNanny::HSM::$hsmtype";
+        if ($@) {
+            print STDERR $@;
+            return;
+        }
+        eval "\$self->{HSM} = CertNanny::HSM::$hsmtype->getInstance(\$entry_options, \$config, \$entryname)";
+        if ($@ or not $self->{HSM}) {
+        	CertNanny::Logging->error("Could not instantiate HSM: ".$@);
+        	return;
+        }
+        
+        my $hsm = $self->{HSM};
+        unless($hsm->can('createrequest') and $hsm->can('genkey')) {
+            unless($hsm->can('engineid')) {
+    	        croak("HSM does not provide function engineid(), can not continue.");
+    	    }
+    	    
+    	    unless($hsm->can('keyform')) {
+    	        croak("HSM does not provide function keyform(), can not continue.");
+    	    }
+        }
     }
 
     # get previous renewal status
@@ -158,27 +178,34 @@ sub getkey {
 	CertNanny::Logging->error("No openssl shell specified");
 	return;
     }
-
-    my $keydata = CertNanny::Util->read_file($filename);
-    if (! defined $keydata || ($keydata eq "")) {
-	CertNanny::Logging->error("getkey(): Could not read private key");
-	return;
-    }
     
-    my $pin = $self->{PIN} || $self->{OPTIONS}->{ENTRY}->{pin};
+    unless($self->hasEngine()) {
+        my $keydata = CertNanny::Util->read_file($filename);
+        if (! defined $keydata || ($keydata eq "")) {
+    	CertNanny::Logging->error("getkey(): Could not read private key");
+    	return;
+        }
+        
+        my $pin = $self->{PIN} || $self->{OPTIONS}->{ENTRY}->{pin};
+        
+        my $keyformat = 'DER';
+        if ($keydata =~ m{ -----BEGIN.*KEY----- }xms) {
+    	$keyformat = 'PEM';
+        }
     
-    my $keyformat = 'DER';
-    if ($keydata =~ m{ -----BEGIN.*KEY----- }xms) {
-	$keyformat = 'PEM';
+        return (
+    	{ 
+    	    KEYDATA => $keydata,
+    	    KEYTYPE => $self->{KEYTYPE},
+    	    KEYFORMAT => $keyformat,
+    	    KEYPASS => $pin,
+    	});        
+    } else {
+        
+        return $filename;
     }
 
-    return (
-	{ 
-	    KEYDATA => $keydata,
-	    KEYTYPE => $self->{KEYTYPE},
-	    KEYFORMAT => $keyformat,
-	    KEYPASS => $pin,
-	});
+    
 }
 
 # create pkcs12 file
@@ -377,10 +404,16 @@ sub generatekey {
 	my $enginetype = $self->{ENGINETYPE} || $self->{OPTIONS}->{ENTRY}->{enginetype} ||'none';
 	my $enginename = $self->{ENGINENAME} || $self->{OPTIONS}->{ENTRY}->{enginename} ||'none';
 	#TODO Doku!
-	if ($self->hasEngine()){
+	if ($self->hasEngine() and $self->{HSM}->can('genkey')){
 	    my $hsm = $self->{HSM};
+	    CertNanny::Logging->debug("Generating a new key using the configured HSM.");
 	    $outfile = $hsm->genkey();
+	    unless($outfile) {
+	        CertNanny::Logging->error("HSM could not generate new key.");
+	        return;
+	    }
     } else{
+        CertNanny::Logging->debug("Generating a new key using native OpenSSL functionality.");
     	my $openssl = $self->{OPTIONS}->{CONFIG}->get('cmd.openssl', 'FILE');
     	if (! defined $openssl) {
 		CertNanny::Logging->error("No openssl shell specified");
@@ -394,10 +427,12 @@ sub generatekey {
 			    'env:PIN');
 	   	 }	
 
-         my @engine_cmd = ();
-         if($enginetype eq "OpenSSL" && $engine eq "yes")
-         {
-            @engine_cmd = ('-engine', $enginename); 
+        my @engine_cmd;
+         if($self->hasEngine()) {
+             my $hsm = $self->{HSM};
+             CertNanny::Logging->debug("Since an engine is used, setting required command line parameters.");
+             push(@engine_cmd, '-engine', $hsm->engineid());
+             push(@engine_cmd, '-keyform', $hsm->keyform()) if $hsm->keyform();
          }
 
     	# generate key
@@ -436,106 +471,114 @@ sub createrequest {
 	CertNanny::Logging->error("Key generation failed");
 	return;
     }    
-
+    
     my $requestfile = $self->{OPTIONS}->{ENTRYNAME} . ".csr";
     $result->{REQUESTFILE} = 
 	File::Spec->catfile($self->{OPTIONS}->{ENTRY}->{statedir},
 			    $requestfile);
-
-    my $pin = $self->{PIN} || $self->{OPTIONS}->{ENTRY}->{pin} || "";
-
-    my $openssl = $self->{OPTIONS}->{CONFIG}->get('cmd.openssl', 'FILE');
-    if (! defined $openssl) {
-	CertNanny::Logging->error("No openssl shell specified");
-	return;
-    }
-
-    my $DN = $self->{CERT}->{INFO}->{SubjectName};
-
-    CertNanny::Logging->debug("DN: $DN");
-    # split DN into individual RDNs. This regex splits at the ','
-    # character if it is not escaped with a \ (negative look-behind)
-    my @RDN = split(/(?<!\\),\s*/, $DN);
     
-    my %RDN_Count;
-    foreach (@RDN) {
-	my ($key, $value) = (/(.*?)=(.*)/);
-	$RDN_Count{$key}++;
-    }
-
-    # delete all entries that only showed up once
-    # all other keys now indicate the total number of appearance
-    map { delete $RDN_Count{$_} if ($RDN_Count{$_} == 1); } keys %RDN_Count;
-
+    if($self->hasEngine() and $self->{HSM}->can('createrequest')) {
+        CertNanny::Logging->debug("Creating new CSR with HSM.");
+        $result = $self->{HSM}->createrequest($result);
+    } else {
+        my $pin = $self->{PIN} || $self->{OPTIONS}->{ENTRY}->{pin} || "";
+        CertNanny::Logging->debug("Creating new CSR with native OpenSSL functionality.");
     
-    # create OpenSSL config file
-    my $config_options = {};
-    $config_options->{req}->{prompt} = "no";
-    $config_options->{req}->{distinguished_name} = "req_distinguished_name";
+        my $openssl = $self->{OPTIONS}->{CONFIG}->get('cmd.openssl', 'FILE');
+        if (! defined $openssl) {
+    	CertNanny::Logging->error("No openssl shell specified");
+    	return;
+        }
     
-    # handle subject alt name
-    if (exists $self->{CERT}->{INFO}->{SubjectAlternativeName}) {
-	   $config_options->{req}->{req_extensions} = "v3_ext";
-    }
+        my $DN = $self->{CERT}->{INFO}->{SubjectName};
     
-    
-    foreach (reverse @RDN) {
-        my $rdnstr = "";
+        CertNanny::Logging->debug("DN: $DN");
+        # split DN into individual RDNs. This regex splits at the ','
+        # character if it is not escaped with a \ (negative look-behind)
+        my @RDN = split(/(?<!\\),\s*/, $DN);
+        
+        my %RDN_Count;
+        foreach (@RDN) {
     	my ($key, $value) = (/(.*?)=(.*)/);
-    	if (exists $RDN_Count{$key}) {
-    	    $rdnstr = $RDN_Count{$key} . ".";
-    	    $RDN_Count{$key}--;
+    	$RDN_Count{$key}++;
+        }
+    
+        # delete all entries that only showed up once
+        # all other keys now indicate the total number of appearance
+        map { delete $RDN_Count{$_} if ($RDN_Count{$_} == 1); } keys %RDN_Count;
+    
+        
+        # create OpenSSL config file
+        my $config_options = {};
+        $config_options->{req}->{prompt} = "no";
+        $config_options->{req}->{distinguished_name} = "req_distinguished_name";
+        
+        # handle subject alt name
+        if (exists $self->{CERT}->{INFO}->{SubjectAlternativeName}) {
+    	   $config_options->{req}->{req_extensions} = "v3_ext";
+        }
+        
+        
+        foreach (reverse @RDN) {
+            my $rdnstr = "";
+        	my ($key, $value) = (/(.*?)=(.*)/);
+        	if (exists $RDN_Count{$key}) {
+        	    $rdnstr = $RDN_Count{$key} . ".";
+        	    $RDN_Count{$key}--;
+        	}
+        	
+        	$rdnstr .= $key; 
+        	$config_options->{req_distinguished_name}->{$rdnstr} = $value;
+        }
+        
+        if (exists $self->{CERT}->{INFO}->{SubjectAlternativeName}) {
+        	my $san = $self->{CERT}->{INFO}->{SubjectAlternativeName};
+        	$san =~ s{ IP\ Address: }{IP:}xmsg;
+        	$config_options->{v3_ext}->{subjectAltName} = $san;
+        }
+        
+        my $tmpconfigfile = CertNanny::Util->writeOpenSSLConfig($config_options);
+        CertNanny::Logging->debug("The following configuration was written to $tmpconfigfile:\n" . CertNanny::Util->read_file($tmpconfigfile));
+    
+        # generate request
+        my @cmd = (qq("$openssl"),
+    	       'req',
+    	       '-config',
+    	       qq("$tmpconfigfile"),
+    	       '-new',
+    	       '-sha1',
+    	       '-out',
+    	       qq("$result->{REQUESTFILE}"),
+    	       '-key',
+    	       qq("$result->{KEYFILE}"),
+    	);
+    	
+    	if($self->hasEngine()) {
+    	    my $hsm = $self->{HSM};
+    	    CertNanny::Logging->debug("Setting required engine parameters for HSM.");
+    	    my $engine_id = $hsm->engineid();
+    	    push(@cmd, ('-engine', $engine_id));
+    	    
+    	    if($hsm->keyform()) {
+    	        push(@cmd, ('-keyform', $hsm->keyform()));
+    	    }
     	}
     	
-    	$rdnstr .= $key; 
-    	$config_options->{req_distinguished_name}->{$rdnstr} = $value;
-    }
+        push (@cmd, ('-passin', 'env:PIN')) unless $pin eq "";
     
-    if (exists $self->{CERT}->{INFO}->{SubjectAlternativeName}) {
-    	my $san = $self->{CERT}->{INFO}->{SubjectAlternativeName};
-    	$san =~ s{ IP\ Address: }{IP:}xmsg;
-    	$config_options->{v3_ext}->{subjectAltName} = $san;
-    }
+        CertNanny::Logging->log({ MSG => "Execute: " . join(" ", @cmd),
+    		 PRIO => 'debug' });
     
-    my $tmpconfigfile = CertNanny::Util->writeOpenSSLConfig($config_options);
-    CertNanny::Logging->debug("The following configuration was written to $tmpconfigfile:\n" . CertNanny::Util->read_file($tmpconfigfile));
-
-    # generate request
-    my @cmd = (qq("$openssl"),
-	       'req',
-	       '-config',
-	       qq("$tmpconfigfile"),
-	       '-new',
-	       '-sha1',
-	       '-out',
-	       qq("$result->{REQUESTFILE}"),
-	       '-key',
-	       qq("$result->{KEYFILE}"),
-	);
-	
-	if($self->hasEngine()) {
-	    my $hsm = $self->{HSM};
-	    my $engine_id = $hsm->engineid();
-	    push(@cmd, ('-engine', $engine_id));
-	    if($hsm->keyform()) {
-	        push(@cmd, ('-keyform', $hsm->keyform()));
-	    }
-	}
-	
-    push (@cmd, ('-passin', 'env:PIN')) unless $pin eq "";
-
-    CertNanny::Logging->log({ MSG => "Execute: " . join(" ", @cmd),
-		 PRIO => 'debug' });
-
-    $ENV{PIN} = $pin;
-    if (run_command(join(' ', @cmd)) != 0) {
-	CertNanny::Logging->error("Request creation failed");
-	delete $ENV{PIN};
-	unlink $tmpconfigfile;
-	return;
+        $ENV{PIN} = $pin;
+        if (run_command(join(' ', @cmd)) != 0) {
+    	CertNanny::Logging->error("Request creation failed");
+    	delete $ENV{PIN};
+    	unlink $tmpconfigfile;
+    	return;
+        }
+        delete $ENV{PIN};
+        unlink $tmpconfigfile;
     }
-    delete $ENV{PIN};
-    unlink $tmpconfigfile;
 
     return $result;
 }
