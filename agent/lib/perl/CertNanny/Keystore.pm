@@ -1614,9 +1614,11 @@ sub sendrequest {
 	my $enroller = $self->get_enroller();
 	$enroller->enroll(%options);
 
-    unlink $requestkeyfile;
-    unlink $oldkeyfile if (defined $oldkeyfile);
-    unlink $oldcertfile if (defined $oldcertfile);
+    unless($self->hasEngine()) {
+        unlink $requestkeyfile;
+        unlink $oldkeyfile if (defined $oldkeyfile);
+        unlink $oldcertfile if (defined $oldcertfile);
+    }
 
     if (-r $newcertfile) {
 	# successful installation of the new certificate.
