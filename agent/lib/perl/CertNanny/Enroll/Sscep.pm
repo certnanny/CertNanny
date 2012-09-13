@@ -75,11 +75,10 @@ sub setOption {
 
 sub readConfig {
 	my $self = shift;
-	my %config = shift;
-	
-	foreach my $section ( keys %config) {
+	my $config = shift;
+	foreach my $section ( keys %{$config}) {
         next if $section eq "INHERIT";
-        while (my ($key, $value) = each(%{$config{$section}})) {
+        while (my ($key, $value) = each(%{$config->{$section}})) {
             next if $key eq "INHERIT";
             $self->{OPTIONS}->{$section}->{$key} = $value if $value;
         }
