@@ -21,6 +21,7 @@ use lib "$FindBin::Bin/../lib/perl";
 
 use CertNanny;
 
+
 if ($OSNAME eq "MSWin32") {
     require Win32;
     Win32->import();
@@ -50,7 +51,6 @@ GetOptions(\%config,
 	      cfg|cfgfile|conf|config=s
 			win_user=s
 			win_password=s
-		  sleep=i
 	      )) or pod2usage(-msg => $msg, -verbose => 0);
 
 pod2usage(-exitstatus => 0, -verbose => 2) if $config{man};
@@ -60,9 +60,7 @@ pod2usage(-msg => $msg, -verbose => 1) if ($config{help} or
 die "Could not read config file $config{cfg}. Stopped" 
     unless (-r $config{cfg});
 
-my $monitor = CertNanny->getInstance(CONFIG => $config{cfg});
-$config{sleep} = 300 if !defined $config{sleep};
-$monitor->setOption("sleep", $config{sleep});
+my $monitor = CertNanny->new(CONFIG => $config{cfg});
 
 foreach my $cmd (@ARGV) {
 	if ($OSNAME eq 'MSWin32') {
@@ -971,7 +969,7 @@ Default: new
 
 Example: old
 
-=item keystore.LABEL.enroll.sscep.URL
+=item keystore.LABEL.scepurl
 
 URL of the SCEP Server to use
 
