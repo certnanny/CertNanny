@@ -40,13 +40,18 @@ sub new
     # propagate PIN to class options
     $self->{PIN} = $self->{OPTIONS}->{ENTRY}->{pin};
 
-    foreach my $entry (qw( keyfile location )) {
-	if (! defined $self->{OPTIONS}->{ENTRY}->{$entry} ||
-	    (! -r $self->{OPTIONS}->{ENTRY}->{$entry})) {
-	    croak("keystore.$entry $self->{OPTIONS}->{ENTRY}->{$entry} not defined, does not exist or unreadable");
+    if (! defined $self->{OPTIONS}->{ENTRY}->{keyfile} ||
+	    (! -r $self->{OPTIONS}->{ENTRY}->{keyfile})
+	    && !defined $self->{OPTIONS}->{ENTRY}->{hsm}) {
+	    croak("keystore.keyfile $self->{OPTIONS}->{ENTRY}->{keyfile} not defined, does not exist or unreadable");
 	    return;
 	}
-    }
+	
+	if (! defined $self->{OPTIONS}->{ENTRY}->{location} ||
+	    (! -r $self->{OPTIONS}->{ENTRY}->{location})) {
+	    croak("keystore.location $self->{OPTIONS}->{ENTRY}->{location} not defined, does not exist or unreadable");
+	    return;
+	}
     
 
 
