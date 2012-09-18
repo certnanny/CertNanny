@@ -19,7 +19,6 @@ use Data::Dumper;
 
 $VERSION = 0.10;
 
-my $INSTANCE;
 
 sub new() {
     my $proto = shift;
@@ -54,7 +53,6 @@ sub new() {
     
     
     $self->{hsm_options} = $hsm_options;
-    CertNanny::Logging->debug("HSM configuration:" . Dumper($self->{hsm_options}));
     $self->{ENTRY} = $entry_options;
     $self->{ENTRYNAME} = $entryname;
     $self->{CONFIG} = $config;
@@ -62,18 +60,8 @@ sub new() {
 	return $self;
 }
 
-sub getInstance() {
-	unless(defined $INSTANCE) {
-		my $proto = shift;
-		$INSTANCE = CertNanny::HSM::Chil->new(@_);
-	}
-	
-	return $INSTANCE;
-}
-
 sub genkey() {
-    shift;
-    my $self = CertNanny::HSM::Chil->getInstance();
+    my $self = shift;
     my $key;
     my @generateopts = ();
     foreach my $param (keys %{$self->{hsm_options}->{key}}) {
