@@ -73,9 +73,10 @@ sub new() {
             return;
         }
         $hsm_options->{key}->{login} = $entry_options->{pin};
+        $hsm_options->{key}->{id} = $entry_options->{keyfile};
         
         #check mandatory params
-        foreach my $param (qw(slot login)) {
+        foreach my $param (qw(slot login id)) {
             unless(defined $hsm_options->{key}->{$param}) {
                 CertNanny::Logging->error("The parameter key.$param is mandatory and needs to be set. Aborting...");
                 return;
@@ -86,8 +87,7 @@ sub new() {
         
     }
     
-    
-    
+    $self->loadKeyInfo();
     
     
     $self->{hsm_options} = $hsm_options;
@@ -106,10 +106,17 @@ sub genkey() {
     my $genkeyopt = "genkey=RSA,1024";
     foreach my $param (keys %{$self->{hsm_options}->{key}}) {
         my $value = $self->{hsm_options}->{key}->{$param};
+        next if (lc($param) eq "inherit");
+        next if (!$value);
         if((grep $_ eq $param , @parameters)) {
             if($param eq "id") {
-                my $current_id = $self->getKeyID();
+                my $current_id = $self->getCurrentKeyNumber();
+                if($current_id == -1) {
+                    CertNanny::Logging->error("genkey(): Could not get a valid number for the current key.");
+                }
                 $value =~ s/%i/$current_id/;
+                # right now we have the current *LABEL*, but we want the hex ID (we need that one);
+                $value = $self->getKeyID($value);
             }
             push(@generateopts, qq($param=$value));
         } elsif ($param eq "genkey") {
@@ -121,7 +128,7 @@ sub genkey() {
     }
     
     
-    my @cmd = ($p11tool,@parameters, $genkeyopt);
+    my @cmd = ($p11tool,@generateopts, $genkeyopt);
     
     my $cmd = join(" ", @cmd);
     CertNanny::Logging->debug("Execute: $cmd");
@@ -138,54 +145,108 @@ sub loadKeyInfo() {
     my $self = shift;
     my $p11tool = $self->{hsm_options}->{p11tool};
     my $slot = $self->{hsm_options}->{key}->{slot};
-    my $login = $self->{hsm_option}->{key}->{login};
-    my $token_pattern = $self->{ENTRY}->{keyfile};
-    $token_pattern =~ s/%i/(\\d+)/;
-    CertNanny::Logging->debug("Will match on token pattern $token_pattern");
+    my $login = $self->{hsm_options}->{key}->{login};
     my @cmd = ($p11tool, "slot=$slot", "login=$login", "ListObjects");
     my $cmd = join(" ",  @cmd);
     CertNanny::Logging->debug("Exec: $cmd");
     my $output;
-    my $highest_id = -1;
+    
 	open FH, "$cmd |" or die "Couldn't execute $cmd: $!\n"; 
 	while(defined(my $line = <FH>)) {
-	    chomp($line);
 	    $output .= $line;
-	    
-	    
-	    
-	    my $line_content = $1;
-	    if($line =~ m/^.*?$token_pattern.*$/) {
-	        
-	        my $id = $1;
-	        if($id > $highest_id) {
-	            $highest_id = $id;
-	        }
-	    }
 	}
 	close FH;
 	my $exitval = $? >> 8;
 	if($exitval != 0) {
 	    CertNanny::Logging->error("Could not execute command successfully.");
-	    return;
-	}
-	
-	my @groups = split(/^\+.*$/, $output);
-	foreach my $group (@groups) {
-	    
-	}
-	
-	
-	if($highest_id == -1) {
-	    CertNanny::Logging->error("Could not get a valid id, returning");
 	    return -1;
 	}
 	
-	return $highest_id;
+	my %keys;
+	my @groups = split(/\+ \d+\.\d+/, $output);
+	foreach my $group (@groups) {
+	    next unless $group =~ /id\s*:\s*[a-f0-9\s]+/;
+	    $group =~ /id\s*:\s*([a-f0-9\s]+).*?\|(.*?)\|/;
+	    my $id = $1;
+	    my $label = $2;
+	    $label =~ s/\s*//g;
+	    $id =~ s/\s*//g;
+	    unless($id and $label) {
+	        CertNanny::Logging->error("Could not get id and label from following output: $group");
+	    }
+	    $keys{$id} = $label;
+	}
+	
+	CertNanny::Logging->debug("Printing all keys...");
+	foreach my $id (keys %keys) {
+	    my $label = $keys{$id};
+	    CertNanny::Logging->debug("Found key with id $id and label $label");
+	}
+	
+	return ${%keys};
+}
+
+sub getKeyID() {
+    my $self = shift;
+    my $label = shift;
+    foreach my $id (keys %{$self->{all_keys}}) {
+        my $current_label = $self->{all_keys}->{$id};
+        if($current_label == $label) {
+            return $id;
+        }
+    }
+    return;
+}
+
+sub getCurrentKeyNumber() {
+    my $self = shift;
+    my $highest_number = -1;
+    my $token_pattern = $self->{hsm_options}->{key}->{id};
+    $token_pattern =~ s/%i/(\\d+)/;
+    CertNanny::Logging->debug("getCurrentKeyNumber(): Will match on token pattern $token_pattern");
+    
+    foreach my $id (keys %{$self->{all_keys}}) {
+        my $label = $self->{all_keys}->{$id};
+        $label =~ m/$token_pattern/;
+        my $number = int($1);
+        if($number > $highest_number) {
+            $highest_number = $number;
+        } elsif ($number == $highest_number) {
+            CertNanny::Logging->error("getCurrentKeyNumber(): Found the same label twice, aborting.");
+            return -1;
+        }
+    }
+	
+	if($highest_number == -1) {
+	    CertNanny::Logging->error("getCurrentKeyNumber(): Could not get a valid number, returning");
+	    return -1;
+	}
+	
+	return $highest_number;
 }
 
 sub availparams() {
-    return ("dev", "device", "lib", "password", "slot", "subject", "timeout", "id", "label");
+    return ("dev", "device", "lib", "password", "slot", "subject", "timeout", "id", "label", "login");
+}
+
+sub engineid() {
+    my $self = shift;
+    my $keytype = $self->{hsm_options}->{keytype};
+    if(defined $keytype and $keytype eq "file") {
+        return "cs"
+    } else {
+        return "pkcs11";
+    }
+}
+
+sub keyform() {
+    my $self = shift;
+    my $keytype = $self->{hsm_options}->{keytype};
+    if(defined $keytype and $keytype eq "file") {
+        return;
+    } else {
+        return "engine";
+    }
 }
 
 
