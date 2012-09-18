@@ -110,7 +110,7 @@ sub new
             print STDERR $@;
             return;
         }
-        eval "\$self->{HSM} = CertNanny::HSM::$hsmtype->getInstance(\$entry_options, \$config, \$entryname)";
+        eval "\$self->{HSM} = CertNanny::HSM::$hsmtype->new(\$entry_options, \$config, \$entryname)";
         if ($@ or not $self->{HSM}) {
         	CertNanny::Logging->error("Could not instantiate HSM: ".$@);
         	return;
