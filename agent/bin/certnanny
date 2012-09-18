@@ -205,11 +205,15 @@ if ($OSNAME eq 'MSWin32') {
 		print $LOG "stdout/stderr redirect\n";
 
 		my $rc;
+		print $LOG "Starting renewal...";
 		eval {
 			$rc = $monitor->renew();
 		};
-		print $LOG "EVAL_ERROR? " . $EVAL_ERROR;
-	        print $LOG "renew was called: $rc\n";
+		if($rc != 0) {
+		    print $LOG "There was an error executing CertNanny monitor object\n";
+		    print $LOG $@;
+		}
+		print $LOG "Renewal finished...";
 
 	 
 		#if the renewal was successful the starttime will be increased by one day (86400 seconds -> 24hours -> 3600 seconds per hour)
