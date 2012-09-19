@@ -106,7 +106,7 @@ sub log {
 	my $arg  = shift;
 	confess "Not a hash ref" unless ( ref($arg) eq "HASH" );
 	return unless ( defined $arg->{MSG} );
-	my $prio = lc( $arg->{PRIO} ) || "info";
+	my $prio = lc( $arg->{PRIO} || "info" );
 
 	my %level = (
 		'debug'  => 4,
