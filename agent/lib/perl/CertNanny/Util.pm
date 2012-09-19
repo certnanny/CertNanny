@@ -685,14 +685,12 @@ sub staticEngine     {
     my $openssl = $self->{OPTIONS}->{openssl_shell};
     push(@cmd, $openssl);
     push(@cmd, 'engine');
-    print "Engine ID before clean: $engine_id\n";
     $engine_id =~ s/[^A-Za-z0-9]*//g;
-    print "Engine ID after clean: $engine_id\n";
     push(@cmd, $engine_id);
     push(@cmd, '-t');
     
     my $cmd = join(' ', @cmd);
-    print "Command is $cmd\n";
+    CertNanny::Logging->debug("Execute: $cmd\n");
     my $output = "";
     open FH, "$cmd |" or die "Couldn't execute $cmd: $!\n"; 
 	while(defined(my $line = <FH>)) {
@@ -700,7 +698,7 @@ sub staticEngine     {
 	    $output .= $line;
 	}
 	close FH;
-	print "Output is $output\n";
+	CertNanny::Logging->debug("Output is $output\n");
 	return $output=~m/\(cs\).*\[ available \]/s;
 }
 
@@ -712,21 +710,48 @@ sub writeOpenSSLConfig {
     my $config_filename = shift || $self->gettmpfile();
     open(my $configfile, ">", $config_filename) or die "Cannot write $config_filename";
 	
+	if(defined $config_hash->{openssl_conf}) {
+	    print $configfile "openssl_conf=$config_hash->{openssl_conf}\n";
+	    delete $config_hash->{openssl_conf};
+	}
+		
 	foreach my $section ( keys %{$config_hash}) {
 		print $configfile "[$section]\n";
-        while (my ($key, $value) = each(%{$config_hash->{$section}})) {
-        	if(-e $value and $^O eq "MSWin32") {
-	        	#on Windows paths have a backslash, so in the string it is \\.
-	        	#In the config it must keep the doubled backslash so the actual 
-	        	#string would contain \\\\. Yes this is ridiculous...
-				$value =~ s/\\/\\\\/g;        		
-        	}
-            print $configfile "$key=$value\n";
+        foreach my $entry_hash (@{$config_hash->{$section}}) {
+            foreach my $key (keys(%{$entry_hash})) {
+                my $value = $entry_hash->{$key};
+            	if(-e $value and $^O eq "MSWin32") {
+    	        	#on Windows paths have a backslash, so in the string it is \\.
+    	        	#In the config it must keep the doubled backslash so the actual 
+    	        	#string would contain \\\\. Yes this is ridiculous...
+    	        	$value =~ s#/#\\#g;
+    				$value =~ s/\\/\\\\/g;        		
+            	}
+                print $configfile "$key=$value\n";
+            }
         }
     }
     
     close $configfile;
 	return $config_filename;
+}
+
+sub getDefaultOpenSSLConfig {
+    shift;
+    my $self = CertNanny::Util->getInstance();
+    
+    
+    
+    my $default_config = {
+        openssl_conf => "openssl_def",
+        openssl_def => [
+            {engines => "engine_section"},
+        ],
+        
+        engine_section => []
+    };
+    
+    return $default_config;
 }
 
 1;
@@ -778,6 +803,10 @@ C<parsecertdata()>
 C<gettmpfile()>
 
 C<staticEngine()>
+
+C<writeOpenSSLConfig()>
+
+C<getDefaultOpenSSLConfig()>
 
 =back
 
@@ -994,3 +1023,33 @@ Returns true if the engine is available, false otherwise.
 The engine_id which should be checked.
 
 =back
+
+=item writeOpenSSLConfig($config_hash, $config_filename)
+
+Writes an OpenSSL configuration file either to $config_filename or to a temporary file. Returns filename of configuration file.
+
+=over 4
+
+=item $config_hash
+
+Configuration hash reference. This hash reference requires a special structure: It has to contain multiple hash references. The key of each of them is the section name for the OpenSSL configuration. Inside it is another hash which contains key => value pairs that are entered as key=value in the OpenSSL configuration.
+For example, you pass:
+ 
+{section_name}->{key_name}=value
+ 
+This will lead to:
+
+[section_name]
+    
+key_name=value
+
+
+=item $config_filename
+
+Optional string that contains the desired filename. If none is passed then a temporary one is created. The filename is always returned, regardless of this setting. 
+
+=back
+
+=item getDefaultOpenSSLConfig()
+
+Returns an OpenSSL default configuration hash. For the of the hash syntax see C<writeOpenSSLConfig()>. It contains an out-of-section default value openssl_conf=openssl_def denoting the OpenSSL section used as a starting point and contains a default engines=engine_section inside it.
