@@ -175,7 +175,17 @@ sub enroll {
 sub writeConfigFile {
 	my $self = shift;
 	
-	my $rc = CertNanny::Util->writeOpenSSLConfig($self->{OPTIONS}, $self->{config_filename});
+	my $openssl_cfg;
+	
+	foreach my $section (keys %{$self->{OPTIONS}}) {
+	    $openssl_cfg->{$section} = [];
+	    foreach my $key (keys %{$self->{OPTIONS}->{$section}}) {
+	        my $value = $self->{OPTIONS}->{$section}->{$key};
+	        push($openssl_cfg->{$section}, {$key => $value});
+	    }
+	}
+	
+	my $rc = CertNanny::Util->writeOpenSSLConfig($openssl_cfg, $self->{config_filename});
 	unless($rc) {
 	    CertNanny::Logging->error("Could not write sscep config file.");
 	    return;
