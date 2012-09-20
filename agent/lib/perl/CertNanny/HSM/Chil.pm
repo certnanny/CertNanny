@@ -132,6 +132,20 @@ sub createrequest() {
     return $result;
 }
 
+sub getEngineConfiguration() {
+    my $self = shift;
+    
+    if(CertNanny::Util->staticEngine($self->engineid())) {
+        CertNanny::Logging->debug("getEngineConfiguration(): Engine reports to be statically compiled with OpenSSL, not return a configuration as none should be needed.");
+        return;
+    }
+    
+    
+    # NYI: Not yet implemented. See Utimaco.pm for reference / help
+    CertNanny::Logging->error("getEngineConfiguration(): Unfortunately, the engine is not static and dynamic loading is not yet supported. Please make a version of OpenSSL with a static engine or implement this.");
+    die;
+}
+
 
 1;
 
