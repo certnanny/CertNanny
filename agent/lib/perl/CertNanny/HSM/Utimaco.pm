@@ -413,6 +413,9 @@ sub checkKeySanity() {
         }
     }
     
+    # update current set of keys
+    $self->{all_keys} = $self->loadKeyInfo();
+    
     return 1;
     
 }
@@ -486,7 +489,7 @@ sub deleteKey() {
     my $hsm_options = $self->{hsm_options};
     my $p11tool = $hsm_options->{p11tool};
     my @deleteopts;
-    CertNanny::Util->gettmpfile();
+    CertNanny::Util->timestamp();
     
     CertNanny::Logging->debug("deleteKey(): Deleting key with ID $keyid");
     push(@deleteopts, 'Slot='.$hsm_options->{key}->{slot});
@@ -533,6 +536,16 @@ my $newkey = $hsm->genkey();
 =head1 DESCRIPTION
 
 Implements the CertNanny::HSM interface. Currently supports key generation.
+
+=head1 ISSUES
+
+=over 4
+
+=item User PIN on command line
+
+Utimaco's p11tool accepts PINs via command line by passing the Login=*PIN* command. For every operation that works on a user's token (all operations within the HSM do that). Unfortunately, this means the PIN has to be passed to the tool, which in turn means it could be read from the command line. This issue can only be resolved by providing a different way to pass the PIN or generating keys in another way.
+
+=back
 
 =head1 FUNCTIONS
 
