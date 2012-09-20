@@ -50,8 +50,6 @@ sub DESTROY
 {
     my $self = shift;
     
-    $self->store_state();
-
     return unless (exists $self->{TMPFILE});
 
     foreach my $file (@{$self->{TMPFILE}}) {
