@@ -401,10 +401,10 @@ Internal function. Stores default options which get overwritten by options that 
 
 Internal function. Perform an sscep command based on the current configuration. Normally you do not need to call this.
 
-=item readConfig( %hash )
+=item readConfig( $hash_ref )
 
-Internal function. Reads the configuration from a passed hash. Gets called by C<new()>. The keys of %hash describe section names. Each element is another hash which consists of key => value pairs for this section.
-Refer to the sscep documentation and example configuration fine (.cnf extension) on the available optiosn. The syntax used is OpenSSL configuration syntax.
+Internal function. Reads the configuration from a passed hash. Gets called by C<new()>. The keys of $hash_ref describe section names. Each element is another hash reference which consists of key => value pairs for this section.
+Refer to the sscep documentation and example configuration fine (.cnf extension) on the available options. The syntax used is OpenSSL configuration syntax.
 
 =item setOption( $key, $value, $section)
 
