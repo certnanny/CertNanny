@@ -519,12 +519,12 @@ sub createrequest {
         # create OpenSSL config file
         my $config_options = CertNanny::Util->getDefaultOpenSSLConfig();
         $config_options->{req} = [];
-        push($config_options->{req}, {prompt => "no"});
-        push($config_options->{req}, {distinguished_name => "req_distinguished_name"});
+        push(@{$config_options->{req}}, {prompt => "no"});
+        push(@{$config_options->{req}}, {distinguished_name => "req_distinguished_name"});
         
         # handle subject alt name
         if (exists $self->{CERT}->{INFO}->{SubjectAlternativeName}) {
-    	   push($config_options->{req}, {req_extensions => "v3_ext"});
+    	   push(@{$config_options->{req}}, {req_extensions => "v3_ext"});
         }
         
         
@@ -538,14 +538,14 @@ sub createrequest {
         	}
         	
         	$rdnstr .= $key; 
-        	push($config_options->{req_distinguished_name}, {$rdnstr => $value});
+        	push(@{$config_options->{req_distinguished_name}}, {$rdnstr => $value});
         }
         
         if (exists $self->{CERT}->{INFO}->{SubjectAlternativeName}) {
         	my $san = $self->{CERT}->{INFO}->{SubjectAlternativeName};
         	$san =~ s{ IP\ Address: }{IP:}xmsg;
         	$config_options->{v3_ext} = [];
-        	push($config_options->{v3_ext}, {subjectAltName => $san});
+        	push(@{$config_options->{v3_ext}}, {subjectAltName => $san});
         }
         
         my @engine_cmd;
@@ -563,7 +563,7 @@ sub createrequest {
     	    if($engine_config) {
     	        my $engine_section = "${engine_id}_section";
                 $config_options->{engine_section} = [];
-                push($config_options->{engine_section}, {$engine_id => "${engine_id}_section"});
+                push(@{$config_options->{engine_section}}, {$engine_id => "${engine_id}_section"});
                 $config_options->{$engine_section} = $engine_config;
     	    }
     	}
