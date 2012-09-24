@@ -1030,10 +1030,10 @@ Writes an OpenSSL configuration file either to $config_filename or to a temporar
 
 =item $config_hash
 
-Configuration hash reference. This hash reference requires a special structure: It has to contain multiple hash references. The key of each of them is the section name for the OpenSSL configuration. Inside it is another hash which contains key => value pairs that are entered as key=value in the OpenSSL configuration.
+Configuration hash reference. This hash reference requires a special structure: The keys of this hash reference are the names of the sections for an OpenSSL configuration file. Inside such a section then is an array reference which is sorted in the way the options should be entered into the configuration file. Each array entry contains a hash reference with a single key => value pair that contains the parameter name as key and the parameter's value as the value of the hash reference.
 For example, you pass:
  
-{section_name}->{key_name}=value
+{section_name}->[0]->{key_name}=value
  
 This will lead to:
 
