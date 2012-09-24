@@ -181,7 +181,7 @@ sub writeConfigFile {
 	    $openssl_cfg->{$section} = [];
 	    foreach my $key (keys %{$self->{OPTIONS}->{$section}}) {
 	        my $value = $self->{OPTIONS}->{$section}->{$key};
-	        push($openssl_cfg->{$section}, {$key => $value});
+	        push(@{$openssl_cfg->{$section}}, {$key => $value});
 	    }
 	}
 	
