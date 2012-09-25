@@ -200,7 +200,8 @@ if ($OSNAME eq 'MSWin32') {
       {
 	        print $LOG "currtime > starttime\n";
 	  	# reinstantiate CertNanny object (make sure that destructor gets called)
-		$monitor = CertNanny->new(CONFIG => $config{cfg});
+	  	$monitor = undef;
+		$monitor = CertNanny->getInstance(CONFIG => $config{cfg});
 		print $LOG "new monitor object\n";
 		# The service is running as normal...
 		# ...add the main code here...
