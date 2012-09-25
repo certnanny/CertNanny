@@ -87,6 +87,7 @@ sub DESTROY {
 	# Windows apparently flushes file handles on close() and ignores autoflush...
 	close STDOUT;
 	close STDERR;
+	$INSTANCE=undef;
 }
 
 
