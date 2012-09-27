@@ -48,13 +48,13 @@ sub new
     
     $certnanny_to_sap_dir = $entry->{certnanny_to_sap_dir};
     if(! $certnanny_to_sap_dir or ! -d $certnanny_to_sap_dir) {
-        $self->seterror("keystore.$entryname.certnanny_to_sap_dir is either missing or not a directory, please check.");
+        CertNanny::Logging->error("keystore.$entryname.certnanny_to_sap_dir is either missing or not a directory, please check.");
         return;
     }
         
     $sap_to_certnanny_dir = $entry->{sap_to_certnanny_dir};
     if(! $sap_to_certnanny_dir or ! -d $sap_to_certnanny_dir) {
-        $self->seterror("keystore.$entryname.sap_to_certnanny_dir is either missing or not a directory, please check.");
+        CertNanny::Logging->error("keystore.$entryname.sap_to_certnanny_dir is either missing or not a directory, please check.");
         return;
     }
     # To enable hooks and to keep in line with
@@ -66,17 +66,17 @@ sub new
     
     my $filename = $entry->{filename};
     if(! $filename) {
-        $self->info("keystore.$entryname.filename is not specified, will look into $sap_to_certnanny_dir to find a file");
+        CertNanny::Logging->info("keystore.$entryname.filename is not specified, will look into $sap_to_certnanny_dir to find a file");
         opendir(DIR, $sap_to_certnanny_dir);
         my @files = grep ! /^\.{1,2}$/, readdir(DIR);
         closedir(DIR);
         if(@files > 1) {
-            $self->seterror("More than one file in $sap_to_certnanny_dir, cannot determine correct file. Please specify keystore.$entryname.filename.");
+            CertNanny::Logging->error("More than one file in $sap_to_certnanny_dir, cannot determine correct file. Please specify keystore.$entryname.filename.");
             return;
         }
         
         if(@files == 1) {
-            $self->seterror("No file in $sap_to_certnanny_dir, cannot determine correct file. Please specify keystore.$entryname.filename.");
+            CertNanny::Logging->error("No file in $sap_to_certnanny_dir, cannot determine correct file. Please specify keystore.$entryname.filename.");
             return;
         }
     }
@@ -87,41 +87,41 @@ sub new
     
     my $p12_xml_file;
     if( ! $filename or ! -r ($p12_xml_file = File::Spec->catfile($sap_to_certnanny_dir, $filename))) {
-        $self->info("No file present in $sap_to_certnanny_dir, no renewal required.");
+        CertNanny::Logging->info("No file present in $sap_to_certnanny_dir, no renewal required.");
         die("Aborting...");
         return;
     }
     
     if( -r File::Spec->catfile($certnanny_to_sap_dir, $filename)) {
-        $self->info("The renewed keystore was not imported yet. Will not continue");
+        CertNanny::Logging->info("The renewed keystore was not imported yet. Will not continue");
         die("Aborting...");
         return;
     }
     
     my $p12_data_tag = $entry->{p12_data_tag};
     if(!$p12_data_tag) {
-        $self->info("keystore.$entryname.p12_data_tag no specified, will use default 'P12DATA'");
+        CertNanny::Logging->info("keystore.$entryname.p12_data_tag no specified, will use default 'P12DATA'");
         $p12_data_tag = 'P12DATA';
     }
     $entry->{p12_data_tag} = $p12_data_tag;
     
     my $p12_pwd_tag = $entry->{p12_pwd_tag};
     if(!$p12_pwd_tag) {
-        $self->info("keystore.$entryname.p12_pwd_tag no specified, will use default 'PWD'");
+        CertNanny::Logging->info("keystore.$entryname.p12_pwd_tag no specified, will use default 'PWD'");
         $p12_pwd_tag = 'PWD';
     }
     $entry->{p12_pwd_tag} = $p12_pwd_tag;
     
-    my $p12_xml = $self->read_file($p12_xml_file);
+    my $p12_xml = CertNanny::Util->read_file($p12_xml_file);
     if(!$p12_xml) {
-        $self->seterror("XML file $p12_xml is empty.");
+        CertNanny::Logging->error("XML file $p12_xml is empty.");
         return;
     }
     $self->{PKCS12}->{XML} = $p12_xml;
     #$p12_xml =~ m/.*?\<$p12_data_tag\>([A-Za-z0-9\+\/=]+)\<\/$p12_data_tag\>.*?\<$p12_pwd_tag\>(.*)?\<\/$p12_pwd_tag\>.*/s;
     $p12_xml =~ m/.*?<$p12_data_tag>([\w\d\s+=\/]+?)<\/$p12_data_tag>.*?<$p12_pwd_tag>(.*?)<\/$p12_pwd_tag>.*?/s;
     if(! $p12_xml ) {
-        $self->seterror("Could not parse XML file. Incorrect format");
+        CertNanny::Logging->error("Could not parse XML file. Incorrect format");
         return;
     }
     
@@ -130,12 +130,12 @@ sub new
     $p12_data =~ s/\s//g;
     $p12_data = MIME::Base64::decode($p12_data);
     if(!$p12_data) {
-        $self->seterror("Could not retrieve PKCS#12 data.");
+        CertNanny::Logging->error("Could not retrieve PKCS#12 data.");
         return;
     }
     
     if(!$p12_pwd) {
-        $self->seterror("Could not get the PKCS#12 password, cannot parse data");
+        CertNanny::Logging->error("Could not get the PKCS#12 password, cannot parse data");
         return;
     }
     
@@ -170,8 +170,8 @@ sub get_pkcs12_file {
     my $self = shift;
     my $p12_file = $self->gettmpfile();
     my $p12_data = $self->{PKCS12}->{DATA};
-    if(!$self->write_file((FILENAME => $p12_file, CONTENT => $p12_data, FORCE => 1))) {
-        $self->seterror("Could not write temporary PKCS#12 file");
+    if(!CertNanny::Util->write_file((FILENAME => $p12_file, CONTENT => $p12_data, FORCE => 1))) {
+        CertNanny::Logging->error("Could not write temporary PKCS#12 file");
         return;
     }
     return $p12_file;
@@ -230,8 +230,8 @@ sub installcert {
     my $xml_filename = $p12_config->{XMLFILENAME};
     # This is the TEMPORARY file we store the keystore in
     my $new_p12_xml_file = File::Spec->catfile($tmp_dir, $xml_filename);
-    if(!$self->write_file((FILENAME => $new_p12_xml_file, CONTENT => $new_p12_xml, FORCE => 1))) {
-        $self->seterror("Could not create temporary file to store PKCS12 XML file");
+    if(!CertNanny::Util->write_file((FILENAME => $new_p12_xml_file, CONTENT => $new_p12_xml, FORCE => 1))) {
+        CertNanny::Logging->error("Could not create temporary file to store PKCS12 XML file");
         return;
     }
     
@@ -242,20 +242,20 @@ sub installcert {
     # This is the location for the NEW XML
     my $new_xml_file = File::Spec->catfile($certnanny_to_sap_dir, $xml_filename);
     if(! unlink $old_xml_file) {
-        $self->seterror("Could not delete old XML file. Will continue to prevent loss of renewed certificate.");
+        CertNanny::Logging->error("Could not delete old XML file. Will continue to prevent loss of renewed certificate.");
     }
     # temporary file written, move it to the certnanny_to_sap_dir
     if($^O eq "MSWin32") {
         if(!move($new_p12_xml_file, $new_xml_file)) {
             my $output = $!;
-            $self->seterror("Could not move temporary file to $certnanny_to_sap_dir: $output");
+            CertNanny::Logging->error("Could not move temporary file to $certnanny_to_sap_dir: $output");
             return;
         }
     } else {
         my $output = `mv "$new_p12_xml_file" "$new_xml_file"`;
         if($?) {
             chomp($output);
-            $self->seterror("Could not move temporary file to $certnanny_to_sap_dir: $output");
+            CertNanny::Logging->error("Could not move temporary file to $certnanny_to_sap_dir: $output");
             return;
         }
     }
