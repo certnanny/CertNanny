@@ -47,7 +47,7 @@ $VERSION = 0.10;
 
 #@EXPORT      = qw(...);       # Symbols to autoexport (:DEFAULT tag)
 
-
+my $INSTANCE;
 
 sub new 
 {
@@ -65,11 +65,27 @@ sub new
     return ($self);
 }
 
+sub DESTROY {
+    $INSTANCE=undef;
+}
+
 # get  file name
 sub getconfigfilename
 {
     my $self = shift;
     $self->{CONFIGFILE};
+}
+
+sub getInstance {
+	unless(defined $INSTANCE) {
+		my $proto = shift;
+		my %args = (
+			@_,		# argument pair list
+		);
+		$INSTANCE = CertNanny::Config->new(%args);
+	}
+	
+	return $INSTANCE;
 }
 
 
@@ -267,8 +283,10 @@ sub parse
 	    inherit_config($self->{CONFIG}->{$toplevel}, $entry);
         }
     }
+  
     1;
 }
+
 
 
 

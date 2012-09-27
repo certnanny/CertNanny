@@ -40,13 +40,18 @@ sub new
     # propagate PIN to class options
     $self->{PIN} = $self->{OPTIONS}->{ENTRY}->{pin};
 
-    foreach my $entry (qw( keyfile location )) {
-	if (! defined $self->{OPTIONS}->{ENTRY}->{$entry} ||
-	    (! -r $self->{OPTIONS}->{ENTRY}->{$entry})) {
-	    croak("keystore.$entry $self->{OPTIONS}->{ENTRY}->{$entry} not defined, does not exist or unreadable");
+    if (! defined $self->{OPTIONS}->{ENTRY}->{keyfile} ||
+	    (! -r $self->{OPTIONS}->{ENTRY}->{keyfile})
+	    && !defined $self->{OPTIONS}->{ENTRY}->{hsm}) {
+	    croak("keystore.keyfile $self->{OPTIONS}->{ENTRY}->{keyfile} not defined, does not exist or unreadable");
 	    return;
 	}
-    }
+	
+	if (! defined $self->{OPTIONS}->{ENTRY}->{location} ||
+	    (! -r $self->{OPTIONS}->{ENTRY}->{location})) {
+	    croak("keystore.location $self->{OPTIONS}->{ENTRY}->{location} not defined, does not exist or unreadable");
+	    return;
+	}
     
 
 
@@ -98,6 +103,36 @@ sub new
 	return;
     }
 
+    # if we want to use an HSM    
+    if($self->{OPTIONS}->{ENTRY}->{hsm}->{type}) {
+        my $hsmtype = $self->{OPTIONS}->{ENTRY}->{hsm}->{type};
+        my $entry_options = $self->{OPTIONS}->{ENTRY};
+        my $config = $self->{OPTIONS}->{CONFIG};
+        my $entryname = $self->{OPTIONS}->{ENTRYNAME};
+        CertNanny::Logging->debug("Using HSM $hsmtype");
+        eval "use CertNanny::HSM::$hsmtype";
+        if ($@) {
+            print STDERR $@;
+            return;
+        }
+        eval "\$self->{HSM} = CertNanny::HSM::$hsmtype->new(\$entry_options, \$config, \$entryname)";
+        if ($@ or not $self->{HSM}) {
+        	CertNanny::Logging->error("Could not instantiate HSM: ".$@);
+        	return;
+        }
+        
+        my $hsm = $self->{HSM};
+        unless($hsm->can('createrequest') and $hsm->can('genkey')) {
+            unless($hsm->can('engineid')) {
+    	        croak("HSM does not provide function engineid(), can not continue.");
+    	    }
+    	    
+    	    unless($hsm->can('keyform')) {
+    	        croak("HSM does not provide function keyform(), can not continue.");
+    	    }
+        }
+    }
+
     # get previous renewal status
     $self->retrieve_state() || return;
 
@@ -124,9 +159,9 @@ sub getcert {
     my $self = shift;
     my $filename = $self->{OPTIONS}->{ENTRY}->{location};
 
-    my $certdata = $self->read_file($filename);
+    my $certdata = CertNanny::Util->read_file($filename);
     if (! defined $certdata) {
-    	$self->seterror("getcert(): Could not read instance certificate file $filename");
+    	CertNanny::Logging->error("getcert(): Could not read instance certificate file $filename");
 	return;
     }
     
@@ -145,30 +180,40 @@ sub getkey {
     my $filename = $self->{OPTIONS}->{ENTRY}->{keyfile};
     my $openssl = $self->{OPTIONS}->{CONFIG}->get('cmd.openssl', 'FILE');
     if (! defined $openssl) {
-	$self->seterror("No openssl shell specified");
-	return;
-    }
-
-    my $keydata = $self->read_file($filename);
-    if (! defined $keydata || ($keydata eq "")) {
-	$self->seterror("getkey(): Could not read private key");
+	CertNanny::Logging->error("No openssl shell specified");
 	return;
     }
     
-    my $pin = $self->{PIN} || $self->{OPTIONS}->{ENTRY}->{pin};
+    unless($self->hasEngine()) {
+        my $keydata = CertNanny::Util->read_file($filename);
+        if (! defined $keydata || ($keydata eq "")) {
+    	CertNanny::Logging->error("getkey(): Could not read private key");
+    	return;
+        }
+        
+        my $pin = $self->{PIN} || $self->{OPTIONS}->{ENTRY}->{pin};
+        
+        my $keyformat = 'DER';
+        if ($keydata =~ m{ -----BEGIN.*KEY----- }xms) {
+    	$keyformat = 'PEM';
+        }
     
-    my $keyformat = 'DER';
-    if ($keydata =~ m{ -----BEGIN.*KEY----- }xms) {
-	$keyformat = 'PEM';
+        return (
+    	{ 
+    	    KEYDATA => $keydata,
+    	    KEYTYPE => $self->{KEYTYPE},
+    	    KEYFORMAT => $keyformat,
+    	    KEYPASS => $pin,
+    	});        
+    } else {
+        if($self->{HSM}->can('getkey')) {
+            return $self->{HSM}->getkey();
+        } else{
+            return $filename;    
+        }
     }
 
-    return (
-	{ 
-	    KEYDATA => $keydata,
-	    KEYTYPE => $self->{KEYTYPE},
-	    KEYFORMAT => $keyformat,
-	    KEYPASS => $pin,
-	});
+    
 }
 
 # create pkcs12 file
@@ -199,34 +244,34 @@ sub createpkcs12 {
 
     my $openssl = $self->{OPTIONS}->{CONFIG}->get('cmd.openssl', 'FILE');
     if (! defined $openssl) {
-	$self->seterror("No openssl shell specified");
+	CertNanny::Logging->error("No openssl shell specified");
 	return;
     }
 
     if (! defined $args{FILENAME}) {
-	$self->seterror("createpks12(): No output file name specified");
+	CertNanny::Logging->error("createpks12(): No output file name specified");
 	return;
     }
 
     if (! defined $args{CERTFILE}) {
-	$self->seterror("createpks12(): No certificate file specified");
+	CertNanny::Logging->error("createpks12(): No certificate file specified");
 	return;
     }
 
     if (! defined $args{KEYFILE}) {
-	$self->seterror("createpks12(): No key file specified");
+	CertNanny::Logging->error("createpks12(): No key file specified");
 	return;
     }
 
-    $self->debug("Certformat: $args{CERTFORMAT}");
+    CertNanny::Logging->debug("Certformat: $args{CERTFORMAT}");
 
     if (! defined $args{CERTFORMAT} or $args{CERTFORMAT} !~ /^(PEM|DER)$/) {
-	$self->seterror("createpks12(): Illegal certificate format specified");
+	CertNanny::Logging->error("createpks12(): Illegal certificate format specified");
 	return;
     }
 
     if (! defined $args{EXPORTPIN}) {
-	$self->seterror("createpks12(): No export PIN specified");
+	CertNanny::Logging->error("createpks12(): No export PIN specified");
 	return;
     }
 
@@ -252,11 +297,11 @@ sub createpkcs12 {
 		'PEM',
 		);
 
-	$self->log({ MSG => "Execute: " . join(" ", @cmd),
+	CertNanny::Logging->log({ MSG => "Execute: " . join(" ", @cmd),
 		     PRIO => 'debug' });
 	
 	if (run_command(join(' ', @cmd)) != 0) {
-	    $self->seterror("Certificate format conversion failed");
+	    CertNanny::Logging->error("Certificate format conversion failed");
 	    return;
 	}
     }
@@ -288,7 +333,7 @@ sub createpkcs12 {
 	my $fh = new IO::File(">$cachainfile");
 	if (! $fh)
 	{
-	    $self->seterror("createpkcs12(): Could not create temporary CA chain file");
+	    CertNanny::Logging->error("createpkcs12(): Could not create temporary CA chain file");
 	    return;
 	}
 	
@@ -301,11 +346,11 @@ sub createpkcs12 {
 	    my @RDN = split(/(?<!\\),\s*/, $entry->{CERTINFO}->{SubjectName});
 	    my $CN = $RDN[0];
 	    $CN =~ s/^CN=//;
-	    $self->debug("Adding CA certificate '$CN' in $file");
+	    CertNanny::Logging->debug("Adding CA certificate '$CN' in $file");
 
-	    my $content = $self->read_file($file);
+	    my $content = CertNanny::Util->read_file($file);
 	    if (! defined $content) {
-		$self->seterror("createpkcs12(): Could not read CA chain entry");
+		CertNanny::Logging->error("createpkcs12(): Could not read CA chain entry");
 		$fh->close;
 		unlink $cachainfile if (defined $cachainfile);
 		return;
@@ -334,11 +379,11 @@ sub createpkcs12 {
 	    );
 
 
-    $self->log({ MSG => "Execute: " . join(" ", @cmd),
+    CertNanny::Logging->log({ MSG => "Execute: " . join(" ", @cmd),
 		 PRIO => 'debug' });
 
     if (run_command(join(' ', @cmd)) != 0) {
-	$self->seterror("PKCS#12 export failed");
+	CertNanny::Logging->error("PKCS#12 export failed");
 	delete $ENV{PIN};
 	delete $ENV{EXPORTPIN};
 	unlink $certfile if ($args{CERTFORMAT} eq "DER");
@@ -361,41 +406,62 @@ sub generatekey {
     my $keyfile = $self->{OPTIONS}->{ENTRYNAME} . "-key.pem";
     my $outfile = File::Spec->catfile($self->{OPTIONS}->{ENTRY}->{statedir},
 				      $keyfile);
-
     my $pin = $self->{PIN} || $self->{OPTIONS}->{ENTRY}->{pin} || "";
+	my $bits = $self->{SIZE} || $self->{OPTIONS}->{ENTRY}->{size} ||'1024';
+	my $engine = $self->{ENGINE} || $self->{OPTIONS}->{ENTRY}->{engine} ||'no';
+	my $enginetype = $self->{ENGINETYPE} || $self->{OPTIONS}->{ENTRY}->{enginetype} ||'none';
+	my $enginename = $self->{ENGINENAME} || $self->{OPTIONS}->{ENTRY}->{enginename} ||'none';
+	#TODO Doku!
+	if ($self->hasEngine() and $self->{HSM}->can('genkey')){
+	    my $hsm = $self->{HSM};
+	    CertNanny::Logging->debug("Generating a new key using the configured HSM.");
+	    $outfile = $hsm->genkey();
+	    unless($outfile) {
+	        CertNanny::Logging->error("HSM could not generate new key.");
+	        return;
+	    }
+    } else{
+        CertNanny::Logging->debug("Generating a new key using native OpenSSL functionality.");
+    	my $openssl = $self->{OPTIONS}->{CONFIG}->get('cmd.openssl', 'FILE');
+    	if (! defined $openssl) {
+		CertNanny::Logging->error("No openssl shell specified");
+		return;
+    	}
 
-    my $openssl = $self->{OPTIONS}->{CONFIG}->get('cmd.openssl', 'FILE');
-    if (! defined $openssl) {
-	$self->seterror("No openssl shell specified");
-	return;
-    }
+	    my @passout = ();
+    	if (defined $pin and $pin ne "") {
+		@passout = ('-des3',
+			    '-passout',
+			    'env:PIN');
+	   	 }	
 
-    my $bits = '1024';
+        my @engine_cmd;
+         if($self->hasEngine()) {
+             my $hsm = $self->{HSM};
+             CertNanny::Logging->debug("Since an engine is used, setting required command line parameters.");
+             push(@engine_cmd, '-engine', $hsm->engineid());
+             push(@engine_cmd, '-keyform', $hsm->keyform()) if $hsm->keyform();
+         }
 
-    my @passout = ();
-    if (defined $pin and $pin ne "") {
-	@passout = ('-des3',
-		    '-passout',
-		    'env:PIN');
-    }
+    	# generate key
+    	my @cmd = (qq("$openssl"),
+	    	'genrsa',
+		   	'-out',
+	       	qq("$outfile"),
+	       	@passout,
+            @engine_cmd,
+	       	$bits);
 
-    # generate key
-    my @cmd = (qq("$openssl"),
-	       'genrsa',
-	       '-out',
-	       qq("$outfile"),
-	       @passout,
-	       $bits);
+	    CertNanny::Logging->log({ MSG => "Execute: " . join(" ", @cmd),
+			 PRIO => 'debug' });
 
-    $self->log({ MSG => "Execute: " . join(" ", @cmd),
-		 PRIO => 'debug' });
-
-    $ENV{PIN} = $pin;
-    if (run_command(join(' ', @cmd)) != 0) {
-	$self->seterror("RSA key generation failed");
-	delete $ENV{PIN};
-	return;
-    }
+	    $ENV{PIN} = $pin;
+	    if (run_command(join(' ', @cmd)) != 0) {
+		CertNanny::Logging->error("RSA key generation failed");
+		delete $ENV{PIN};
+		return;
+   		}
+	}
     chmod 0600, $outfile;
     delete $ENV{PIN};
     
@@ -404,109 +470,135 @@ sub generatekey {
 
 sub createrequest {
     my $self = shift;
-    $self->info("Creating request");
+    CertNanny::Logging->info("Creating request");
 
     #print Dumper $self;
     my $result = $self->generatekey();
     
     if (! defined $result) {
-	$self->seterror("Key generation failed");
+	CertNanny::Logging->error("Key generation failed");
 	return;
     }    
-
+    
     my $requestfile = $self->{OPTIONS}->{ENTRYNAME} . ".csr";
     $result->{REQUESTFILE} = 
 	File::Spec->catfile($self->{OPTIONS}->{ENTRY}->{statedir},
 			    $requestfile);
-
-    my $pin = $self->{PIN} || $self->{OPTIONS}->{ENTRY}->{pin} || "";
-
-    my $openssl = $self->{OPTIONS}->{CONFIG}->get('cmd.openssl', 'FILE');
-    if (! defined $openssl) {
-	$self->seterror("No openssl shell specified");
-	return;
-    }
-
-    my $DN = $self->{CERT}->{INFO}->{SubjectName};
-
-    $self->debug("DN: $DN");
-    # split DN into individual RDNs. This regex splits at the ','
-    # character if it is not escaped with a \ (negative look-behind)
-    my @RDN = split(/(?<!\\),\s*/, $DN);
     
-    my %RDN_Count;
-    foreach (@RDN) {
-	my ($key, $value) = (/(.*?)=(.*)/);
-	$RDN_Count{$key}++;
-    }
-
-    # delete all entries that only showed up once
-    # all other keys now indicate the total number of appearance
-    map { delete $RDN_Count{$_} if ($RDN_Count{$_} == 1); } keys %RDN_Count;
-
-    # create OpenSSL config file
-    my $tmpconfigfile = $self->gettmpfile();
-    my $fh = new IO::File(">$tmpconfigfile");
-    if (! $fh)
-    {
-    	$self->seterror("createrequest(): Could not create temporary OpenSSL config file");
+    if($self->hasEngine() and $self->{HSM}->can('createrequest')) {
+        CertNanny::Logging->debug("Creating new CSR with HSM.");
+        $result = $self->{HSM}->createrequest($result);
+    } else {
+        my $pin = $self->{PIN} || $self->{OPTIONS}->{ENTRY}->{pin} || "";
+        CertNanny::Logging->debug("Creating new CSR with native OpenSSL functionality.");
+    
+        my $openssl = $self->{OPTIONS}->{CONFIG}->get('cmd.openssl', 'FILE');
+        if (! defined $openssl) {
+    	CertNanny::Logging->error("No openssl shell specified");
     	return;
-    }
-    print $fh "[ req ]\n";
-    print $fh "prompt = no\n";
-    print $fh "distinguished_name = req_distinguished_name\n";
+        }
     
-    # handle subject alt name
-    if (exists $self->{CERT}->{INFO}->{SubjectAlternativeName}) {
-	print $fh "req_extensions = v3_ext\n";
-    }
+        my $DN = $self->{CERT}->{INFO}->{SubjectName};
     
-    print $fh "[ req_distinguished_name ]\n";
-    foreach (reverse @RDN) {
-	my ($key, $value) = (/(.*?)=(.*)/);
-	if (exists $RDN_Count{$key}) {
-	    print $fh $RDN_Count{$key} . ".";
-	    $RDN_Count{$key}--;
-	}
-	print $fh $_ . "\n";
-    }
+        CertNanny::Logging->debug("DN: $DN");
+        # split DN into individual RDNs. This regex splits at the ','
+        # character if it is not escaped with a \ (negative look-behind)
+        my @RDN = split(/(?<!\\),\s*/, $DN);
+        
+        my %RDN_Count;
+        foreach (@RDN) {
+    	my ($key, $value) = (/(.*?)=(.*)/);
+    	$RDN_Count{$key}++;
+        }
     
-    if (exists $self->{CERT}->{INFO}->{SubjectAlternativeName}) {
-	my $san = $self->{CERT}->{INFO}->{SubjectAlternativeName};
-	$san =~ s{ IP\ Address: }{IP:}xmsg;
-	print $fh "[ v3_ext ]\n";
-	print $fh "subjectAltName = $san\n";
-    }
+        # delete all entries that only showed up once
+        # all other keys now indicate the total number of appearance
+        map { delete $RDN_Count{$_} if ($RDN_Count{$_} == 1); } keys %RDN_Count;
     
-    $fh->close();
-
-    # generate request
-    my @cmd = (qq("$openssl"),
-	       'req',
-	       '-config',
-	       qq("$tmpconfigfile"),
-	       '-new',
-	       '-sha1',
-	       '-out',
-	       qq("$result->{REQUESTFILE}"),
-	       '-key',
-	       qq("$result->{KEYFILE}"),
-	);
-
-    push (@cmd, ('-passin', 'env:PIN')) unless $pin eq "";
-
-    $self->log({ MSG => "Execute: " . join(" ", @cmd),
-		 PRIO => 'debug' });
-
-    $ENV{PIN} = $pin;
-    if (run_command(join(' ', @cmd)) != 0) {
-	$self->seterror("Request creation failed");
-	delete $ENV{PIN};
-	unlink $tmpconfigfile;
-	return;
+        
+        # create OpenSSL config file
+        my $config_options = CertNanny::Util->getDefaultOpenSSLConfig();
+        $config_options->{req} = [];
+        push(@{$config_options->{req}}, {prompt => "no"});
+        push(@{$config_options->{req}}, {distinguished_name => "req_distinguished_name"});
+        
+        # handle subject alt name
+        if (exists $self->{CERT}->{INFO}->{SubjectAlternativeName}) {
+    	   push(@{$config_options->{req}}, {req_extensions => "v3_ext"});
+        }
+        
+        
+        $config_options->{req_distinguished_name} = [];
+        foreach (reverse @RDN) {
+            my $rdnstr = "";
+        	my ($key, $value) = (/(.*?)=(.*)/);
+        	if (exists $RDN_Count{$key}) {
+        	    $rdnstr = $RDN_Count{$key} . ".";
+        	    $RDN_Count{$key}--;
+        	}
+        	
+        	$rdnstr .= $key; 
+        	push(@{$config_options->{req_distinguished_name}}, {$rdnstr => $value});
+        }
+        
+        if (exists $self->{CERT}->{INFO}->{SubjectAlternativeName}) {
+        	my $san = $self->{CERT}->{INFO}->{SubjectAlternativeName};
+        	$san =~ s{ IP\ Address: }{IP:}xmsg;
+        	$config_options->{v3_ext} = [];
+        	push(@{$config_options->{v3_ext}}, {subjectAltName => $san});
+        }
+        
+        my @engine_cmd;
+        if($self->hasEngine()) {
+    	    my $hsm = $self->{HSM};
+    	    CertNanny::Logging->debug("Setting required engine parameters for HSM.");
+    	    my $engine_id = $hsm->engineid();
+    	    push(@engine_cmd, '-engine', $engine_id);
+    	    
+    	    if($hsm->keyform()) {
+    	        push(@engine_cmd, '-keyform', $hsm->keyform());
+    	    }
+    	    
+    	    my $engine_config = $self->{HSM}->getEngineConfiguration();
+    	    if($engine_config) {
+    	        my $engine_section = "${engine_id}_section";
+                $config_options->{engine_section} = [];
+                push(@{$config_options->{engine_section}}, {$engine_id => "${engine_id}_section"});
+                $config_options->{$engine_section} = $engine_config;
+    	    }
+    	}
+        
+        my $tmpconfigfile = CertNanny::Util->writeOpenSSLConfig($config_options);
+        CertNanny::Logging->debug("The following configuration was written to $tmpconfigfile:\n" . CertNanny::Util->read_file($tmpconfigfile));
+    
+        # generate request
+        my @cmd = (qq("$openssl"),
+    	       'req',
+    	       '-config',
+    	       qq("$tmpconfigfile"),
+    	       '-new',
+    	       '-sha1',
+    	       '-out',
+    	       qq("$result->{REQUESTFILE}"),
+    	       '-key',
+    	       qq("$result->{KEYFILE}"),
+    	);
+        push (@cmd, ('-passin', 'env:PIN')) unless $pin eq "";
+        push (@cmd, @engine_cmd);
+    
+        CertNanny::Logging->log({ MSG => "Execute: " . join(" ", @cmd),
+    		 PRIO => 'debug' });
+    
+        $ENV{PIN} = $pin;
+        if (run_command(join(' ', @cmd)) != 0) {
+    	CertNanny::Logging->error("Request creation failed");
+    	delete $ENV{PIN};
+    	unlink $tmpconfigfile;
+    	return;
+        }
+        delete $ENV{PIN};
+        unlink $tmpconfigfile;
     }
-    delete $ENV{PIN};
-    unlink $tmpconfigfile;
 
     return $result;
 }
@@ -528,27 +620,39 @@ sub installcert {
 
     ######################################################################
     ### private key...
-    my $newkey = $self->convertkey(
-	KEYFILE => $keyfile,
-	KEYFORMAT => 'PEM',
-	KEYTYPE   => 'OpenSSL',
-	KEYPASS   => $pin,
-	OUTFORMAT => $self->{KEYFORMAT},
-	OUTTYPE   => $self->{KEYTYPE},
-	OUTPASS   => $pin,
-	);
-
-    if (! defined $newkey) {
-	$self->seterror("Could not read/convert new key");
-	return;
+    my $newkey;
+    unless($self->hasEngine() and $self->{HSM}->keyform() ne "file") {
+        unless($self->hasEngine()) {
+            $newkey = $self->convertkey(
+        	KEYFILE => $keyfile,
+        	KEYFORMAT => 'PEM',
+        	KEYTYPE   => 'OpenSSL',
+        	KEYPASS   => $pin,
+        	OUTFORMAT => $self->{KEYFORMAT},
+        	OUTTYPE   => $self->{KEYTYPE},
+        	OUTPASS   => $pin,
+        	);
+        } else {
+            my $keydata = CertNanny::Util->read_file($keyfile);
+            $newkey->{KEYDATA} = $keydata;
+            # the following data is probably not necessary, but we emulate convertkey here
+            $newkey->{KEYFORMAT} = $self->{KEYFORMAT};
+            $newkey->{KEYTYPE} = $self->{KEYTYPE};
+            $newkey->{KEYPASS} = $pin;
+        }
+    
+        if (! defined $newkey) {
+    	CertNanny::Logging->error("Could not read/convert new key");
+    	return;
+        }
+    
+        push(@newkeystore, 
+    	 {
+    	     DESCRIPTION => "End entity private key",
+    	     FILENAME    => $self->{OPTIONS}->{ENTRY}->{keyfile},
+    	     CONTENT     => $newkey->{KEYDATA},
+    	 });
     }
-
-    push(@newkeystore, 
-	 {
-	     DESCRIPTION => "End entity private key",
-	     FILENAME    => $self->{OPTIONS}->{ENTRY}->{keyfile},
-	     CONTENT     => $newkey->{KEYDATA},
-	 });
     
     
     ######################################################################
@@ -560,7 +664,7 @@ sub installcert {
 	);
 
     if (! defined $newcert) {
-	$self->seterror("Could not read/convert new certificate");
+	CertNanny::Logging->error("Could not read/convert new certificate");
 	return;
     }
 
@@ -603,7 +707,7 @@ sub installcert {
 		     CONTENT     => $cacert->{CERTDATA},
 		 });
 	} else {
-	    $self->seterror("Could not convert CA certificate for level $ii");
+	    CertNanny::Logging->error("Could not convert CA certificate for level $ii");
 	    return;
 	}
 	$ii++;
@@ -616,7 +720,7 @@ sub installcert {
 	my $fh = new IO::File(">" . $self->{OPTIONS}->{ENTRY}->{rootcacertbundle});
 	if (! $fh)
 	{
-	    $self->seterror("installcert(): Could not create Root CA certificate bundle file");
+	    CertNanny::Logging->error("installcert(): Could not create Root CA certificate bundle file");
 	    return;
 	}
 
@@ -628,7 +732,7 @@ sub installcert {
 	    
 	    if (! defined $cert)
 	    {
-		$self->seterror("installcert(): Could not convert root certificate $entry->{CERTFILE}");
+		CertNanny::Logging->error("installcert(): Could not convert root certificate $entry->{CERTFILE}");
 		return;
 	    }
 
@@ -663,7 +767,7 @@ sub installcert {
 
 	# sanity check
 	if (! -d $dir || ! -w $dir) {
-	    $self->seterror("installcert(): Root CA certificate target directory $dir does not exist or is not writable");
+	    CertNanny::Logging->error("installcert(): Root CA certificate target directory $dir does not exist or is not writable");
 	    return;
 	}
 
@@ -676,7 +780,7 @@ sub installcert {
 	    
 	    if (! defined $cert)
 	    {
-		$self->seterror("installcert(): Could not convert root certificate $entry->{CERTFILE}");
+		CertNanny::Logging->error("installcert(): Could not convert root certificate $entry->{CERTFILE}");
 		return;
 	    }
 
@@ -689,12 +793,12 @@ sub installcert {
 		$dir,
 		$filename);
 	    
-	    if (! $self->write_file(
+	    if (! CertNanny::Util->write_file(
 		      FILENAME => $filename,
 		      CONTENT  => $cert->{CERTDATA},
 		      FORCE    => 1,
 		)) {
-		$self->seterror("installcert(): Could not write root certificate $filename");
+		CertNanny::Logging->error("installcert(): Could not write root certificate $filename");
 		return;
 	    }
 
@@ -706,11 +810,16 @@ sub installcert {
     # try to write the new keystore 
 
     if (! $self->installfile(@newkeystore)) {
-	$self->seterror("Could not install new keystore");
+	CertNanny::Logging->error("Could not install new keystore");
 	return;
     }
 	   
     return 1;
+}
+
+sub hasEngine {
+    my $self = shift;
+    return defined $self->{HSM};
 }
 
 

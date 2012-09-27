@@ -21,6 +21,7 @@ use lib "$FindBin::Bin/../lib/perl";
 
 use CertNanny;
 
+
 if ($OSNAME eq "MSWin32") {
     require Win32;
     Win32->import();
@@ -50,6 +51,7 @@ GetOptions(\%config,
 	      cfg|cfgfile|conf|config=s
 			win_user=s
 			win_password=s
+		  sleep=i
 	      )) or pod2usage(-msg => $msg, -verbose => 0);
 
 pod2usage(-exitstatus => 0, -verbose => 2) if $config{man};
@@ -59,7 +61,9 @@ pod2usage(-msg => $msg, -verbose => 1) if ($config{help} or
 die "Could not read config file $config{cfg}. Stopped" 
     unless (-r $config{cfg});
 
-my $monitor = CertNanny->new(CONFIG => $config{cfg});
+my $monitor = CertNanny->getInstance(CONFIG => $config{cfg});
+$config{sleep} = 300 if !defined $config{sleep};
+$monitor->setOption("sleep", $config{sleep});
 
 foreach my $cmd (@ARGV) {
 	if ($OSNAME eq 'MSWin32') {
@@ -68,16 +72,24 @@ foreach my $cmd (@ARGV) {
 		if ($cmd eq "install") {
 			my $cfgpath = $config{cfg};
 			my $servicepath= File::Spec->catfile($FindBin::Bin, $FindBin::Script);
-			
+			my $executable_name = $EXECUTABLE_NAME;
+			if($servicepath =~ /\w+\.exe/) {
+			    $executable_name = $servicepath;
+			}
+			my $params_str = "";
+			if($executable_name ne $servicepath) {
+			    $params_str = qq{"$servicepath"};
+			}
+			$params_str = qq{$params_str --cfg "$cfgpath" --sleep $config{sleep}};
 			my $ret = Win32::Daemon::CreateService({
 				machine =>  '',
 				name    =>  $servicename,
 				display =>  $servicename,
-				path    =>  $EXECUTABLE_NAME,
+				path    =>  $executable_name,
 				user    =>  $config{win_user} || "",
 				pwd     =>  $config{win_password} || "",
 				description => 'Automatic certificate renewal',
-				parameters =>qq{"$servicepath" --cfg "$cfgpath"},
+				parameters =>$params_str,
 			});
 			
 			if ($ret) {
@@ -188,7 +200,8 @@ if ($OSNAME eq 'MSWin32') {
       {
 	        print $LOG "currtime > starttime\n";
 	  	# reinstantiate CertNanny object (make sure that destructor gets called)
-		$monitor = CertNanny->new(CONFIG => $config{cfg});
+	  	$monitor = undef;
+		$monitor = CertNanny->getInstance(CONFIG => $config{cfg});
 		print $LOG "new monitor object\n";
 		# The service is running as normal...
 		# ...add the main code here...
@@ -196,11 +209,15 @@ if ($OSNAME eq 'MSWin32') {
 		print $LOG "stdout/stderr redirect\n";
 
 		my $rc;
+		print $LOG "Starting renewal...";
 		eval {
 			$rc = $monitor->renew();
 		};
-		print $LOG "EVAL_ERROR? " . $EVAL_ERROR;
-	        print $LOG "renew was called: $rc\n";
+		if($rc != 0) {
+		    print $LOG "There was an error executing CertNanny monitor object\n";
+		    print $LOG $@;
+		}
+		print $LOG "Renewal finished...";
 
 	 
 		#if the renewal was successful the starttime will be increased by one day (86400 seconds -> 24hours -> 3600 seconds per hour)
@@ -960,7 +977,7 @@ Default: new
 
 Example: old
 
-=item keystore.LABEL.scepurl
+=item keystore.LABEL.enroll.sscep.URL
 
 URL of the SCEP Server to use
 
