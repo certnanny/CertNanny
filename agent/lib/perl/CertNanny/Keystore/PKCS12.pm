@@ -72,6 +72,17 @@ sub DESTROY {
     $self->SUPER::DESTROY if $self->can("SUPER::DESTROY");
 }
 
+# returns filename with all PKCS#12 data
+sub get_pkcs12_file {
+    my $self = shift;
+    return $self->{OPTIONS}->{ENTRY}->{location};
+}
+
+sub get_pin {
+    my $self;
+    return $self->{PIN};
+}
+
 
 # extract certificate
 sub getcert {
@@ -83,8 +94,8 @@ sub getcert {
 	return;
     }
     
-    my $filename = $self->{OPTIONS}->{ENTRY}->{location};
-    my $pin = $self->{OPTIONS}->{ENTRY}->{pin};
+    my $filename = $self->get_pkcs12_file();
+    my $pin = $self->get_pin();
 
     my @passin = ();
     if (defined $pin) {
@@ -148,8 +159,8 @@ sub getkey {
 	return;
     }
     
-    my $filename = $self->{OPTIONS}->{ENTRY}->{location};
-    my $pin = $self->{OPTIONS}->{ENTRY}->{pin};
+    my $filename = $self->get_pkcs12_file();
+    my $pin = $self->get_pin();
 
     my @passin = ();
     if (defined $pin) {
@@ -218,19 +229,11 @@ sub createrequest {
     return;
 }
 
-
-
-# This method is called once the new certificate has been received from
-# the SCEP server. Its responsibility is to create a new keystore containing
-# the new key, certificate, CA certificate keychain and collection of Root
-# certificates configured for CertNanny.
-# A true return code indicates that the keystore was installed properly.
-sub installcert {
+sub get_new_pkcs12_data {
     my $self = shift;
     my %args = ( 
 		 @_,         # argument pair list
 		 );
-
     # create prototype PKCS#12 file
     my $keyfile = $self->{STATE}->{DATA}->{RENEWAL}->{REQUEST}->{KEYFILE};
     my $certfile = $args{CERTFILE}; 
@@ -250,7 +253,7 @@ sub installcert {
     my $pkcs12file = $self->createpkcs12(
 	FILENAME => $self->gettmpfile(),
 	FRIENDLYNAME => $label,
-	EXPORTPIN => $self->{PIN},
+	EXPORTPIN => $self->get_pin(),
 	CACHAIN => \@cachain);
     
     
@@ -267,6 +270,25 @@ sub installcert {
 	CertNanny::Logging->error("Could read new keystore file " . $pkcs12file);
 	return;
     }
+    
+    return $data;
+}
+
+
+
+# This method is called once the new certificate has been received from
+# the SCEP server. Its responsibility is to create a new keystore containing
+# the new key, certificate, CA certificate keychain and collection of Root
+# certificates configured for CertNanny.
+# A true return code indicates that the keystore was installed properly.
+sub installcert {
+    my $self = shift;
+    my %args = ( 
+		 @_,         # argument pair list
+		 );
+
+    my $data = $self->get_new_pkcs12_data(%args);
+    return unless $data;
 
     my @newkeystore;
     # schedule for installation
