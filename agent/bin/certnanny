@@ -21,6 +21,7 @@ use lib "$FindBin::Bin/../lib/perl";
 
 use CertNanny;
 
+
 if ($OSNAME eq "MSWin32") {
     require Win32;
     Win32->import();
@@ -79,7 +80,7 @@ foreach my $cmd (@ARGV) {
 			if($executable_name ne $servicepath) {
 			    $params_str = qq{"$servicepath"};
 			}
-			$params_str = qq{$params_str --cfg "$cfgpath"};
+			$params_str = qq{$params_str --cfg "$cfgpath" --sleep $config{sleep}};
 			my $ret = Win32::Daemon::CreateService({
 				machine =>  '',
 				name    =>  $servicename,
@@ -199,7 +200,8 @@ if ($OSNAME eq 'MSWin32') {
       {
 	        print $LOG "currtime > starttime\n";
 	  	# reinstantiate CertNanny object (make sure that destructor gets called)
-		$monitor = CertNanny->new(CONFIG => $config{cfg});
+	  	$monitor = undef;
+		$monitor = CertNanny->getInstance(CONFIG => $config{cfg});
 		print $LOG "new monitor object\n";
 		# The service is running as normal...
 		# ...add the main code here...
@@ -207,11 +209,15 @@ if ($OSNAME eq 'MSWin32') {
 		print $LOG "stdout/stderr redirect\n";
 
 		my $rc;
+		print $LOG "Starting renewal...";
 		eval {
 			$rc = $monitor->renew();
 		};
-		print $LOG "EVAL_ERROR? " . $EVAL_ERROR;
-	        print $LOG "renew was called: $rc\n";
+		if($rc != 0) {
+		    print $LOG "There was an error executing CertNanny monitor object\n";
+		    print $LOG $@;
+		}
+		print $LOG "Renewal finished...";
 
 	 
 		#if the renewal was successful the starttime will be increased by one day (86400 seconds -> 24hours -> 3600 seconds per hour)
