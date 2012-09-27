@@ -1,4 +1,3 @@
-<<<<<<< HEAD:agent/lib/perl/__Win32/DAEMON.PM
 #//////////////////////////////////////////////////////////////////////////////
 #//
 #//  Daemon.pm
@@ -2100,4 +2099,3 @@ This library is free software and may be distributed under the same terms
 as perl itself.
 
 =cut
->>>>>>> hotfix/sap:agent/lib/perl/Win32/DAEMON.PM
