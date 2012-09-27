@@ -65,6 +65,10 @@ sub new
     return ($self);
 }
 
+sub DESTROY {
+    $INSTANCE=undef;
+}
+
 # get  file name
 sub getconfigfilename
 {
