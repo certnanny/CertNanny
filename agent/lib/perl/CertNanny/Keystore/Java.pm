@@ -376,7 +376,7 @@ sub installcert {
     my $alias = $entry->{alias};
     my $timestamp = time();
     my $backupalias = "old-${alias}-${timestamp}";
-    if(!$self->changealias($alias, $backupalias)) {
+    if(!$self->changealias($alias, $backupalias, $location)) {
         CertNanny::Logging->error("Could not change old key's alias from $alias to $backupalias. Cannot proceed with certificate installation.");
         return;
     }
@@ -427,22 +427,22 @@ sub installcert {
     
     # rename the new key to the old key's alias
     my $newkeyalias = $self->getnewkey();
-    if(!$self->changealias($newkeyalias, $alias)) {
+    if(!$self->changealias($newkeyalias, $alias, $location)) {
         CertNanny::Logging->error("Could not rename new key to old key's alias from $newkeyalias to $alias. Rolling back previous renaming to get back the old store");
-        if(!$self->changealias($backupalias, $alias)) {
+        if(!$self->changealias($backupalias, $alias, $location)) {
             CertNanny::Logging->error("Could not even rename the old key back to its previous name. Something is seriously wrong. Keystore might be broken, please investigate!");
             return;
         }
     }
     
     # install the new cert with the old alias
-    if(!$self->importcert($args{CERTFILE}, $alias)) {
+    if(!$self->importcert($args{CERTFILE}, $alias, $location)) {
         CertNanny::Logging->error("Could not import the new certificate. Currently active key has no valid certificate. Rolling back previous renaming to get back working store.");
-        if(!$self->changealias($alias, $newkeyalias)) {
+        if(!$self->changealias($alias, $newkeyalias, $location)) {
             CertNanny::Logging->error("Could not rename the new key back to its previous alias. Thus cannot restore old key's alias. Keystore might be broken, please investigate!");
             return;
         }
-        if(!$self->changealias($backupalias, $alias)) {
+        if(!$self->changealias($backupalias, $alias, $location)) {
             CertNanny::Logging->error("Could not rename the old key back to its previous name. Keystore might be broken, please investigate!");
             return;
         }
@@ -469,7 +469,7 @@ sub importcert {
     my $self = shift;
     my $certfile = shift;
     my $alias = shift;
-    my $location = $self->{OPTIONS}->{ENTRY}->{location};
+    my $location = shift || $self->{OPTIONS}->{ENTRY}->{location};
     
     my @cmd = $self->keytoolcmd($location, '-import', '-noprompt', -alias => qq{"$alias"}, -file => qq{"$certfile"});
     CertNanny::Logging->info("Importing certificate with alias $alias");
@@ -485,7 +485,7 @@ sub changealias {
     my $self = shift;
     my $alias = shift;
     my $destalias = shift;
-    my $location = $self->{OPTIONS}->{ENTRY}->{location};
+    my $location = shift || $self->{OPTIONS}->{ENTRY}->{location};
     my @cmd = ('-changealias', );
     push(@cmd, '-alias');
     push(@cmd, qq{"$alias"});
