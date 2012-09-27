@@ -135,6 +135,7 @@ sub iterate_entries
 	{
 	    print "LOG: [error] Could not instantiate keystore $entry\n" if ($loglevel >= 1);
 	}
+	print "\n\n";
     }
 
     return $rc;
