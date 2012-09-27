@@ -1,0 +1,64 @@
+; Create a new request with a new keypair
+[NewRequest]
+;The following has no effect on the -new command and is thus not included
+;Exportable=TRUE
+
+;Choose your desired key length in bits. Common values are 1024, 2048 and 4096.
+;Use 2048 if not otherwise required.
+KeyLength=2048
+
+;Defines key usage. A key can be used either for signature only or for both encryption and signature
+;The motivation behind this is that a signature only key will never be exportable while encryption keys
+;are possibly archived when they expire (so they are only used for decryption of old data)
+;1 stands for encryption and signature (both)
+;2 stands for signature only
+;If you want encryption only, take a look at EncipherOnly
+KeySpec=2
+
+;The key usage can be used to more specifically determine the usage of the key.
+;Default usage is 0xa0, if unsure, keep it (does not need to be enabled)
+;KeyUsage=0xa0
+;WARNING! The next settings enables ALL usages:
+;KeyUsage=0xff
+
+;enable this if you want to use machine storage and not user storage.
+;May be useful when running a server that uses the machine storage
+;MachineKeySet=TRUE
+
+;Do not enable the next one unless you know what you are doing
+;This is for CMC only
+;PrivateKeyArchive=TRUE
+
+;This setting determines the provider to use. A default provider is pre-configured and can probably just stay
+;If you need a list of possible providers run "certutil -csplist"
+; Warning: The base provide can not be used for a 2048 bit key.
+ProviderName="Microsoft Enhanced Cryptographic Provider v1.0"
+
+;The ProviderType parameter relies on the selected provider above and can also be seen by "certutil -csplist"
+;For the above default provider you can probably keep the setting
+ProviderType=1
+
+;The requester name is only relevant for PKCS7 and CMC, not PKCS10.
+;Requestername=""
+
+;The request type (format). Use CMC only if you specifically want it.
+;PKCS7 is used for signing/encryption, if you know you need this, choose it
+;PKCS10 is the standard CSR-format, so leave it if unsure
+RequestType=PKCS10
+
+;The silent option determines whether the user may be prompted for anything
+;This may be needed if it is mandatory to not have any user interaction
+;Silent=TRUE
+
+;If you plan on using SMIME for encryption then choose this one to true (and set the KeySpec to be used for encryption)
+;If unsure leave it commented out
+;SMIME=TRUE
+
+;This is IMPORTANT!
+;This is a mandatory field you need to change! Set it to the desired CN including any other data needed
+;for example set it to
+;NOTE: If using the file with CertNanny, you do not set anything here, as CertNanyn will overwrite it!
+;Subject="CN=John Smith,CN=Users,DC=Contoso,DC=com"
+
+;Enable this value if you wish to recieve a password prompt to protect your generated private key
+;UserProtected=TRUE

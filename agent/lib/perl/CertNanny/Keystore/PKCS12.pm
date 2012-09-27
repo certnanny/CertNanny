@@ -42,7 +42,7 @@ sub new
     $self->{PIN} = $self->{OPTIONS}->{ENTRY}->{pin};
 
     # sample sanity checks for configuration settings
-    foreach my $entry qw( location ) {
+    foreach my $entry (qw( location )) {
  	if (! defined $self->{OPTIONS}->{ENTRY}->{$entry} ||
  	    (! -r $self->{OPTIONS}->{ENTRY}->{$entry})) {
  	    croak("keystore.$entry $self->{OPTIONS}->{ENTRY}->{$entry} not defined, does not exist or unreadable");
@@ -72,6 +72,17 @@ sub DESTROY {
     $self->SUPER::DESTROY if $self->can("SUPER::DESTROY");
 }
 
+# returns filename with all PKCS#12 data
+sub get_pkcs12_file {
+    my $self = shift;
+    return $self->{OPTIONS}->{ENTRY}->{location};
+}
+
+sub get_pin {
+    my $self;
+    return $self->{PIN};
+}
+
 
 # extract certificate
 sub getcert {
@@ -79,12 +90,12 @@ sub getcert {
 
     my $openssl = $self->{OPTIONS}->{CONFIG}->get('cmd.openssl', 'FILE');
     if (! defined $openssl) {
-	$self->seterror("No openssl shell specified");
+	CertNanny::Logging->error("No openssl shell specified");
 	return;
     }
     
-    my $filename = $self->{OPTIONS}->{ENTRY}->{location};
-    my $pin = $self->{OPTIONS}->{ENTRY}->{pin};
+    my $filename = $self->get_pkcs12_file();
+    my $pin = $self->get_pin();
 
     my @passin = ();
     if (defined $pin) {
@@ -106,8 +117,8 @@ sub getcert {
 
     my $cmd = join(' ', @cmd);
     my $handle;
-    if (! open $handle, "$cmd 2>/dev/null |") {
-	$self->seterror("could not run OpenSSL shell");
+    if (! open $handle, "$cmd |") {
+	CertNanny::Logging->error("could not run OpenSSL shell");
 	delete $ENV{PIN};
 	return;
     }
@@ -144,12 +155,12 @@ sub getkey {
 
     my $openssl = $self->{OPTIONS}->{CONFIG}->get('cmd.openssl', 'FILE');
     if (! defined $openssl) {
-	$self->seterror("No openssl shell specified");
+	CertNanny::Logging->error("No openssl shell specified");
 	return;
     }
     
-    my $filename = $self->{OPTIONS}->{ENTRY}->{location};
-    my $pin = $self->{OPTIONS}->{ENTRY}->{pin};
+    my $filename = $self->get_pkcs12_file();
+    my $pin = $self->get_pin();
 
     my @passin = ();
     if (defined $pin) {
@@ -175,7 +186,7 @@ sub getkey {
     my $cmd = join(' ', @cmd);
     my $handle;
     if (! open $handle, "$cmd |") {
-	$self->seterror("could not run OpenSSL shell");
+	CertNanny::Logging->error("could not run OpenSSL shell");
 	delete $ENV{PIN};
 	return;
     }
@@ -218,25 +229,17 @@ sub createrequest {
     return;
 }
 
-
-
-# This method is called once the new certificate has been received from
-# the SCEP server. Its responsibility is to create a new keystore containing
-# the new key, certificate, CA certificate keychain and collection of Root
-# certificates configured for CertNanny.
-# A true return code indicates that the keystore was installed properly.
-sub installcert {
+sub get_new_pkcs12_data {
     my $self = shift;
     my %args = ( 
 		 @_,         # argument pair list
 		 );
-
     # create prototype PKCS#12 file
     my $keyfile = $self->{STATE}->{DATA}->{RENEWAL}->{REQUEST}->{KEYFILE};
     my $certfile = $args{CERTFILE}; 
     my $label = $self->{CERT}->{LABEL};
     
-    $self->info("Creating prototype PKCS#12 from certfile $certfile, keyfile $keyfile, label $label");
+    CertNanny::Logging->info("Creating prototype PKCS#12 from certfile $certfile, keyfile $keyfile, label $label");
 
     # all trusted Root CA certificates...
     my @cachain = @{$self->{STATE}->{DATA}->{ROOTCACERTS}};
@@ -250,23 +253,42 @@ sub installcert {
     my $pkcs12file = $self->createpkcs12(
 	FILENAME => $self->gettmpfile(),
 	FRIENDLYNAME => $label,
-	EXPORTPIN => $self->{PIN},
+	EXPORTPIN => $self->get_pin(),
 	CACHAIN => \@cachain);
     
     
     if (! defined $pkcs12file) {
-	$self->seterror("Could not create prototype PKCS#12 from received certificate");
+	CertNanny::Logging->error("Could not create prototype PKCS#12 from received certificate");
 	return;
     }
-    $self->info("Created prototype PKCS#12 file $pkcs12file");
+    CertNanny::Logging->info("Created prototype PKCS#12 file $pkcs12file");
 
 
-    my $data = $self->read_file($pkcs12file);
+    my $data = CertNanny::Util->read_file($pkcs12file);
     unlink $pkcs12file;
     if (! defined $data) {
-	$self->seterror("Could read new keystore file " . $pkcs12file);
+	CertNanny::Logging->error("Could read new keystore file " . $pkcs12file);
 	return;
     }
+    
+    return $data;
+}
+
+
+
+# This method is called once the new certificate has been received from
+# the SCEP server. Its responsibility is to create a new keystore containing
+# the new key, certificate, CA certificate keychain and collection of Root
+# certificates configured for CertNanny.
+# A true return code indicates that the keystore was installed properly.
+sub installcert {
+    my $self = shift;
+    my %args = ( 
+		 @_,         # argument pair list
+		 );
+
+    my $data = $self->get_new_pkcs12_data(%args);
+    return unless $data;
 
     my @newkeystore;
     # schedule for installation
@@ -279,7 +301,7 @@ sub installcert {
     
 
     if (! $self->installfile(@newkeystore)) {   # if any error happened
-	$self->seterror("Could not install new keystore");
+	CertNanny::Logging->error("Could not install new keystore");
 	return;
     }
     

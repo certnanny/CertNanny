@@ -89,14 +89,14 @@
 
 <!--Main Components-->
 	<DirectoryRef Id='INSTALLDIR'>
-		<Directory Id='ETC' Name='etc'>
-				<Component Id='etccomponent' Guid='8351C338-3C7E-11E1-AC51-C4C74724019B'>
-					<File Id='config' Name='certnanny.cfg' Source='certnanny.cfg' KeyPath='yes'>
-					</File>
-				</Component>
+		<Directory Id='etc' Name='etc'>
+			<Component Id='etccomponent' Guid='8351C338-3C7E-11E1-AC51-C4C74724019B'>
+				<File Id='config' Name='certnanny.cfg' Source='certnanny.cfg' KeyPath='yes'>
+				</File>
+			</Component>
 		</Directory>
 			
-		<Directory Id='BIN' Name='bin'>
+		<Directory Id='bin' Name='bin'>
 			<Component Id='bincomponent' Guid='D5C307D4-3C7F-11E1-B306-75C94724019B'>
 				<File Id='main' Name='certnanny' Source='certnanny' KeyPath='yes'>
 				</File>
@@ -125,10 +125,10 @@
 			</File>
 		</Component>	
 
-		<Component Id='readmecomponent' Guid='F4ECBDB4-3DFE-11A2-9524-783D4824019B'>
+		<!--<Component Id='readmecomponent' Guid='F4ECBDB4-3DFE-11A2-9524-783D4824019B'>
 			<File Id='readme' Name='README' Source='README' KeyPath='yes'>
 			</File>
-		</Component>			
+		</Component>-->			
 	</DirectoryRef>	
 
 	
@@ -227,7 +227,7 @@
 			<ComponentRef Id="createcerts" /> 
 			<ComponentRef Id="createtrustedroot" /> 
 			<ComponentRef Id="createquarantine" /> 
-			<ComponentRef Id="readmecomponent" /> 
+			<!--<ComponentRef Id="readmecomponent" /> -->
 			<ComponentRef Id="uninstallcomponent" /> 
 			</Feature>
 

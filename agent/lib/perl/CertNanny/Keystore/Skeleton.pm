@@ -33,10 +33,10 @@ $VERSION = 0.10;
 # Some useful code snippets
 #
 # Log debug information:
-# $self->debug("My debug level is " . $self->loglevel());
+# CertNanny::Logging->debug("My debug level is " . CertNanny::Logging->loglevel());
 #
 # Log informational message:
-# $self->info("Some informational message");
+# CertNanny::Logging->info("Some informational message");
 #
 # Get a temporary file name (automatically cleaned up after termination)
 # my $tmpfile = $self->gettmpfile();
@@ -47,19 +47,19 @@ $VERSION = 0.10;
 # (On Unix this results in /var/tmp/foobar)
 #
 # Read file contents to a scalar:
-# my $content = $self->read_file($filename);
+# my $content = CertNanny::Util->read_file($filename);
 # if (! defined $content) {
-#   $self->seterror("...");
+#   CertNanny::Logging->error("...");
 #   return;
 # }
 #
 # Write contents of a scalar variable to a file:
-# if (! $self->write_file(
+# if (! CertNanny::Util->write_file(
 #   FILENAME => $filename,
 #   CONTENT  => $myvariable,
 #   FORCE    => 1,           # existing files will not be overwritten otherwise
 # )) {
-#   $self->seterror("...");
+#   CertNanny::Logging->error("...");
 #   return;
 # }
 #
@@ -180,7 +180,7 @@ sub getcert {
 
     # use this to signal an error
     if (0) {
-	$self->seterror("getcert(): some unspecified error happened");
+	CertNanny::Logging->error("getcert(): some unspecified error happened");
 	return;
     }
 
@@ -299,7 +299,7 @@ sub installcert {
 #     }
 
     if (1) {   # if any error happened
-	$self->seterror("Could not install new keystore");
+	CertNanny::Logging->error("Could not install new keystore");
 	return;
     }
     
