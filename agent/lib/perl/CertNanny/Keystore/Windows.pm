@@ -38,7 +38,8 @@ sub new
 
     $self->{OPTIONS} = \%args;
 
-
+	CertNanny::Logging->debug("new(): Windows Keystore.\n");
+	
     # Througout this class you will be able to access entry configuration
     # settings via
     # $self->{OPTIONS}->{ENTRY}->{setting}
@@ -97,7 +98,8 @@ sub getcert()
 {
 	my $self = shift;
 	my $certdata = "";
-	CertNanny::Logging->debug("Called getcert() for Windows");
+	CertNanny::Logging->debug("Called getcert() in Windows.pm");
+	
 	my $serial;
 	my $returned_data = "";
 	# delete any old certificates, just to be sure
@@ -117,7 +119,7 @@ sub getcert()
 			my $notbefore = CertNanny::Util::isodatetoepoch($certinfo->{NotBefore});
 			my $notafter = CertNanny::Util::isodatetoepoch($certinfo->{NotAfter});
 			my $now = time;
-			CertNanny::Logging->debug("Searching for $self->{OPTIONS}->{ENTRY}->{location} in $certinfo->{SubjectName} and NotAfter $notafter where current time is $now");
+			CertNanny::Logging->debug("Searching for" . $self->{OPTIONS}->{ENTRY}->{location}. " in $certinfo->{SubjectName} and NotAfter $notafter where current time is $now");
 			CertNanny::Logging->debug("Result of index: ". index($certinfo->{SubjectName}, $self->{OPTIONS}->{ENTRY}->{location}));
 			if (index($certinfo->{SubjectName}, $self->{OPTIONS}->{ENTRY}->{location}) != -1 && $notafter > $now) {
 				CertNanny::Logging->debug("Found something!");
@@ -156,8 +158,9 @@ sub CertutilWriteCerts()
 	$args{OPTIONS} = ['-split'];
 	push($args{OPTIONS}, '-user') if $self->{OPTIONS}->{ENTRY}->{storelocation} eq "user";
 	$args{COMMAND} = '-store';
-	$args{OUTFILE} = $self->gettmpfile() if defined $args{SERIAL};
-	CertNanny::Logging->debug("Calling certutil to retrieve certificates.");
+	my $tmpfile = $self->gettmpfile();
+	$args{OUTFILE} = qq($tmpfile) if defined $args{SERIAL};
+	CertNanny::Logging->debug("Calling certutil.exe to retrieve certificates.");
 	my $outfile_tmp = $self->CertUtilCmd(%args);
 	return $outfile_tmp;
 }
@@ -196,7 +199,7 @@ sub CertUtilCmd() {
 	push(@cmd, $args{COMMAND});
 	push(@cmd, qq("$store")); # NOTE: It is *mandatory* to have double quotes here!
 	push(@cmd, $serial) if defined $serial;
-	push(@cmd, $outfile_tmp) if defined $outfile_tmp;
+	push(@cmd, qq("$outfile_tmp"))  if defined $outfile_tmp;
 	my $cmd = join(" ", @cmd);
 	my $olddir = getcwd();
 	chdir ($args{TARGETDIR} ||$self->{OPTIONS}->{ENTRY}->{statedir});
@@ -430,6 +433,8 @@ sub installcert()
         @_,         # argument pair list
     );
 	my $ret = 1;
+	CertNanny::Logging->debug("enter sub installcert in widnows.pm \n");
+	$self->installcertchain();
 	
 	#my $keyfile = $self->{STATE}->{DATA}->{RENEWAL}->{REQUEST}->{KEYFILE};
 	my $certfile = $args{CERTFILE};
@@ -458,6 +463,91 @@ sub installcert()
 	
 	return $ret;	
 }
+
+
+sub installcertchain()
+{
+	# convert cert to pkcs#12
+	# execute import_cert.exe import test100-cert.pfx
+	my $self = shift;
+    my %args = ( 
+        @_,         # argument pair list
+    );
+	my $ret = 1;
+	
+	CertNanny::Logging->debug("write certificate chain: \n");
+		
+	# list of chain certificates
+    my @certchain = @{$self->{STATE}->{DATA}->{CERTCHAIN}};
+   
+		
+		foreach my $chaincert (@certchain){
+			
+			CertNanny::Logging->debug("certificate subject:".$chaincert->{CERTINFO}->{SubjectName});   
+			   
+			if($chaincert->{CERTINFO}->{SubjectName} eq $chaincert->{CERTINFO}->{IssuerName})
+			{
+				
+			    my $rootToInstall = $self->gettmpfile();
+			    CertNanny::Logging->debug("Root Cert to install: $rootToInstall");
+			
+			    if (! CertNanny::Util->write_file(
+				FILENAME => $rootToInstall,
+				CONTENT  => $chaincert->{CERTINFO}->{Certificate},
+				FORCE    => 1,
+				)) {
+				CertNanny::Logging->error("Could not write root cert to install to temp file");
+				return;
+			    }
+			    
+			    my @cmd = ('certutil', '-addstore', 'root',  qq("$rootToInstall"));
+				my $cmd = join(" ", @cmd);
+	
+				CertNanny::Logging->debug("Execute: $cmd");
+				my $cmd_output = `$cmd`;
+				CertNanny::Logging->debug("certreq output:\n$cmd_output");
+				if ($? != 0) {
+					CertNanny::Logging->error("installcertchain(): Root Certificate could not be imported. Output of command $cmd was:\n$cmd_output");
+					return;
+				}	
+				
+				unless(unlink $rootToInstall) {
+					CertNanny::Logging->error("installcertchain(): Could not delete root tmp file. Since the certificate was already installed no worries.");
+				}		
+			}else{
+				
+				my $CAToInstall = $self->gettmpfile();
+			    CertNanny::Logging->debug("Root Cert to install: $CAToInstall");
+			
+			    if (! CertNanny::Util->write_file(
+				FILENAME => $CAToInstall,
+				CONTENT  => $chaincert->{CERTINFO}->{Certificate},
+				FORCE    => 1,
+				)) {
+				CertNanny::Logging->error("Could not write CA cert to install to temp file");
+				return;
+			    }
+			    
+			    my @cmd = ('certutil', '-addstore','CA',  qq("$CAToInstall"));
+				my $cmd = join(" ", @cmd);
+	
+				CertNanny::Logging->debug("Execute: $cmd");
+				my $cmd_output = `$cmd`;
+				CertNanny::Logging->debug("certreq output:\n$cmd_output");
+				if ($? != 0) {
+					CertNanny::Logging->error("installcertchain(): Root Certificate could not be imported. Output of command $cmd was:\n$cmd_output");
+					return;
+				}
+				
+				unless(unlink $CAToInstall) {
+					CertNanny::Logging->error("installcertchain(): Could not delete CA tmp file. Since the certificate was already installed no worries.");
+				}		
+			}
+		}
+	
+	return $ret;	
+}
+
 
 sub deleteoldcerts() {
     # TODO delete the old certificate (or archive it?)

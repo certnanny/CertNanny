@@ -53,7 +53,7 @@ sub new
     if (!$self->{CONFIG}->get("path.lib", "FILE")) {
 	$self->{CONFIG}->set("path.lib", File::Spec->catdir(@dirs, 'lib'));
     }
-    
+    CertNanny::Logging->debug("set perl path lib to:".File::Spec->catdir(@dirs, 'lib'));
     if (!$self->{CONFIG}->get("path.libjava", "FILE")) {
 	$self->{CONFIG}->set("path.libjava", File::Spec->catdir($self->{CONFIG}->get("path.lib", "FILE"), 'java'));
     }
@@ -99,12 +99,10 @@ sub AUTOLOAD
     return if $attr eq 'DESTROY';   
 
     # automagically call
-    if ($attr =~ /(?:info|check|renew)/) {
+    if ($attr =~ /(?:info|check|renew|enroll)/) {
 	return $self->iterate_entries("do_$attr");
     }
-    elsif($attr =~ /initialenroll/i){
-    	do_challengePW();
-    }
+
 }
 
 sub get_config_value
@@ -185,13 +183,13 @@ sub do_check
     return 1;
 }
 
-sub do_challengePW{
+sub do_enroll{
 	my $self = shift;
 	my %args = ( @_ );
 	
 #	my $rootCerts CertNanny::Enroll::Sscep::getCa();
 	
-	print"ende";#TODO
+	print"Initial enrollment not yet supported";#TODO
 	
 }
 sub do_renew
@@ -214,10 +212,16 @@ sub do_renew
     
     $rc = $keystore->checkvalidity($autorenew);
     if (! $rc) { 
+    	
 	# schedule automatic renewal
-	my $rndwaittime = int(rand($self->{"sleep"}));
-	CertNanny::Logging->log({MSG => "Scheduling renewal but randomly waiting $rndwaittime seconds to ease stress on the PKI"});
-	sleep $rndwaittime;
+	CertNanny::Logging->debug("wait: ". $self->{CONFIG}->get('randomWait'));
+		if($self->{CONFIG}->get('randomWait') eq "yes" ){
+		my $rndwaittime = int(rand($self->{"sleep"}));
+		CertNanny::Logging->log({MSG => "Scheduling renewal but randomly waiting $rndwaittime seconds to ease stress on the PKI"});
+		sleep $rndwaittime;	
+			
+		}
+
 	$keystore->{INSTANCE}->renew();
     }
 
