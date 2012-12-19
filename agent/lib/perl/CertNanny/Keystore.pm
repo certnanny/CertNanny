@@ -1634,6 +1634,7 @@ sub sendrequest {
 	$self->{STATE}->{DATA}->{CERTCHAIN} = 
 	    $self->buildcertificatechain($newcert);
 	
+
 	if (! defined $self->{STATE}->{DATA}->{CERTCHAIN}) {
 	    CertNanny::Logging->error("Could not build certificate chain, probably trusted root certificate was not configured");
 	    return;

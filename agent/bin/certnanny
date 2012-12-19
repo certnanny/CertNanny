@@ -302,6 +302,7 @@ Actions:
 
   check             Check all configured keystores
   renew             Run automatic renewal on all configured keystores
+  enroll			Run inital enrollment for configured keystores that do NOT have a certificate installed. 
   install           Install CertNanny as a Windows Service (applicable only on Windows platforms)
   uninstall         Uninstall CertNanny service (applicable only on Windows platforms)
     
@@ -337,6 +338,11 @@ is within the configured warning interval.
 Check the configured keystores and schedule automatic renewal.
 Can be repeated as many times as desired and will automatically keep
 the correct state.
+
+=item B<enroll>
+ 
+Check the configured keystores for inital enrollment configuration.
+If no certificate is found, run inital enrollment via the configured method.
 
 =item B<install>
 
