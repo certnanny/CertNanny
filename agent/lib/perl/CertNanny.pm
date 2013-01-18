@@ -188,16 +188,24 @@ sub do_renew
     my %args = ( @_ );
 
     my $keystore = $args{KEYSTORE};
+	my $entry = $args{ENTRY};
 
     my $autorenew = $self->{ITEMS}->{$args{ENTRY}}->{autorenew_days};
     my $warnexpiry = $self->{ITEMS}->{$args{ENTRY}}->{warnexpiry_days};
 
     my $rc;
-
     $rc = $keystore->checkvalidity(0);
-    if (! $rc) {
-	$keystore->log({MSG => "Certificate has expired. No automatic renewal can be performed.", PRIO => 'error'});
-	return 1;
+    if (!$rc) {
+		my $warnexpired_hook = $self->{ITEMS}->{$entry}->{hook}->{warnexpired};
+
+		$keystore->log({MSG => "Certificate has expired. No automatic renewal can be performed.", PRIO => 'error'});
+		$keystore->executehook($warnexpired_hook,
+								'__NOTBEFORE__' => $keystore->{CERT}->{INFO}->{NotBefore},
+								'__NOTAFTER__' => $keystore->{CERT}->{INFO}->{NotAfter},
+								);
+		my $abort = $keystore->{INSTANCE}->{OPTIONS}->{ENTRY}->{abortifcertexpired};
+		
+		return 1 if ($abort =~ m/yes/xmsi)
     }
     
     $rc = $keystore->checkvalidity($autorenew);

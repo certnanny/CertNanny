@@ -211,6 +211,7 @@ sub parse
 	    DEFAULT => {
 		autorenew_days => 30,
 		warnexpiry_days => 20,
+		abortifcertexpired => 'yes',
 		type => 'none',
 		scepsignaturekey => 'new',
 	    },
