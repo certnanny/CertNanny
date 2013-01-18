@@ -98,7 +98,6 @@ foreach my $cmd (@ARGV) {
 		}
 	}
 	
-	
 	$monitor->$cmd(%config) || die "Invalid action: $cmd. Stopped";
 }
 if (scalar @ARGV > 0) {
@@ -1025,6 +1024,13 @@ Subsequent entries are only read if the index numbers are adjacent.
 
 =back
 
+=item keystore.LABEL.abortifcertexpired
+
+Setting which specifies if CertNanny should return or not if an expired certificate
+is being used.
+
+Default: yes
+
 =head4 Hook definitions
 
 A hooks is called whenever a certain event occurs. Hooks allow to call
@@ -1111,6 +1117,18 @@ is replaced with the new state. The following states are defined:
 these tags are replaced with the NotBefore/NotAfter dates of the certificate
 
 =back
+
+=item keystore.LABEL.hook.warnexpired
+
+  Specifies an executable that is called whenever a certificate is expired.
+
+=over
+
+=item __NOTBEFORE__
+
+=item __NOTAFTER__
+
+these tags are replaced with the NotBefore/NotAfter dates of the certificate
 
 =back
 

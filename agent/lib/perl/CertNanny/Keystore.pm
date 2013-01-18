@@ -44,7 +44,7 @@ sub new
     bless $self, $class;
 
     $self->{CONFIG} = $args{CONFIG};
-
+	
     foreach my $item (qw(statedir scepcertdir)) {
 	if (! exists $args{ENTRY}->{$item}) {
 	    croak "No $item specified for keystore " . $args{ENTRY}->{location};
