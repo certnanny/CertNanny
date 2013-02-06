@@ -79,7 +79,7 @@ sub get_pkcs12_file {
 }
 
 sub get_pin {
-    my $self;
+    my $self = shift;
     return $self->{PIN};
 }
 
