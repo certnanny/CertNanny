@@ -589,5 +589,40 @@ sub getkey() {
     return $self->{OPTIONS}->{ENTRY}->{location};
 }
 
+# Import p12 
+# Import a p12 with private key and certificate into target keystore
+# also adding the certificate chain if required
+# options:
+# hashref containing
+# FILE => 'path/file.p12'
+# PIN  => 'file pin'
+# LOCATION  => 'user|mashine'
+# examples:
+# eval "CertNanny::Keystore::Windows::importP12( %p12args )";
+# IMPORTANT NOTICE: THIS METHOD MUST BE CALLED IN STATIC CONTEXT, NEVER AS A CLASS METHOD
+sub importP12 {
+	#my $entry = shift; 
+	my %args = @_ ;
+
+	my @cmd;
+	push(@cmd, 'certutil');
+	
+	if($args{LOCATION} eq 'user') {
+		push(@cmd, '-user');	
+	}
+
+	push(@cmd, '-p');	
+	push(@cmd, "$args{PIN}");
+	push(@cmd, "-importPFX");
+	push(@cmd, "$args{FILENAME}");
+	push(@cmd, "NoExport,NoRoot");
+
+	my $cmd = join(" ", @cmd);
+	
+	my $cmd_output = `$cmd`;
+	#chdir $olddir;
+	CertNanny::Logging->debug("Dumping output of above command:\n $cmd_output");
+    return 1;
+}
 
 1;
