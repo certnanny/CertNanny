@@ -1,13 +1,14 @@
 #!/bin/bash
 
-#############################################
+########################################
 #
-# create a testing environment for certnanny
+# create and manage testing environment
+# for certnanny
 #
 # author: sebastian roland
-# date: 04.02.2013
+# date: 14.02.2013
 #
-#############################################
+########################################
 
 ### BEGIN CONFIG ###
 
@@ -27,7 +28,7 @@ export ROOT                                                         # make var a
 usage()
 {
     echo "${0} init <path_to_openssl_config>"
-    echo "${0} create_ee <server|email|user>"
+    echo "${0} create_ee <server|email|user> <openssl>"
 
     exit -1
 }
@@ -44,6 +45,89 @@ env_already_created()
     fi
 }
 
+get_next_free_index()
+{
+    cert_type=${1}
+    index=1
+
+    for cert in $(ls -1 ${ROOT}/ca | grep -E 10-ee_${cert_type}_[[:digit:]]+_)
+    do
+        present_index=$(echo $cert | cut -d '_' -f 3)
+        if [ ${present_index} -ge ${index} ]
+        then
+            index=$(expr ${present_index} + 1)
+        fi
+    done
+
+    echo ${index}
+}
+
+create_keystore_openssl()
+{
+    cert_type=${1}
+
+    # determine next available number for cert type
+    index=$(get_next_free_index ${cert_type})
+
+    # create csr
+    ${OPENSSL} req -new -keyout ${ROOT}/ca/10-ee_${cert_type}_${index}_key.pem -out ${ROOT}/ca/csr/10-ee_${cert_type}_${index}_cert.csr -subj "/CN=10-ee_${cert_type}_${index}/OU=development/O=certnanny" -config ${openssl_conf} &> /dev/null
+    # sign request
+    ${OPENSSL} ca -name ca_int_${cert_type} -in ${ROOT}/ca/csr/10-ee_${cert_type}_${index}_cert.csr -out ${ROOT}/ca/10-ee_${cert_type}_${index}_cert.pem -config ${openssl_conf} &> /dev/null << EOF
+y
+y
+EOF
+}
+
+create_keystore_mq()
+{
+    cert_type=${1}
+
+    # determine next available number for cert type
+    index=$(get_next_free_index ${cert_type})
+
+    echo "mq keystores are currently not supported!"
+}
+
+create_keystore_java()
+{
+    cert_type=${1}
+
+    # determine next available number for cert type
+    index=$(get_next_free_index ${cert_type})
+
+    echo "java keystores are currently not supported!"
+}
+
+create_keystore_windows()
+{
+    cert_type=${1}
+
+    # determine next available number for cert type
+    index=$(get_next_free_index ${cert_type})
+
+    echo "windows keystores are currently not supported!"
+}
+
+create_keystore_pkcs12()
+{
+    cert_type=${1}
+
+    # determine next available number for cert type
+    index=$(get_next_free_index ${cert_type})
+
+    echo "pkcs12 keystores are currently not supported!"
+}
+
+create_keystore_sap()
+{
+    cert_type=${1}
+
+    # determine next available number for cert type
+    index=$(get_next_free_index ${cert_type})
+
+    echo "sap keystores are currently not supported!"
+}
+
 ### END FUNCTIONS ###
 
 ### MAIN ###
@@ -51,13 +135,19 @@ arg_count=${#}
 arg1=${1}
 openssl_conf="${ROOT}/etc/openssl_test_env.conf"
 
-if [ ${arg_count} -ne 2 ]
+if [ ! -x ${OPENSSL} ]
 then
-    usage
+    echo "ERROR: '${OPENSSL}' either not existent or executable"
+    exit -2
 fi
 
 case "${arg1}" in
     init)
+            if [ ! ${arg_count} -eq 2 ]
+            then
+                usage
+            fi
+
             arg_openssl_conf=${2}
 
             # do some checks
@@ -75,7 +165,7 @@ case "${arg1}" in
                     [yY])
                             ;;
                     *)
-                            exit -2
+                            exit -3
                             ;;
                 esac
             fi
@@ -87,7 +177,7 @@ case "${arg1}" in
             if [ ! -w ${root_parent} ]
             then
                 echo "ERROR: '${root_parent}' is not writeable"
-                exit -3
+                exit -4
             fi
 
             rm -rf ${ROOT}
@@ -141,10 +231,15 @@ EOF
             ;;
 
     create_ee)
+            if [ ! ${arg_count} -eq 3 ]
+            then
+                usage
+            fi
+
             if ! env_already_created
             then
                 echo "ERROR: cant find testing environment. please create first with ${0} init"
-                exit -4
+                exit -5
             fi
 
             cert_type=${2}
@@ -157,29 +252,35 @@ EOF
                         ;;
                 *)
                         echo "ERROR: '${cert_type}' is not a valid cert type"
-                        exit -5
+                        exit -6
                         ;;
             esac
 
-            # determine next available number for cert type
-            index=1
-            for cert in $(ls -1 ${ROOT}/ca | grep -E 02-ee_${cert_type}_[[:digit:]]+_cert.pem)
-            do
-                present_index=$(echo $cert | cut -d '_' -f 3)
-                if [ ${present_index} -ge ${index} ]
-                then
-                    index=$(expr ${present_index} + 1)
-                fi
-            done
-
-            # create csr
-            ${OPENSSL} req -new -keyout ${ROOT}/ca/02-ee_${cert_type}_${index}_key.pem -out ${ROOT}/ca/csr/02-ee_${cert_type}_${index}_cert.csr -subj "/CN=02-ee_${cert_type}_${index}/OU=development/O=certnanny" -config ${openssl_conf} &> /dev/null
-            # sign request
-            ${OPENSSL} ca -name ca_int_${cert_type} -in ${ROOT}/ca/csr/02-ee_${cert_type}_${index}_cert.csr -out ${ROOT}/ca/02-ee_${cert_type}_${index}_cert.pem -config ${openssl_conf} &> /dev/null << EOF
-y
-y
-EOF
-
+            keystore=${3}
+            case "${keystore}" in
+                openssl)
+                        create_keystore_openssl ${cert_type}
+                        ;;
+                mq)
+                        create_keystore_mq ${cert_type}
+                        ;;
+                java)
+                        create_keystore_java ${cert_type}
+                        ;;
+                windows)
+                        create_keystore_windows ${cert_type}
+                        ;;
+                pkcs12)
+                        create_keystore_pkcs12 ${cert_type}
+                        ;;
+                sap)
+                        create_keystore_sap ${cert_type}
+                        ;;
+                *)
+                        echo "ERROR: '${keystore}' is not a valid keystore"
+                        exit -7
+                        ;;
+            esac
             ;;
 
     *)
