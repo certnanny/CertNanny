@@ -79,7 +79,7 @@ sub get_pkcs12_file {
 }
 
 sub get_pin {
-    my $self;
+    my $self = shift;
     return $self->{PIN};
 }
 
@@ -308,5 +308,41 @@ sub installcert {
     # only on success:
     return 1;
 }
+
+# Import p12 
+# Import a p12 with private key and certificate into target keystore
+# also adding the certificate chain if required
+# options:
+# hashref containing
+# FILE => 'path/file.p12'
+# PIN  => 'file pin'
+# ENTRYNAME  => 'capi'
+# CONF => CertnannyConfig Hashref 
+# examples:
+# eval "CertNanny::Keystore::Windows::importP12( %p12args )";
+# IMPORTANT NOTICE: THIS METHOD MUST BE CALLED IN STATIC CONTEXT, NEVER AS A CLASS METHOD
+sub importP12 {
+	#my $entry = shift; 
+	my %args = @_ ;
+	my $conf = $args{CONF} ;
+	my $p12 = $args{FILENAME} ; 
+	
+	my $keystoreData =  CertNanny::Util->read_file($p12);
+	
+	 
+	if (! CertNanny::Util->write_file(
+		FILENAME => $conf->{'CONFIG'}->{'certmonitor'}->{$args{ENTRYNAME}}->{'location'},
+		CONTENT  => $keystoreData,
+		FORCE    => 0,
+	)) {
+		    CertNanny::Logging->error("Could not write new p12 Keystore, file already exists ?!");
+		    return;
+	}
+
+
+    return 1;
+}
+
+
 
 1;

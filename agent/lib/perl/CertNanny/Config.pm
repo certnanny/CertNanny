@@ -79,10 +79,7 @@ sub getconfigfilename
 sub getInstance {
 	unless(defined $INSTANCE) {
 		my $proto = shift;
-		my %args = (
-			@_,		# argument pair list
-		);
-		$INSTANCE = CertNanny::Config->new(%args);
+		$INSTANCE = CertNanny::Config->new(@_);
 	}
 	
 	return $INSTANCE;
