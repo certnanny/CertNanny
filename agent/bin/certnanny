@@ -339,10 +339,44 @@ Check the configured keystores and schedule automatic renewal.
 Can be repeated as many times as desired and will automatically keep
 the correct state.
 
+If a initial enrollment configuration is found, certnanny will try to request a new certificate and create the keystore. 
+
 =item B<enroll>
  
 Check the configured keystores for inital enrollment configuration.
 If no certificate is found, run inital enrollment via the configured method.
+
+The mendatory configuration is: 
+keystore.(keystorename).initialenroll.auth.mode =  [anonymous|password|certificate]
+keystore.(keystorename).initialenroll.profile = e.g. 09. TLS Client and TLS Server 
+keystore.(keystorename).initialenroll.subject = CN=test.domain.com,OU=Nanny, O=NannyLand, C=DE
+
+you may specify additional subject alternative names to be added to the CSR data:
+keystore.(keystorename).initialenroll.san.1 = DNS:test.domain.com:Cert1
+keystore.(keystorename).initialenroll.san.2 = DNS:test2.domain.com:Cert1
+
+There are 3 possible initial enrollemnt methods that are configured with 
+keystore.(keystorename).initialenroll.auth.mode =  [anonymous|password|certificate]
+
+1. Authmode [certificate]
+
+Enrollment on behalf with a SCEP client certificate (currently only implemented):
+ 
+keystore.(keystorename).initialenroll.auth.mode = certificate
+keystore.(keystorename).initialenroll.auth.cert = $(prefixcfg)/enrollSCEP.pem
+keystore.(keystorename).initialenroll.auth.key = $(prefixcfg)/com_scepclient_key.pem
+keystore.(keystorename).initialenroll.auth.pin = PIN
+
+2. Authmode [anonymous]
+Enrollment with a selfsigned certificate (annonymus enrollment)
+
+to be implemented
+
+3. Authmode [password]
+Enrollment with a chalange password 
+
+to be implemented 
+#keystore.(keystorename).initialenroll.auth.challengepassword = pw
 
 =item B<install>
 
@@ -989,6 +1023,20 @@ URL of the SCEP Server to use
 
 Example: http://scep.ca.example.com/cgi-bin/scep
 
+
+=item keystore.LABEL.enroll.sscep.monitorSysInfo 
+Per default this informastion will be send via a get parameter to the SCEP server:
+
+All found macaddresses in macaddress=[,seperated list]
+CertNanny Version in cnversion=string
+System FQDN from Net::Domain::hostfqdn in sysfqdn
+System name from POSIX:uname()[0]in sysname
+System release from POSIX:uname()[2] in sysrelease
+System architecture from POSIX:uname()[4] in sysarch
+
+to disable this feature set 
+keystore.LABEL.enroll.sscep.monitorSysInfo = no ; (yes is default)
+
 =item keystore.LABEL.scepcertdir
 
 SCEP CA certificate directory. Specify a directory where CertNanny may place CA
@@ -1485,6 +1533,7 @@ Mandatory, specifies the Distinguished Name of a certificate in the Windows keys
 
 Example: 
     CN=www.example.com,O=Example Ltd.,DC=example,DC=com
+    keystore.LABEL.location = www.example.com
 
 =item keystore.LABEL.type
 
@@ -1494,17 +1543,11 @@ Mandatory, must literally be set to Windows.
 
 Issuer Distingushed Name as (Perl) regular expression.
 
-=item keystore.LABEL.storename
-
-Optional, specifies the name of the certificate store, e.g. MY. This setting should generally not be changed.
-
-Default: MY
-
 =item keystore.LABEL.storelocation
 
 Optional, specifies the name of the certificate store location: memory, machine, user  
 
-Default: machine
+Default: user
 
 =back
 
@@ -1512,15 +1555,18 @@ Limitations:
 
 =over
 
-=item
-
-The key must be exportable and strong private key protection may not be enabled.
-
 =item 
 
 If there are two or more identical certificates in the certificate store, the renewal process
-will not work and one of the  certificates has to be removed manually.
+will not work and one of the certificates has to be removed manually. 
 
+Multiple certificates are supported but the CN part of the certificates have to differ so a substring of the CN gives a unique result. 
+OK: 
+	CN=www.example.com:cert1,O=Example Ltd.,DC=example,DC=com
+	CN=www.example.com:cert2,O=Example Ltd.,DC=example,DC=com
+Buggy:
+	CN=www.example.com:cert,O=Example Ltd.,DC=example,DC=com
+	CN=www.example.com:cert2,O=Example Ltd.,DC=example,DC=com
 =back
 
 =head4 2.2.2.5 Windows IIS keystore
