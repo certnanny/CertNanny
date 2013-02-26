@@ -14,9 +14,11 @@ use CertNanny::Logging;
 use File::Spec;
 use vars qw( $VERSION );
 use Exporter;
-use Cwd;
+use Data::Dumper;
+use Net::Domain;
+use POSIX;
+#use Cwd;
 
-$VERSION = 0.10;
 
 sub new {
 	my $proto = shift;
@@ -29,7 +31,13 @@ sub new {
 	bless $self, $class;
 	# type is determined, now delete it so only sections will be scanned.
 	delete $entry_options->{enroll}->{type};
-	$self->{OPTIONS} = $self->defaultOptions();
+	##if monitorSysInfo is not set we set it to be enabled by default 
+	if (!exists $config->{'CONFIG'}->{'certmonitor'}->{$entryname}->{'enroll'}->{'sscep'}->{'monitorSysInfo'} ){
+		$config->{'CONFIG'}->{'certmonitor'}->{$entryname}->{'enroll'}->{'sscep'}->{'monitorSysInfo'} = 'yes' ;
+	}
+	
+	#print ' $entryname sscep self is:' .Dumper($config) . $config->{'CONFIG'}->{'certmonitor'}->{$entryname}->{'enroll'}->{'sscep'}->{'monitorSysInfo'};
+	$self->{OPTIONS} = $self->defaultOptions($config->{'CONFIG'}->{'certmonitor'}->{$entryname}->{'enroll'}->{'sscep'}->{'monitorSysInfo'});
 	$self->readConfig($entry_options->{enroll});
 	# SCEP url
 #	$self->{URL} = $config->{URL} or die("No SCEP URL given");
@@ -269,7 +277,33 @@ sub getNextCA {
 
 sub defaultOptions {
 	my $self = shift;
+	my $monitorSysInfo = shift;
+	my $monitor = '';
 	
+	CertNanny::Logging->debug("get defaultOptions $monitorSysInfo");	
+	
+	if(defined $monitorSysInfo and $monitorSysInfo ne '' and $monitorSysInfo ne 'no' )
+	{
+		my @macs = CertNanny::Util->getmacaddresses();
+	    my $macaddresses = "macaddress=" ; 
+	    
+	    foreach my $mac (@macs)
+	    {
+	    	if($mac ne '00:00:00:00:00:00'){
+	    		$macaddresses.=$mac.',';
+	    	}
+	    }
+	    $macaddresses = substr($macaddresses , 0 , -1) ; #remove last ","
+			    
+	    $monitor = $macaddresses.'&cnversion='.$CertNanny::VERSION ;
+	    $monitor .= '&sysfqdn='.Net::Domain::hostfqdn();
+	    $monitor .= '&sysname='.(POSIX::uname())[0];
+	    $monitor .= '&sysrelease='.(POSIX::uname())[2];
+	    $monitor .= '&sysarch='.(POSIX::uname())[4];
+	    
+	    CertNanny::Logging->debug("Add monitor information $monitor");		
+	}
+		
 	my %options = (
 		sscep_engine_capi => {
 			'new_key_location' => 'REQUEST',
@@ -279,7 +313,14 @@ sub defaultOptions {
 			'PollInterval' => 5,
 			'MaxPollCount' => 1
 		}
-	);
+		);
+		
+		if($monitor ne ''){
+			 $options{'sscep'} = {
+				MonitorInformation => $monitor
+			};	
+		}
+		
 	
 	return \%options;
 }
