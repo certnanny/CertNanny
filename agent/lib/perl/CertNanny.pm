@@ -24,10 +24,11 @@ use CertNanny::Logging;
 use CertNanny::Enroll;
 use CertNanny::Enroll::Sscep;
 use Data::Dumper;
+use POSIX ;
 
 use IPC::Open3;
 
-$VERSION = 0.10;
+$VERSION = 0.12;
 
 my $INSTANCE;
 
@@ -53,7 +54,7 @@ sub new
     if (!$self->{CONFIG}->get("path.lib", "FILE")) {
 	$self->{CONFIG}->set("path.lib", File::Spec->catdir(@dirs, 'lib'));
     }
-    
+    CertNanny::Logging->debug("set perl path lib to:".File::Spec->catdir(@dirs, 'lib'));
     if (!$self->{CONFIG}->get("path.libjava", "FILE")) {
 	$self->{CONFIG}->set("path.libjava", File::Spec->catdir($self->{CONFIG}->get("path.lib", "FILE"), 'java'));
     }
@@ -99,12 +100,10 @@ sub AUTOLOAD
     return if $attr eq 'DESTROY';   
 
     # automagically call
-    if ($attr =~ /(?:info|check|renew)/) {
+    if ($attr =~ /(?:info|check|renew|enroll)/) {
 	return $self->iterate_entries("do_$attr");
     }
-    elsif($attr =~ /initialenroll/i){
-    	do_challengePW();
-    }
+
 }
 
 sub get_config_value
@@ -122,7 +121,7 @@ sub iterate_entries
 
     my $rc = 1;
     foreach my $entry (keys %{$self->{ITEMS}}) {
-	CertNanny::Logging->info("Checking keystore $entry\n");
+	CertNanny::Logging->debug("Checking keystore $entry\n");
 	my $keystore = 
 	    CertNanny::Keystore->new(CONFIG => $self->{CONFIG},
 				     ENTRY =>  $self->{ITEMS}->{$entry},
@@ -133,9 +132,17 @@ sub iterate_entries
 	}
 	else 
 	{
-	    print "LOG: [error] Could not instantiate keystore $entry\n" if ($loglevel >= 1);
+		CertNanny::Logging->log({MSG => "Could not instantiate keystore $entry\n", PRIO => 'error'});
+		if($action eq 'do_renew' or $action eq 'do_enroll'){
+			CertNanny::Logging->log({MSG => "Check for initial enrollment configuration.", PRIO => 'info'});
+			if ($self->{ITEMS}->{$entry}->{initialenroll}->{auth}){
+				CertNanny::Logging->log({MSG => "Fund initial enrollment configuration for ". $self->{ITEMS}->{$entry}->{initialenroll}->{subject}, PRIO => 'info'});
+					    $self->do_enroll(ENTRY => $self->{ITEMS}->{$entry} ,
+					    				ENTRYNAME => $entry);		
+			}
+		}
 	}
-	print "\n\n";
+		print "\n\n";
     }
 
     return $rc;
@@ -185,15 +192,83 @@ sub do_check
     return 1;
 }
 
-sub do_challengePW{
+sub do_enroll{
 	my $self = shift;
-	my %args = ( @_ );
 	
-#	my $rootCerts CertNanny::Enroll::Sscep::getCa();
+    my %args = ( @_ );
+    my $entry = $args{ENTRY};
+    my $entryname = $args{ENTRYNAME};
+ 
+		if( $self->{ITEMS}->{$entryname}->{initialenroll}->{auth}->{mode} eq 'certificate'){
+			
+			CertNanny::Logging->log({MSG => "Start initial enrollment with authentication method certificate.", PRIO => 'info'});
+			
+			my $keystore ;	    
+			   
+			##Change keystore attributes to instantitae a openSSL keystore with the entrollment certificate
+		    $entry->{initialenroll}->{targetType}=  $entry->{type} ;  
+		    $entry->{type}= 'OpenSSL';    
+		    $entry->{location}= $entry->{initialenroll}->{auth}->{cert};      
+		    $entry->{format}= 'PEM';  
+		    $entry->{keyfile}= $entry->{initialenroll}->{auth}->{key};
+		    $entry->{pin} = $entry->{initialenroll}->{auth}->{pin};
+		    
+
+			
+			if(exists $self->{ITEMS}->{$entryname}->{hsm})
+			{
+				$self->{ITEMS}->{$entryname}->{hsm} = undef;
+			}
+			if(exists $self->{ITEMS}->{$entryname}->{certreqinf})
+			{
+				$self->{ITEMS}->{$entryname}->{certreqinf} = undef;
+			}
+			if(exists $self->{ITEMS}->{$entryname}->{certreq})
+			{
+				$self->{ITEMS}->{$entryname}->{certreq} = undef;
+			}
+
+
+			$keystore = 
+	    		CertNanny::Keystore->new(CONFIG => $self->{CONFIG},
+				     ENTRY =>  $self->{ITEMS}->{$entryname},
+				     ENTRYNAME => $entryname);
+			
+			
+			$keystore->{INSTANCE}->{INITIALENROLLEMNT} = 'yes'; 
+			#disable engine specific configuration 
+			$keystore->{INSTANCE}->{OPTIONS}->{ENTRY}->{enroll}->{engine_section} = undef; 
+			$keystore->{INSTANCE}->{OPTIONS}->{ENTRY}->{enroll}->{sscep}->{engine} = undef; 
 	
-	print"ende";#TODO
+			#Start the initial enrollment runining an native openSSL keystore renewal 
+			my $ret = $keystore->{INSTANCE}->renew();
 	
+			my $conf  =  CertNanny::Config->new($self->{CONFIG}->{CONFIGFILE});
+			
+			#reset the keystore configuration after the inital enrollment back to the .cfg file specified settings including engine 
+			$self->{ITEMS}->{$entryname} = $conf->{CONFIG}->{certmonitor}->{$entryname}; 
+			
+			my $newkeystore = 
+	    		CertNanny::Keystore->new(CONFIG => $self->{CONFIG},
+				     ENTRY =>  $self->{ITEMS}->{$entryname},
+				     ENTRYNAME => $entryname);
+				     
+			my $autorenew = $self->{ITEMS}->{$args{ENTRY}}->{autorenew_days};	     
+			
+			if($newkeystore)
+			{
+				my $isValid = $newkeystore->checkvalidity($autorenew);
+		 		 CertNanny::Logging->log({MSG => "initial enrollment for keystore $entryname successful ", PRIO => 'info'});	
+				
+			}else{
+				CertNanny::Logging->log({MSG => "initial enrollment on going for keystore $entryname", PRIO => 'info'});	
+			}
+			
+		}else{
+			CertNanny::Logging->log({MSG => "Initial enrollment other then certificate authentication not yet supported", PRIO => 'error'});				
+	}
 }
+
 sub do_renew
 {
     my $self = shift;
@@ -212,12 +287,20 @@ sub do_renew
 	return 1;
     }
     
+    #print "self is : " . Dumper $self;
+    
     $rc = $keystore->checkvalidity($autorenew);
     if (! $rc) { 
+    	
 	# schedule automatic renewal
-	my $rndwaittime = int(rand($self->{"sleep"}));
-	CertNanny::Logging->log({MSG => "Scheduling renewal but randomly waiting $rndwaittime seconds to ease stress on the PKI"});
-	sleep $rndwaittime;
+	
+		if(exists $self->{CONFIG}->{CONFIG}->{randomWait}){
+			CertNanny::Logging->debug("wait rnd time between 0 and ". $self->{CONFIG}->{CONFIG}->{randomWait});
+			my $rndwaittime = int(rand($self->{CONFIG}->{CONFIG}->{randomWait} ));
+			CertNanny::Logging->info("Scheduling renewal but randomly waiting $rndwaittime seconds to ease stress on the PKI");
+			sleep $rndwaittime;			
+		}
+
 	$keystore->{INSTANCE}->renew();
     }
 

@@ -21,6 +21,7 @@ use File::Spec;
 use File::Temp;
 use strict;
 use Time::Local;
+use Data::Dumper;
 
 use vars qw(@ISA @EXPORT @EXPORT_OK %EXPORT_TAGS $VERSION);
 use Exporter;
@@ -700,6 +701,29 @@ sub staticEngine     {
 	return $output=~m/\(cs\).*\[ available \]/s;
 }
 
+sub encodeBMPString{
+	shift; 
+	my $self = CertNanny::Util->getInstance();
+	my $stringToEncode =  shift;
+	
+	my $hex = unpack('H*', "$stringToEncode");
+
+	my $len = length($stringToEncode);
+	
+	my $result = "1e:"; 
+	$result .= sprintf("%02x", $len * 2  );
+		
+	for (my $i = 0; $i < length $hex; $i+=2) {
+		
+		 $result .= sprintf(":00:%s", substr ($hex, $i, 2));
+	}
+	#print "Util::BMP String:" .$result; 
+	return $result;
+	
+	
+}
+
+
 sub writeOpenSSLConfig {
     shift;
     my $self = CertNanny::Util->getInstance();
@@ -751,6 +775,45 @@ sub getDefaultOpenSSLConfig {
     
     return $default_config;
 }
+
+# Find all ethernet MAC addresses on the system
+# and print them to stdout
+#
+# Author: Andreas Leibl
+#         andreas@leibl.co.uk
+# 2013-01-30 Martin Bartosch: minor changes
+#
+sub getmacaddresses {
+    my $command;
+    my $s = ':';		     # the separator: ":" for Unix, "-" for Win
+    if ($^O eq 'MSWin32') {
+		 $command = 'ipconfig /all';
+		 $s = "-";
+    } elsif ($^O eq 'aix') {
+		 $command = "lsdev | egrep -w 'ent[0-9]+' | cut -d ' ' -f 1 | while read adapter; do entstat -d \$adapter | grep 'Hardware Address:'; done";
+    } else {
+		 $command = "ifconfig -a";
+    }
+
+    #print "DEBUG: OS is $^O\n";
+
+    local $/;		 		 		 # slurp
+
+    open (my $cmd, '-|', $command) or die "unable to run $command";
+    my $ifconfigout = <$cmd>;
+    close $cmd;
+
+    #print "DEBUG: full command output:\n$ifconfigout DEBUG: end of full output\n\n\nDEBUG: found MAC addresses:\n";
+
+    my @result;
+    while ( $ifconfigout =~ s/\b([\da-f]{1,2}$s[\da-f]{1,2}$s[\da-f]{1,2}$s[\da-f]{1,2}$s[\da-f]{1,2}$s[\da-f]{1,2})\b//i ) {
+		 my $mac = $1;
+		 $mac =~ s/-/:/g;    # in case we have windows output, harmonise it
+		 push @result, $mac;
+    }
+    return @result;
+}
+
 
 1;
 
