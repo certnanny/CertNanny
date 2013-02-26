@@ -407,7 +407,7 @@ sub generatekey {
     my $outfile = File::Spec->catfile($self->{OPTIONS}->{ENTRY}->{statedir},
 				      $keyfile);
     my $pin = $self->{PIN} || $self->{OPTIONS}->{ENTRY}->{pin} || "";
-	my $bits = $self->{SIZE} || $self->{OPTIONS}->{ENTRY}->{size} ||'1024';
+	my $bits = $self->{SIZE} || $self->{OPTIONS}->{ENTRY}->{size} ||'2048';
 	my $engine = $self->{ENGINE} || $self->{OPTIONS}->{ENTRY}->{engine} ||'no';
 	my $enginetype = $self->{ENGINETYPE} || $self->{OPTIONS}->{ENTRY}->{enginetype} ||'none';
 	my $enginename = $self->{ENGINENAME} || $self->{OPTIONS}->{ENTRY}->{enginename} ||'none';
@@ -498,7 +498,15 @@ sub createrequest {
     	return;
         }
     
-        my $DN = $self->{CERT}->{INFO}->{SubjectName};
+    	my $DN ;
+    	#for inital enrollment we override the DN to use the configured desiered DN rather then the preset enrollment certificates DN
+        if($self->{INITIALENROLLEMNT} eq 'yes')
+        {
+      		 $DN = $self->{OPTIONS}->{ENTRY}->{initialenroll}->{subject};
+        }else{
+        	 $DN = $self->{CERT}->{INFO}->{SubjectName};
+        }
+      		
     
         CertNanny::Logging->debug("DN: $DN");
         # split DN into individual RDNs. This regex splits at the ','
@@ -521,12 +529,29 @@ sub createrequest {
         $config_options->{req} = [];
         push(@{$config_options->{req}}, {prompt => "no"});
         push(@{$config_options->{req}}, {distinguished_name => "req_distinguished_name"});
+              
+        # handle subject alt names from inital configuration information 
+		my $newsans = '';
         
-        # handle subject alt name
-        if (exists $self->{CERT}->{INFO}->{SubjectAlternativeName}) {
-    	   push(@{$config_options->{req}}, {req_extensions => "v3_ext"});
+        if($self->{INITIALENROLLEMNT} eq 'yes')
+        {  	
+        	if (exists $self->{OPTIONS}->{ENTRY}->{initialenroll}->{san}){
+        		push(@{$config_options->{req}}, {req_extensions => "v3_ext"});
+          	SANS:	 	
+        		 foreach my $key ( keys %{$self->{OPTIONS}->{ENTRY}->{initialenroll}->{san}} ){
+        		 	next SANS if($key eq 'INHERIT'); 
+        		 	$newsans .= $self->{OPTIONS}->{ENTRY}->{initialenroll}->{san}->{$key}.','; 
+        		 	
+        		 }
+        		##write inittal enrollment SANs into the cert information without last ','
+      			$self->{CERT}->{INFO}->{SubjectAlternativeName} = substr($newsans , 0 , -1) ;
+        		 
+        	}	 
+        }else{
+        	 if (exists $self->{CERT}->{INFO}->{SubjectAlternativeName}) {
+    	   		push(@{$config_options->{req}}, {req_extensions => "v3_ext"});
         }
-        
+        }
         
         $config_options->{req_distinguished_name} = [];
         foreach (reverse @RDN) {
@@ -547,6 +572,18 @@ sub createrequest {
         	$config_options->{v3_ext} = [];
         	push(@{$config_options->{v3_ext}}, {subjectAltName => $san});
         }
+        
+        if($self->{INITIALENROLLEMNT} eq 'yes')
+        {
+        	CertNanny::Logging->debug("Enter initial enrollment section");
+        	
+        	if(exists $self->{OPTIONS}->{ENTRY}->{initialenroll}->{profile} ){
+        	
+        		CertNanny::Logging->debug("Found initial enroll profile: " . $self->{OPTIONS}->{ENTRY}->{initialenroll}->{profile} );
+        		push(@{$config_options->{v3_ext}}, { '1.3.6.1.4.1.311.20.2' => 'DER:'.CertNanny::Util->encodeBMPString($self->{OPTIONS}->{ENTRY}->{initialenroll}->{profile}) });
+        	}     	
+        }
+        
         
         my @engine_cmd;
         if($self->hasEngine()) {

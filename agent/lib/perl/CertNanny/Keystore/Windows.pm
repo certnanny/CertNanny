@@ -73,8 +73,7 @@ sub new
 		}
 	}
     
-    #$self->{OPTIONS}->{ENTRY}->{storename} ||= 'MY';
-    $self->{OPTIONS}->{ENTRY}->{storelocation} ||= 'machine';
+    $self->{OPTIONS}->{ENTRY}->{storelocation} ||= 'user';
     
     my $engine_section = $self->getDefaultEngineSection();
     $self->{OPTIONS}->{ENTRY}->{enroll}->{sscep}->{engine} = $engine_section;
@@ -172,12 +171,12 @@ sub CertUtilDeleteCert() {
 	push($args{OPTIONS}, '-user') if $self->{OPTIONS}->{ENTRY}->{storelocation} eq "user";
 	$args{COMMAND} = '-delstore';
 	my $serial = $args{SERIAL};
-	my $store = $args{STORE} || "My";
-	unless($serial and $store) {
-	    CertNanny::Logging->error("A deletion was requested, but either no serial or no storename was provided.");
+#	my $store = $args{STORE} || "My";
+	unless($serial) {
+	    CertNanny::Logging->error("A deletion was requested, no serial.");
 	    return;
 	}
-	CertNanny::Logging->debug("Deleting ceritifcate with serial $serial from store $store");
+	CertNanny::Logging->debug("Deleting ceritifcate with serial $serial from store $self->{OPTIONS}->{ENTRY}->{storelocation}");
 	$self->CertUtilCmd(%args);
 	return !$?;
 }
@@ -259,7 +258,7 @@ sub CertreqWriteConfig() {
     open(my $configfile, ">", $inf_file_out) or die "Cannot write $inf_file_out";
 	
 	foreach my $section ( keys  $self->{OPTIONS}->{ENTRY}->{certreq}) {
-		print $configfile "[$section]\n";
+		CertNanny::Logging->debug( $configfile . "[$section]\n" );
         while (my ($key, $value) = each($self->{OPTIONS}->{ENTRY}->{certreq}->{$section})) {
         	if(-e $value and $^O eq "MSWin32") {
 	        	#on Windows paths have a backslash, so in the string it is \\.
@@ -271,12 +270,11 @@ sub CertreqWriteConfig() {
         	if($key eq "Subject") {
         	    $value =~ s/,\s+(\w+=)/,$1/g;
         	}
-            print $configfile "$key=$value\n";
+           CertNanny::Logging->debug( $configfile."$key=$value\n");
         }
-    }
-    
-    close $configfile;
-    
+    }  
+    close $configfile; 
+       
     return $inf_file_out;	
 }
 
@@ -596,7 +594,8 @@ sub getkey() {
 # hashref containing
 # FILE => 'path/file.p12'
 # PIN  => 'file pin'
-# LOCATION  => 'user|mashine'
+# ENTRYNAME  => 'capi'
+# CONF => CertnannyConfig Hashref 
 # examples:
 # eval "CertNanny::Keystore::Windows::importP12( %p12args )";
 # IMPORTANT NOTICE: THIS METHOD MUST BE CALLED IN STATIC CONTEXT, NEVER AS A CLASS METHOD
@@ -604,10 +603,14 @@ sub importP12 {
 	#my $entry = shift; 
 	my %args = @_ ;
 
+  
 	my @cmd;
 	push(@cmd, 'certutil');
+	my $conf = $args{CONF} ;
 	
-	if($args{LOCATION} eq 'user') {
+	CertNanny::Logging->debug( "storelocation:" .$conf->{'CONFIG'}->{'certmonitor'}->{$args{ENTRYNAME}}->{'storelocation'} );
+	if($conf->{'CONFIG'}->{'certmonitor'}->{$args{ENTRYNAME}}->{'storelocation'} eq 'user') {
+		CertNanny::Logging->debug("Store location for import is user");
 		push(@cmd, '-user');	
 	}
 
