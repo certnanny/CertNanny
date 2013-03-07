@@ -926,6 +926,22 @@ Sets the time frame for starting the renewal process in seconds (optional). Shou
 
 Default: 86400 
 
+=item randomWait (optional)
+
+Sets a random backoff time before starting the renewal. If defined conditionalwait will be prioritized and evaluated first. 
+Example: 
+	 randomwait =  90  will force a random backoff time of N between 0 and 90 seconds. 
+
+=item conditionalwait
+
+Sets a conditional random backoff time before starting the renewal between HHMMSS  - HHMMSS. 
+It is posible to define a longer backofftime to be used at night as example. Outside the defined period randomwait will be used if defined. 
+
+Example: 
+conditionalwait.time = 50
+conditionalwait.start =  080000     #this would be 8 am 
+conditionalwait.end  =   140000		#this is 2 pm
+
 =back
 
 

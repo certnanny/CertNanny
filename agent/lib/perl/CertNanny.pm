@@ -198,6 +198,50 @@ sub do_enroll{
     my %args = ( @_ );
     my $entry = $args{ENTRY};
     my $entryname = $args{ENTRYNAME};
+    
+       ##check for extendedConditialWait time 
+	if(exists $self->{CONFIG}->{CONFIG}->{conditionalwait}->{'time'}){	
+		CertNanny::Logging->debug("wait extendedt time in seconds between 0 and " . $self->{CONFIG}->{CONFIG}->{conditionalwait}->{'time'} ) ;
+		
+		my $date = CertNanny::Util::epochtoisodate(time(),1);
+		my $currentDate = substr($date, 0 ,8);
+		my $now = time();
+		
+		CertNanny::Logging->debug("$now currentDate:  $date"  ) ;				
+		my $startTime = CertNanny::Util::isodatetoepoch( $currentDate.$self->{CONFIG}->{CONFIG}->{conditionalwait}->{'start'} ,1 );
+		my $endTime = CertNanny::Util::isodatetoepoch($currentDate.$self->{CONFIG}->{CONFIG}->{conditionalwait}->{'end'},1 );
+		CertNanny::Logging->debug( "$startTime startISO: ".$currentDate.$self->{CONFIG}->{CONFIG}->{conditionalwait}->{'start'});
+		CertNanny::Logging->debug( "$endTime endISO: ".$currentDate.$self->{CONFIG}->{CONFIG}->{conditionalwait}->{'end'});		
+	
+		
+		if( $startTime > $endTime ){
+			#if the end time is greater then the end time we assume the start time started the day before. 
+			$startTime -= 24*60*60;
+			CertNanny::Logging->debug("new starttime $startTime in ISO" . CertNanny::Util::epochtoisodate($startTime,1)) ;		
+		}
+		
+		if($now > $startTime and  $now < $endTime )
+		{
+			my $rndwaittime = int(rand($self->{CONFIG}->{CONFIG}->{conditionalwait}->{'time'} ));
+			CertNanny::Logging->debug( "Inside the conditinal time start extended backoff time of $rndwaittime seconds" ) ;
+			sleep $rndwaittime;	
+		}else{
+			CertNanny::Logging->debug( "outside the conditinal time no backoff" ) ;
+			if(exists $self->{CONFIG}->{CONFIG}->{randomwait}){
+				CertNanny::Logging->debug("wait rnd time between 0 and ". $self->{CONFIG}->{CONFIG}->{randomwait});
+				my $rndwaittime = int(rand($self->{CONFIG}->{CONFIG}->{randomwait} ));
+				CertNanny::Logging->info("Scheduling renewal but randomly waiting $rndwaittime seconds to ease stress on the PKI");
+				sleep $rndwaittime;			
+			}		
+		}
+	}else{
+		if(exists $self->{CONFIG}->{CONFIG}->{randomwait}){
+			CertNanny::Logging->debug("wait rnd time between 0 and ". $self->{CONFIG}->{CONFIG}->{randomwait});
+			my $rndwaittime = int(rand($self->{CONFIG}->{CONFIG}->{randomwait} ));
+			CertNanny::Logging->info("Scheduling renewal but randomly waiting $rndwaittime seconds to ease stress on the PKI");
+			sleep $rndwaittime;			
+		}	
+	}
  
 		if( $self->{ITEMS}->{$entryname}->{initialenroll}->{auth}->{mode} eq 'certificate'){
 			
@@ -287,19 +331,52 @@ sub do_renew
 	return 1;
     }
     
-    #print "self is : " . Dumper $self;
-    
     $rc = $keystore->checkvalidity($autorenew);
     if (! $rc) { 
-    	
-	# schedule automatic renewal
-	
-		if(exists $self->{CONFIG}->{CONFIG}->{randomWait}){
-			CertNanny::Logging->debug("wait rnd time between 0 and ". $self->{CONFIG}->{CONFIG}->{randomWait});
-			my $rndwaittime = int(rand($self->{CONFIG}->{CONFIG}->{randomWait} ));
+    # schedule automatic renewal	
+
+    ##check for extendedConditialWait time 
+	if(exists $self->{CONFIG}->{CONFIG}->{conditionalwait}->{'time'}){	
+		CertNanny::Logging->debug("wait extendedt time in seconds between 0 and " . $self->{CONFIG}->{CONFIG}->{conditionalwait}->{'time'} ) ;
+		
+		my $date = CertNanny::Util::epochtoisodate(time(),1);
+		my $currentDate = substr($date, 0 ,8);
+		my $now = time();
+		
+		CertNanny::Logging->debug("$now currentDate:  $date"  ) ;				
+		my $startTime = CertNanny::Util::isodatetoepoch( $currentDate.$self->{CONFIG}->{CONFIG}->{conditionalwait}->{'start'} ,1 );
+		my $endTime = CertNanny::Util::isodatetoepoch($currentDate.$self->{CONFIG}->{CONFIG}->{conditionalwait}->{'end'},1 );
+		CertNanny::Logging->debug( "$startTime startISO: ".$currentDate.$self->{CONFIG}->{CONFIG}->{conditionalwait}->{'start'});
+		CertNanny::Logging->debug( "$endTime endISO: ".$currentDate.$self->{CONFIG}->{CONFIG}->{conditionalwait}->{'end'});		
+		
+		if( $startTime > $endTime ){
+			#if the end time is greater then the end time we assume the start time started the day before. 
+			$startTime -= 24*60*60;
+			CertNanny::Logging->debug("new starttime $startTime in ISO" . CertNanny::Util::epochtoisodate($startTime,1)) ;		
+		}
+		
+		if($now > $startTime and  $now < $endTime )
+		{
+			my $rndwaittime = int(rand($self->{CONFIG}->{CONFIG}->{conditionalwait}->{'time'} ));
+			CertNanny::Logging->debug( "Inside the conditinal time start extended backoff time of $rndwaittime seconds" ) ;
+			sleep $rndwaittime;	
+		}else{
+			CertNanny::Logging->debug( "outside the conditinal time no backoff" ) ;	
+			if(exists $self->{CONFIG}->{CONFIG}->{randomwait}){
+				CertNanny::Logging->debug("wait rnd time between 0 and ". $self->{CONFIG}->{CONFIG}->{randomwait});
+				my $rndwaittime = int(rand($self->{CONFIG}->{CONFIG}->{randomwait} ));
+				CertNanny::Logging->info("Scheduling renewal but randomly waiting $rndwaittime seconds to ease stress on the PKI");
+				sleep $rndwaittime;			
+			}		
+		}
+	}else{
+			if(exists $self->{CONFIG}->{CONFIG}->{randomwait}){
+			CertNanny::Logging->debug("wait rnd time between 0 and ". $self->{CONFIG}->{CONFIG}->{randomwait});
+			my $rndwaittime = int(rand($self->{CONFIG}->{CONFIG}->{randomwait} ));
 			CertNanny::Logging->info("Scheduling renewal but randomly waiting $rndwaittime seconds to ease stress on the PKI");
 			sleep $rndwaittime;			
-		}
+		}	
+	}
 
 	$keystore->{INSTANCE}->renew();
     }
