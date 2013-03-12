@@ -6,7 +6,7 @@
 # for certnanny
 #
 # author: sebastian roland
-# date: 14.02.2013
+# date: 07.03.2013
 #
 ########################################
 
@@ -61,6 +61,10 @@ get_next_free_index()
 
     echo ${index}
 }
+
+# all functions used for creating a specific keystore get the cert_type
+# as argument. possible values are <server|email|user>.
+# as a convention filename should be "10-ee_${cert_type}_${index}_*"
 
 create_keystore_openssl()
 {
@@ -143,7 +147,7 @@ fi
 
 case "${arg1}" in
     init)
-            if [ ! ${arg_count} -eq 2 ]
+            if [ ${arg_count} -ne 2 ]
             then
                 usage
             fi
@@ -231,7 +235,7 @@ EOF
             ;;
 
     create_ee)
-            if [ ! ${arg_count} -eq 3 ]
+            if [ ${arg_count} -ne 3 ]
             then
                 usage
             fi
