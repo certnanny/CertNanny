@@ -106,26 +106,42 @@ sub timestamp
 sub isodatetoepoch
 {
     my $isodate = shift;
+    my $isLocalTime = shift; 
 
     return unless defined $isodate;
+	if(!defined $isLocalTime){
+		    if (my ($year, $mon, $mday, $hours, $min, $sec) = ($isodate =~ /^(\d{4})(\d\d)(\d\d)(\d\d)(\d\d)(\d\d)$/))
+		    {
+			$mon -= 1;
+			$year -= 1900;
+			
+			return timegm($sec, $min, $hours, $mday, $mon, $year);
+			}			
+	}else{
+			if (my ($year, $mon, $mday, $hours, $min, $sec) = ($isodate =~ /^(\d{4})(\d\d)(\d\d)(\d\d)(\d\d)(\d\d)$/))
+		    {
+			$mon -= 1;
+			$year -= 1900;
+			
+			return timelocal($sec, $min, $hours, $mday, $mon, $year);
+			}
+	}
 
-    if (my ($year, $mon, $mday, $hours, $min, $sec) = ($isodate =~ /^(\d{4})(\d\d)(\d\d)(\d\d)(\d\d)(\d\d)$/))
-    {
-	$mon -= 1;
-	$year -= 1900;
-	return timegm($sec, $min, $hours, $mday, $mon, $year);
-    }
+	
     return;
 }
 
 # convert Unix Epoch to ISO Date
-# arg: Epoch seconds
+# arg: Epoch seconds , use localtime flag
 # return: ISO Date (YYYYMMDDHHMMSS)
 sub epochtoisodate
 {
     my $epoch = shift;
-    my ($seconds, $minutes, $hours, $day_of_month, $month, $year,
-	$wday, $yday, $isdst) = gmtime($epoch);
+    my $isLocalTime = shift; 
+    
+    if(!defined $isLocalTime){
+    	   my ($seconds, $minutes, $hours, $day_of_month, $month, $year,
+			$wday, $yday, $isdst) = gmtime($epoch);
     return sprintf("%04d%02d%02d%02d%02d%02d", 
 		   $year + 1900, 
 		   $month + 1, 
@@ -133,6 +149,22 @@ sub epochtoisodate
 		   $hours,
 		   $minutes,
 		   $seconds);
+    	
+    }else{
+    	  my ($seconds, $minutes, $hours, $day_of_month, $month, $year,
+			$wday, $yday, $isdst) = localtime($epoch);
+		CertNanny::Logging->debug("Localtime daylightsaving $isdst");
+				
+     return  sprintf("%04d%02d%02d%02d%02d%02d", 
+		   $year + 1900, 
+		   $month + 1, 
+		   $day_of_month,
+		   $hours,
+		   $minutes,
+		   $seconds);
+    	
+    }
+ 
 }
 
 
