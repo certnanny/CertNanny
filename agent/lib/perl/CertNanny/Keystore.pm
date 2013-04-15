@@ -1576,7 +1576,7 @@ sub sendrequest {
     		# only necessary if no engine support is available
     		# otherwise the keystore or engine is responsible for returning
     		# the correct format
-    		CertNanny::Logging->debug(Dumper($oldkey));
+    		#CertNanny::Logging->debug(Dumper($oldkey));
     		
     		my $oldkey_pem_unencrypted = $self->convertkey(
     		    %{$oldkey},
