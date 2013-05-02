@@ -257,24 +257,25 @@ sub CertreqWriteConfig() {
     my $inf_file_out = $self->gettmpfile();
     open(my $configfile, ">", $inf_file_out) or die "Cannot write $inf_file_out";
 	
-	foreach my $section ( keys  $self->{OPTIONS}->{ENTRY}->{certreq}) {
-		CertNanny::Logging->debug( $configfile . "[$section]\n" );
-        while (my ($key, $value) = each($self->{OPTIONS}->{ENTRY}->{certreq}->{$section})) {
-        	if(-e $value and $^O eq "MSWin32") {
-	        	#on Windows paths have a backslash, so in the string it is \\.
-	        	#In the config it must keep the doubled backslash so the actual 
-	        	#string would contain \\\\. Yes this is ridiculous...
-				$value =~ s/\\/\\\\/g;        		
-        	}
-        	
-        	if($key eq "Subject") {
-        	    $value =~ s/,\s+(\w+=)/,$1/g;
-        	}
-           CertNanny::Logging->debug( $configfile."$key=$value\n");
+	foreach my $section ( keys $self->{OPTIONS}->{ENTRY}->{certreq}) {
+	print $configfile "[$section]\n";
+	        while (my ($key, $value) = each($self->{OPTIONS}->{ENTRY}->{certreq}->{$section})) {
+	         if(-e $value and $^O eq "MSWin32") {
+	#on Windows paths have a backslash, so in the string it is \\.
+	#In the config it must keep the doubled backslash so the actual
+	#string would contain \\\\. Yes this is ridiculous...
+	$value =~ s/\\/\\\\/g;
+         }
+        
+         if($key eq "Subject") {
+         $value =~ s/,\s+(\w+=)/,$1/g;
+         }
+            print $configfile "$key=$value\n";
         }
-    }  
-    close $configfile; 
-       
+    }
+    
+    close $configfile;
+    
     return $inf_file_out;	
 }
 
