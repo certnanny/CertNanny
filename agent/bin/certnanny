@@ -51,6 +51,7 @@ GetOptions(\%config,
 	      cfg|cfgfile|conf|config=s
 			win_user=s
 			win_password=s
+			challengepassword=s
 		  sleep=i
 	      )) or pod2usage(-msg => $msg, -verbose => 0);
 
@@ -61,9 +62,12 @@ pod2usage(-msg => $msg, -verbose => 1) if ($config{help} or
 die "Could not read config file $config{cfg}. Stopped" 
     unless (-r $config{cfg});
 
+$config{keystore.DEFAULT.initialenroll.auth.challengepassword} = $config{challengepassword};
+
 my $monitor = CertNanny->getInstance(CONFIG => $config{cfg});
 $config{sleep} = 300 if !defined $config{sleep};
 $monitor->setOption("sleep", $config{sleep});
+
 
 foreach my $cmd (@ARGV) {
 	if ($OSNAME eq 'MSWin32') {
@@ -295,6 +299,7 @@ Options:
   --man             full documentation
 
   --cfg             specify config file to use
+  --challengepassword   specify a challenge password to use for a initial enrollment (all keystores)
   --win_user        specify alternative Windows username to run the Windows Service
   --win_password    specify password corresponding to win_user
 
@@ -370,13 +375,16 @@ keystore.(keystorename).initialenroll.auth.pin = PIN
 2. Authmode [anonymous]
 Enrollment with a selfsigned certificate (annonymus enrollment)
 
-to be implemented
-
 3. Authmode [password]
-Enrollment with a chalange password 
+The challenge password can be placed in the config: 
+keystore.(keystorename).initialenroll.auth.challengepassword = CHALLANGE
+or as a comand line parameter: 
 
-to be implemented 
-#keystore.(keystorename).initialenroll.auth.challengepassword = pw
+certnanny renew --cfg [...] --challengepassword  "myGlobalSecretChallange"
+
+A password provided via the commandline will be used for every keystore if not configured:
+
+keystore.(keystorename).initialenroll.auth.challengepassword = "myKeystoreSecretChallange"
 
 =item B<install>
 
@@ -1577,12 +1585,17 @@ If there are two or more identical certificates in the certificate store, the re
 will not work and one of the certificates has to be removed manually. 
 
 Multiple certificates are supported but the CN part of the certificates have to differ so a substring of the CN gives a unique result. 
+
 OK: 
 	CN=www.example.com:cert1,O=Example Ltd.,DC=example,DC=com
+	
 	CN=www.example.com:cert2,O=Example Ltd.,DC=example,DC=com
+	
 Buggy:
 	CN=www.example.com:cert,O=Example Ltd.,DC=example,DC=com
+	
 	CN=www.example.com:cert2,O=Example Ltd.,DC=example,DC=com
+	
 =back
 
 =head4 2.2.2.5 Windows IIS keystore
