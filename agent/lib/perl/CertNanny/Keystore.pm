@@ -115,27 +115,34 @@ sub new
 	unless defined $self->{INSTANCE};
 
     # get certificate
-    $self->{CERT} = $self->{INSTANCE}->getcert();
-
-    if (defined $self->{CERT}) {
-		$self->{CERT}->{INFO} = $self->getcertinfo(%{$self->{CERT}});
-		my $subjectname = $self->{CERT}->{INFO}->{SubjectName};
-		my $serial = $self->{CERT}->{INFO}->{SerialNumber};
-		my $issuer = $self->{CERT}->{INFO}->{IssuerName};
-		CertNanny::Logging->debug("Certificate Information:\n\tSubjectName: $subjectname\n\tSerial: $serial\n\tIssuer: $issuer");
-	
-		my %convopts = %{$self->{CERT}};
-	
-		$convopts{OUTFORMAT} = 'PEM';
-		$self->{CERT}->{RAW}->{PEM}  = $self->convertcert(%convopts)->{CERTDATA};
-		$convopts{OUTFORMAT} = 'DER';
-		$self->{CERT}->{RAW}->{DER}  = $self->convertcert(%convopts)->{CERTDATA};
+    if(defined $self->{INSTANCE}->{OPTIONS}->{CONFIG}->{INITIALENROLLEMNT} and $self->{INSTANCE}->{OPTIONS}->{CONFIG}->{INITIALENROLLEMNT} eq 'yes' ){
+    		
+    		CertNanny::Logging->debug("Initialenrollment keystore that has no certificate to read yet.");
     }else{
-		CertNanny::Logging->error("Could not parse instance certificate");
-		return;
-    }
-    $self->{INSTANCE}->setcert($self->{CERT});
+    	    	
+    	$self->{CERT} = $self->{INSTANCE}->getcert();
 
+  	  if (defined $self->{CERT}) {
+		$self->{CERT}->{INFO} = $self->getcertinfo(%{$self->{CERT}});
+			my $subjectname = $self->{CERT}->{INFO}->{SubjectName};
+			my $serial = $self->{CERT}->{INFO}->{SerialNumber};
+			my $issuer = $self->{CERT}->{INFO}->{IssuerName};
+			CertNanny::Logging->debug("Certificate Information:\n\tSubjectName: $subjectname\n\tSerial: $serial\n\tIssuer: $issuer");
+		
+			my %convopts = %{$self->{CERT}};
+		
+			$convopts{OUTFORMAT} = 'PEM';
+			$self->{CERT}->{RAW}->{PEM}  = $self->convertcert(%convopts)->{CERTDATA};
+			$convopts{OUTFORMAT} = 'DER';
+			$self->{CERT}->{RAW}->{DER}  = $self->convertcert(%convopts)->{CERTDATA};
+	    }else{
+			CertNanny::Logging->error("Could not parse instance certificate");
+			return;
+	    }
+	    $self->{INSTANCE}->setcert($self->{CERT});
+      	
+    }
+    
     # get previous renewal status
     #$self->retrieve_state() or return;
 
@@ -1017,7 +1024,7 @@ sub getinfo
 sub checkvalidity {	
     my $self = shift;
     my $days = shift || 0;
-    
+   
     my $notAfter = isodatetoepoch($self->{CERT}->{INFO}->{NotAfter});
     return unless defined $notAfter;
 
@@ -1032,12 +1039,12 @@ sub renew {
     my $self = shift;
 
     $self->renewalstate("initial") unless defined $self->renewalstate();
-    my $laststate = "n/a";
+    my $laststate = "n/a";  
 
     while ($laststate ne $self->renewalstate()) {
 	$laststate = $self->renewalstate();
 	# renewal state machine
-	if ($self->renewalstate() eq "initial") {
+	if ($self->renewalstate() eq "initial" or $self->renewalstate() eq "keygenerated") {
 	    CertNanny::Logging->log({ MSG => "State: initial",
 			 PRIO => 'debug' });
 	    
@@ -1140,6 +1147,14 @@ sub importP12 {
 	return;
 }
 
+sub generatekey {
+	#my $self = shift;
+		##needs to be implemented in keystore
+		
+		CertNanny::Logging->error("WRONG GENERATE KEY! ");
+	return; 
+}
+
 # get all root certificates from the configuration that are currently
 # valid
 # return:
@@ -1155,12 +1170,22 @@ sub getrootcerts {
     foreach my $index (keys %{$self->{OPTIONS}->{ENTRY}->{rootcacert}}) {
 		next if ($index eq "INHERIT");
 		#....{$index} is a valid cert?
-		my $res = $self->checkCert($self->{OPTIONS}->{ENTRY}->{rootcacert}->{$index});
-		if ($res !=0) {
+		CertNanny::Logging->debug("check for root file: ".$self->{OPTIONS}->{ENTRY}->{rootcacert}->{$index});
+		my $res = 0;
+		
+		#avoid error message trying to read a directory in openSSL 
+		if(not -d $self->{OPTIONS}->{ENTRY}->{rootcacert}->{$index} ){
+				CertNanny::Logging->debug("root cert is a directory");  
+				$res = $self->checkCert($self->{OPTIONS}->{ENTRY}->{rootcacert}->{$index});
+		}		
+		
+		if ($res != 0) {
 			push(@result,$res);
 		}
 		else{ 
 			#check if ...{$index} is folder
+			CertNanny::Logging->debug("check for roots directory");
+				
 			if ( not opendir(inFolder,$self->{OPTIONS}->{ENTRY}->{rootcacert}->{$index})){
 				CertNanny::Logging->error("can't open folder: $index"); 
 				next ROOTCERT; #eventuell die? 
@@ -1168,10 +1193,15 @@ sub getrootcerts {
 			#go through each file in the folder and check if it is avalid cert
 			my @files = readdir inFolder;
 			foreach my $file (@files){
-				my $res = $self->checkCert("$self->{OPTIONS}->{ENTRY}->{rootcacert}->{$index}$file");
-				if ($res !=0) {
-					push(@result,$res);
-				}	
+				if($file ne "."  and $file ne ".." and $file ne ''){
+					my $rootFile = File::Spec->catfile($self->{OPTIONS}->{ENTRY}->{rootcacert}->{$index}, "$file");
+					CertNanny::Logging->debug("Trusted root certificate: ".$rootFile);
+					my $res = $self->checkCert($rootFile);
+					if ($res !=0) {
+						push(@result,$res);
+					}	
+				}
+
 			}	
 		}		
     }
@@ -1378,7 +1408,7 @@ sub buildcertificatechain {
 	CertNanny::Logging->error("Certificate chain could not be built");
 	return;
     }
-
+	
     my $fingerprint = $chain[0]->{CERTINFO}->{CertificateFingerprint};
     if (! exists $rootcertfingerprint{ $fingerprint }) {
 	CertNanny::Logging->error("Root certificate is not trusted");
@@ -1576,7 +1606,7 @@ sub sendrequest {
     		# only necessary if no engine support is available
     		# otherwise the keystore or engine is responsible for returning
     		# the correct format
-    		CertNanny::Logging->debug(Dumper($oldkey));
+    		#CertNanny::Logging->debug(Dumper($oldkey));
     		
     		my $oldkey_pem_unencrypted = $self->convertkey(
     		    %{$oldkey},
@@ -1740,8 +1770,23 @@ sub sendrequest {
 				   croak "Could not execute $target keystore importP12 function. Aborted. $@" ;
 				return 0;
 			    }else{
+			    	  	
+			    	CertNanny::Logging->debug("Compleated clean up after initial enrollment and p12 import.");
+			    	if($self->{OPTIONS}->{ENTRY}->{initialenroll}->{auth}->{mode} eq "password"   or 
+			    	$self->{OPTIONS}->{ENTRY}->{initialenroll}->{auth}->{mode} eq "anonymous"	){
+			    		
+			    		my $selfsigncert = $self->{OPTIONS}->{ENTRYNAME}."-selfcert.pem";
+			    		my $outCert = File::Spec->catfile($self->{OPTIONS}->{ENTRY}->{statedir},$selfsigncert);
+			    		CertNanny::Logging->debug("delete selfsign cert: ".$outCert);
+			    			
+			    		if(-e $outCert)
+			    		{		    			
+			    			unlink $outCert;
+			    			CertNanny::Logging->debug("deleted ". $outCert);
+			    		}
+			    	}
+			    	
 			         unlink $outp12 ;
-			         
 			    	 $self->renewalstate("completed");
 			    	 $rc = 1;
 			    }
