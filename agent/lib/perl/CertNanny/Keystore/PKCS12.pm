@@ -105,6 +105,7 @@ sub getcert {
     }
 
     my @cmd;
+  
 
     @cmd = (qq("$openssl"),
 	    'pkcs12',
@@ -114,6 +115,7 @@ sub getcert {
 	    '-clcerts',
 	    @passin,
 	);
+	 CertNanny::Logging->debug ("PKCS12:getcert cmd @cmd");
 
     my $cmd = join(' ', @cmd);
     my $handle;
@@ -133,6 +135,7 @@ sub getcert {
 	$label = $1;
     }
     $certdata =~ s{ \A .* (?=-----BEGIN\ CERTIFICATE) }{}xms;
+	CertNanny::Logging->debug ("PKCS12:getcert certdata $certdata");
 
     return (
 	{
