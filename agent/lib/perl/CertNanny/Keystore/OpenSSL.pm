@@ -20,6 +20,7 @@ use File::Spec;
 use File::Copy;
 use Data::Dumper;
 use CertNanny::Util;
+use Net::Domain;
 
 $VERSION = 0.10;
 
@@ -40,19 +41,24 @@ sub new
     # propagate PIN to class options
     $self->{PIN} = $self->{OPTIONS}->{ENTRY}->{pin};
 
-    if (! defined $self->{OPTIONS}->{ENTRY}->{keyfile} ||
+	if(defined $self->{OPTIONS}->{CONFIG}->{INITIALENROLLEMNT} and $self->{OPTIONS}->{CONFIG}->{INITIALENROLLEMNT} eq 'yes' ){
+ 		CertNanny::Logging->info("Initial enrollment mode, skip check for key and cert file");
+
+	}else{
+				
+		if (! defined $self->{OPTIONS}->{ENTRY}->{keyfile} ||
 	    (! -r $self->{OPTIONS}->{ENTRY}->{keyfile})
 	    && !defined $self->{OPTIONS}->{ENTRY}->{hsm}) {
-	    croak("keystore.keyfile $self->{OPTIONS}->{ENTRY}->{keyfile} not defined, does not exist or unreadable");
-	    return;
-	}
+		    croak("keystore.keyfile $self->{OPTIONS}->{ENTRY}->{keyfile} not defined, does not exist or unreadable");
+		    return;
+		}
 	
-	if (! defined $self->{OPTIONS}->{ENTRY}->{location} ||
-	    (! -r $self->{OPTIONS}->{ENTRY}->{location})) {
-	    croak("keystore.location $self->{OPTIONS}->{ENTRY}->{location} not defined, does not exist or unreadable");
-	    return;
+		if (! defined $self->{OPTIONS}->{ENTRY}->{location} ||
+		    (! -r $self->{OPTIONS}->{ENTRY}->{location})) {
+		    croak("keystore.location $self->{OPTIONS}->{ENTRY}->{location} not defined, does not exist or unreadable");
+		    return;
+		}	
 	}
-    
 
 
     # desired target formats
@@ -406,6 +412,7 @@ sub generatekey {
     my $keyfile = $self->{OPTIONS}->{ENTRYNAME} . "-key.pem";
     my $outfile = File::Spec->catfile($self->{OPTIONS}->{ENTRY}->{statedir},
 				      $keyfile);
+				      	
     my $pin = $self->{PIN} || $self->{OPTIONS}->{ENTRY}->{pin} || "";
 	my $bits = $self->{SIZE} || $self->{OPTIONS}->{ENTRY}->{size} ||'2048';
 	my $engine = $self->{ENGINE} || $self->{OPTIONS}->{ENTRY}->{engine} ||'no';
@@ -471,9 +478,20 @@ sub generatekey {
 sub createrequest {
     my $self = shift;
     CertNanny::Logging->info("Creating request");
-
+	
+	my $result = undef; 
     #print Dumper $self;
-    my $result = $self->generatekey();
+    if($self->{INITIALENROLLEMNT} eq 'yes'  and $self->{OPTIONS}->{ENTRY}->{initialenroll}->{auth}->{mode} eq 'password')
+    {
+    	my $keyfile = $self->{OPTIONS}->{ENTRYNAME} . "-key.pem";
+    	my $outfile = File::Spec->catfile($self->{OPTIONS}->{ENTRY}->{statedir},$keyfile);
+    	$result = { KEYFILE => $outfile };
+      	CertNanny::Logging->debug("Skip key generation in initialenrollment its already generated for selfsign certificate");
+	
+    }else{
+    	 $result = $self->generatekey();
+    }
+   
     
     if (! defined $result) {
 	CertNanny::Logging->error("Key generation failed");
@@ -544,9 +562,9 @@ sub createrequest {
         		 	
         		 }
         		##write inittal enrollment SANs into the cert information without last ','
-      			$self->{CERT}->{INFO}->{SubjectAlternativeName} = substr($newsans , 0 , -1) ;
-        		 
+      			$self->{CERT}->{INFO}->{SubjectAlternativeName} = substr($newsans , 0 , -1) ;      		 
         	}	 
+           	
         }else{
         	 if (exists $self->{CERT}->{INFO}->{SubjectAlternativeName}) {
     	   		push(@{$config_options->{req}}, {req_extensions => "v3_ext"});
@@ -581,7 +599,14 @@ sub createrequest {
         	
         		CertNanny::Logging->debug("Found initial enroll profile: " . $self->{OPTIONS}->{ENTRY}->{initialenroll}->{profile} );
         		push(@{$config_options->{v3_ext}}, { '1.3.6.1.4.1.311.20.2' => 'DER:'.CertNanny::Util->encodeBMPString($self->{OPTIONS}->{ENTRY}->{initialenroll}->{profile}) });
-        	}     	
+        	}
+        	
+        	if(exists $self->{OPTIONS}->{ENTRY}->{initialenroll}->{auth}->{challengepassword}){
+        		CertNanny::Logging->debug("Add challenge Password to CSR"); 
+        		push(@{$config_options->{req}}, {attributes  => "req_attributes"});   		
+         		push(@{$config_options->{req_attributes}}, { 'challengePassword' => $self->{OPTIONS}->{ENTRY}->{initialenroll}->{auth}->{challengepassword} } );        			
+        	}
+        	     	
         }
         
         
@@ -857,6 +882,100 @@ sub installcert {
 sub hasEngine {
     my $self = shift;
     return defined $self->{HSM};
+}
+
+sub selfsign {
+    my $self = shift;
+
+ 	my $openssl = $self->{OPTIONS}->{CONFIG}->get('cmd.openssl', 'FILE');
+    my $selfsigncert = $self->{OPTIONS}->{ENTRYNAME} . "-selfcert.pem";
+    my $outfile = File::Spec->catfile($self->{OPTIONS}->{ENTRY}->{statedir},
+				      $selfsigncert);
+    my $pin = $self->{PIN} || $self->{OPTIONS}->{ENTRY}->{pin} || "";
+    
+    ######prepere openssl config file##########
+    my $DN ;
+    	#for inital enrollment we override the DN to use the configured desiered DN rather then the preset enrollment certificates DN
+        if($self->{INITIALENROLLEMNT} eq 'yes')
+        {
+      		 $DN = $self->{OPTIONS}->{ENTRY}->{initialenroll}->{subject};
+        }else{
+        	 $DN = Net::Domain::hostfqdn();
+        }
+      		
+    
+        CertNanny::Logging->debug("DN: $DN");
+        # split DN into individual RDNs. This regex splits at the ','
+        # character if it is not escaped with a \ (negative look-behind)
+        my @RDN = split(/(?<!\\),\s*/, $DN);
+        
+        my %RDN_Count;
+        foreach (@RDN) {
+    	my ($key, $value) = (/(.*?)=(.*)/);
+    	$RDN_Count{$key}++;
+        }
+    
+        # delete all entries that only showed up once
+        # all other keys now indicate the total number of appearance
+        map { delete $RDN_Count{$_} if ($RDN_Count{$_} == 1); } keys %RDN_Count;
+    
+    
+        
+     my $config_options = CertNanny::Util->getDefaultOpenSSLConfig();
+     $config_options->{req} = [];
+     push(@{$config_options->{req}}, {prompt => "no"});
+     push(@{$config_options->{req}}, {distinguished_name => "req_distinguished_name"});
+       
+        $config_options->{req_distinguished_name} = [];
+        foreach (reverse @RDN) {
+            my $rdnstr = "";
+        	my ($key, $value) = (/(.*?)=(.*)/);
+        	if (exists $RDN_Count{$key}) {
+        	    $rdnstr = $RDN_Count{$key} . ".";
+        	    $RDN_Count{$key}--;
+        	}
+        	
+        	$rdnstr .= $key; 
+        	push(@{$config_options->{req_distinguished_name}}, {$rdnstr => $value});
+        }
+        
+
+
+        my $tmpconfigfile = CertNanny::Util->writeOpenSSLConfig($config_options);
+        CertNanny::Logging->debug("The following configuration was written to $tmpconfigfile:\n" . CertNanny::Util->read_file($tmpconfigfile));
+        
+    
+            # generate request
+        my @cmd = (qq("$openssl"),
+    	       'req',
+    	       '-config',
+    	       qq("$tmpconfigfile"),
+    	       '-x509',
+    	       '-new',
+    	       '-sha1',
+    	       '-out',
+    	       qq("$outfile"),
+    	       '-key',
+    	       qq("$self->{OPTIONS}->{ENTRY}->{keyfile}"),
+    	);
+ 
+    
+		push (@cmd, ('-passin', 'env:PIN')) unless $pin eq "";
+    
+        CertNanny::Logging->log({ MSG => "Execute: " . join(" ", @cmd),
+    		 PRIO => 'debug' });
+    
+        $ENV{PIN} = $pin;
+        if (run_command(join(' ', @cmd)) != 0) {
+    		CertNanny::Logging->error("Selfsign certifcate creation failed!");
+         	delete $ENV{PIN};
+        }
+    
+			#    openssl req -x509 -days 365 -new -out self-signed-certificate.pem
+			#	-key pub-sec-key.pem
+
+    
+    return ({ CERT => $outfile });
 }
 
 

@@ -216,20 +216,20 @@ sub read_file
 
     if (! -e $filename)
     {
-	CertNanny::Logging->error("read_file(): file does not exist");
+	CertNanny::Logging->error("read_file(): file does not exist: $filename");
 	return;
     }
 
     if (! -r $filename)
     {
-	CertNanny::Logging->error("read_file(): file is not readable");
+	CertNanny::Logging->error("read_file(): file is not readable: $filename");
 	return;
     }
 
     my $result = do {
 	open my $fh, '<', $filename;
 	if (! $fh) {
-	    CertNanny::Logging->error("read_file(): file open failed");
+	    CertNanny::Logging->error("read_file(): file open failed: $filename");
 	    return;
 	}
 	binmode $fh;
@@ -806,6 +806,60 @@ sub getDefaultOpenSSLConfig {
     };
     
     return $default_config;
+}
+
+
+sub backoffTime {
+	
+	my $config = shift;
+	
+		CertNanny::Logging->debug("CertNanny::Util::backofftime") ;
+		
+		if(exists $config->{CONFIG}->{conditionalwait}->{'time'}){	
+		CertNanny::Logging->debug("wait extendedt time in seconds between 0 and " . $config->{CONFIG}->{conditionalwait}->{'time'} ) ;
+		
+		my $date = CertNanny::Util::epochtoisodate(time(),1);
+		my $currentDate = substr($date, 0 ,8);
+		my $now = time();
+		
+		CertNanny::Logging->debug("$now currentDate:  $date"  ) ;				
+		my $startTime = CertNanny::Util::isodatetoepoch( $currentDate.$config->{CONFIG}->{conditionalwait}->{'start'} ,1 );
+		my $endTime = CertNanny::Util::isodatetoepoch($currentDate.$config->{CONFIG}->{conditionalwait}->{'end'},1 );
+		CertNanny::Logging->debug( "$startTime startISO: ".$currentDate.$config->{CONFIG}->{conditionalwait}->{'start'});
+		CertNanny::Logging->debug( "$endTime endISO: ".$currentDate.$config->{CONFIG}->{conditionalwait}->{'end'});		
+	
+		
+		if( $startTime > $endTime ){
+			#if the end time is greater then the end time we assume the start time started the day before. 
+			$startTime -= 24*60*60;
+			CertNanny::Logging->debug("new starttime $startTime in ISO" . CertNanny::Util::epochtoisodate($startTime,1)) ;		
+		}
+		
+		if($now > $startTime and  $now < $endTime )
+		{
+			my $rndwaittime = int(rand($config->{CONFIG}->{conditionalwait}->{'time'} ));
+			CertNanny::Logging->debug( "Inside the conditinal time start extended backoff time of $rndwaittime seconds" ) ;
+			sleep $rndwaittime;	
+		}else{
+			CertNanny::Logging->debug( "outside the conditinal time no backoff" ) ;
+			if(exists $config->{CONFIG}->{randomwait}){
+				CertNanny::Logging->debug("wait rnd time between 0 and ". $config->{CONFIG}->{randomwait});
+				my $rndwaittime = int(rand($config->{CONFIG}->{randomwait} ));
+				CertNanny::Logging->info("Scheduling renewal but randomly waiting $rndwaittime seconds to ease stress on the PKI");
+				sleep $rndwaittime;			
+			}		
+		}
+	}else{
+		if(exists $config->{CONFIG}->{randomwait}){
+			CertNanny::Logging->debug("wait rnd time between 0 and ".$config->{CONFIG}->{randomwait});
+			my $rndwaittime = int(rand($config->{CONFIG}->{randomwait} ));
+			CertNanny::Logging->info("Scheduling renewal but randomly waiting $rndwaittime seconds to ease stress on the PKI");
+			sleep $rndwaittime;			
+		}	
+	}
+	
+	
+	return 1;
 }
 
 # Find all ethernet MAC addresses on the system
