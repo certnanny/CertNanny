@@ -631,7 +631,7 @@ sub createrequest {
     	}
         
         my $tmpconfigfile = CertNanny::Util->writeOpenSSLConfig($config_options);
-        CertNanny::Logging->debug("The following configuration was written to $tmpconfigfile:\n" . CertNanny::Util->read_file($tmpconfigfile));
+        #CertNanny::Logging->debug("The following configuration was written to $tmpconfigfile:\n" . CertNanny::Util->read_file($tmpconfigfile));
     
         # generate request
         my @cmd = (qq("$openssl"),
