@@ -176,7 +176,12 @@ sub do_check
     my $warnexpiry = $self->{ITEMS}->{$args{ENTRY}}->{warnexpiry_days};
     
     my $rc;
+   
+    $keystore->{CERT} = $keystore->{INSTANCE}->getcert();
+    $keystore->{CERT}->{INFO} = $keystore->getcertinfo(%{$keystore->{CERT}});
     $rc = $keystore->checkvalidity(0);
+     
+    #CertNanny::Logging->debug("Get cert: $rc : ". Dumper($keystore));
     if (! $rc) {
 	CertNanny::Logging->log({MSG => "Certificate has expired. No automatic renewal can be performed.", PRIO => 'error'});
 	return 1;
@@ -258,11 +263,11 @@ sub do_enroll{
 				     ENTRYNAME => $entryname);
 				     
 		$newkeystore->retrieve_state() or return;
-
+				
+		my $autorenew = $self->{ITEMS}->{$args{ENTRY}}->{autorenew_days};	     			
+		my $renewalstate = $newkeystore->{INSTANCE}->{STATE}->{DATA}->{RENEWAL}->{STATUS};
 		
-			my $autorenew = $self->{ITEMS}->{$args{ENTRY}}->{autorenew_days};	     
-			
-			if($newkeystore->renewalstate() eq 'sendrequest') {
+			if($renewalstate eq 'sendrequest') {
 					CertNanny::Logging->log({MSG => "Initial enrollment request send." , PRIO => 'info'});
 				    # get previous renewal status
 			    #$self->retrieve_state() or return;
@@ -270,7 +275,7 @@ sub do_enroll{
 			    # check if we can write to the file
 			    $newkeystore->store_state() || croak "Could not write state file $newkeystore->{STATE}->{FILE}";
 			}
-			if($newkeystore->renewalstate() eq 'completed') {
+			if($renewalstate eq 'completed') {
 				my $isValid = $newkeystore->checkvalidity($autorenew);
 				CertNanny::Logging->log({MSG => "Initial enrollment completed successfully. Onbehalf." , PRIO => 'info'});
 				$newkeystore->store_state() || croak "Could not write state file $newkeystore->{STATE}->{FILE}";
@@ -278,130 +283,129 @@ sub do_enroll{
 			
 			return 1;
 			
-		}else{
-			
-			if($self->{ITEMS}->{$entryname}->{initialenroll}->{auth}->{mode} eq 'password' or
-				$self->{ITEMS}->{$entryname}->{initialenroll}->{auth}->{mode} eq 'anonymous'	
-			 ){
-				CertNanny::Logging->log({MSG => "Start initial enrollment with authentication method " . $self->{ITEMS}->{$entryname}->{initialenroll}->{auth}->{mode} , PRIO => 'info'});
+	}else{
+		
+		if($self->{ITEMS}->{$entryname}->{initialenroll}->{auth}->{mode} eq 'password' or
+			$self->{ITEMS}->{$entryname}->{initialenroll}->{auth}->{mode} eq 'anonymous'	
+		){
+			CertNanny::Logging->log({MSG => "Start initial enrollment with authentication method " . $self->{ITEMS}->{$entryname}->{initialenroll}->{auth}->{mode} , PRIO => 'info'});
 				
 					
-				##Change keystore attributes to instantitae a openSSL keystore with the entrollment certificate
-		    	$entry->{initialenroll}->{targetType}=  $entry->{type} ;  
-		    	$entry->{type}= 'OpenSSL';    
-		    	$self->{CONFIG}->{INITIALENROLLEMNT} = 'yes'; 			
+			##Change keystore attributes to instantitae a openSSL keystore with the entrollment certificate
+		    $entry->{initialenroll}->{targetType}=  $entry->{type} ;  
+		    $entry->{type}= 'OpenSSL';    
+		    $self->{CONFIG}->{INITIALENROLLEMNT} = 'yes'; 			
 	
-				my $newkeystore = 
-	    		CertNanny::Keystore->new(CONFIG => $self->{CONFIG},
-				     ENTRY =>  $self->{ITEMS}->{$entryname},
-				     ENTRYNAME => $entryname);
+			my $newkeystore = 
+	   		CertNanny::Keystore->new(CONFIG => $self->{CONFIG},
+			     ENTRY =>  $self->{ITEMS}->{$entryname},
+			     ENTRYNAME => $entryname);
 				     
-				$newkeystore->retrieve_state() || croak "Could not write state file $newkeystore->{STATE}->{FILE}";
-		
-				     
-				$newkeystore->{INSTANCE}->{INITIALENROLLEMNT} = 'yes';
+			$newkeystore->retrieve_state() || croak "Could not write state file $newkeystore->{STATE}->{FILE}";
+	
+			     
+			$newkeystore->{INSTANCE}->{INITIALENROLLEMNT} = 'yes';
 				
-				if($self->{ITEMS}->{$entryname}->{initialenroll}->{auth}->{mode} eq 'password'){
-					if (! defined $newkeystore->{INSTANCE}->{OPTIONS}->{ENTRY}->{initialenroll}->{auth}->{challengepassword}){
+			if($self->{ITEMS}->{$entryname}->{initialenroll}->{auth}->{mode} eq 'password'){
+				if (! defined $newkeystore->{INSTANCE}->{OPTIONS}->{ENTRY}->{initialenroll}->{auth}->{challengepassword}){
 							
-						CertNanny::Logging->log({MSG => 'Using commandline argument challangePassword for initial enrollment' , PRIO => 'debug'});
+					CertNanny::Logging->log({MSG => 'Using commandline argument challangePassword for initial enrollment' , PRIO => 'debug'});
 						
-						$newkeystore->{INSTANCE}->{OPTIONS}->{ENTRY}->{initialenroll}->{auth}->{challengepassword} = $self->{globalchallengepassword} ;				
-					}
+					$newkeystore->{INSTANCE}->{OPTIONS}->{ENTRY}->{initialenroll}->{auth}->{challengepassword} = $self->{globalchallengepassword} ;				
 				}
+			}
 												
-				my $key = $newkeystore->{INSTANCE}->{OPTIONS}->{ENTRYNAME} . "-key.pem";
-    			my $keyfile = File::Spec->catfile($newkeystore->{INSTANCE}->{OPTIONS}->{ENTRY}->{statedir},$key);
+			my $key = $newkeystore->{INSTANCE}->{OPTIONS}->{ENTRYNAME} . "-key.pem";
+    		my $keyfile = File::Spec->catfile($newkeystore->{INSTANCE}->{OPTIONS}->{ENTRY}->{statedir},$key);
     
     		      
-				unless(-e $keyfile) {
-					
-				my $newkey = $newkeystore->{INSTANCE}->generatekey(); 	;
+			unless(-e $keyfile) {
+				
+			my $newkey = $newkeystore->{INSTANCE}->generatekey(); 	;
 				 
-				CertNanny::Logging->log({MSG => "keyfile $newkey->{KEYFILE} ,  " , PRIO => 'debug'}); 
-			 	$newkeystore->{INSTANCE}->{OPTIONS}->{ENTRY}->{keyfile} = $newkey->{KEYFILE} ;  
-
-			 	CertNanny::Logging->log({MSG => "keyfile $newkeystore->{INSTANCE}->{OPTIONS}->{ENTRY}->{keyfile} ,  " , PRIO => 'debug'});
-		    	$newkeystore->{INSTANCE}->{ENTRY}->{format}= 'PEM';  
+			CertNanny::Logging->log({MSG => "keyfile $newkey->{KEYFILE} ,  " , PRIO => 'debug'}); 
+		 	$newkeystore->{INSTANCE}->{OPTIONS}->{ENTRY}->{keyfile} = $newkey->{KEYFILE} ;  
+		 	CertNanny::Logging->log({MSG => "keyfile $newkeystore->{INSTANCE}->{OPTIONS}->{ENTRY}->{keyfile} ,  " , PRIO => 'debug'});
+	    	$newkeystore->{INSTANCE}->{ENTRY}->{format}= 'PEM';  
 		
-				}else{
-					CertNanny::Logging->log({MSG => "Key already generated" , PRIO => 'debug'});
-					#CertNanny::Logging->log({MSG => 'newkeystore with key : '.Dumper($newkeystore) , PRIO => 'debug'});
-					 $newkeystore->{INSTANCE}->{OPTIONS}->{ENTRY}->{keyfile} = $keyfile ; 
-					 $entry->{keyfile}= $entry->{initialenroll}->{auth}->{key};
-		 	  	$entry->{pin} = $entry->{initialenroll}->{auth}->{pin};	
+			}else{
+				CertNanny::Logging->log({MSG => "Key already generated" , PRIO => 'debug'});
+				#CertNanny::Logging->log({MSG => 'newkeystore with key : '.Dumper($newkeystore) , PRIO => 'debug'});
+				 $newkeystore->{INSTANCE}->{OPTIONS}->{ENTRY}->{keyfile} = $keyfile ; 
+				 $entry->{keyfile}= $entry->{initialenroll}->{auth}->{key};
+		 	  	 $entry->{pin} = $entry->{initialenroll}->{auth}->{pin};	
 			    
 			
-				}	
+			}	
 				
-				my $selfsigncert = $newkeystore->{INSTANCE}->{OPTIONS}->{ENTRYNAME}."-selfcert.pem";
-   				my $outCert = File::Spec->catfile($newkeystore->{INSTANCE}->{OPTIONS}->{ENTRY}->{statedir},$selfsigncert);
+			my $selfsigncert = $newkeystore->{INSTANCE}->{OPTIONS}->{ENTRYNAME}."-selfcert.pem";
+   			my $outCert = File::Spec->catfile($newkeystore->{INSTANCE}->{OPTIONS}->{ENTRY}->{statedir},$selfsigncert);
 				
-				unless(-e $outCert) {
+			unless(-e $outCert) {
 					
-					CertNanny::Logging->log({MSG => "Initial enrollment started, generate new selfsigned cert ", PRIO => 'debug'});
-					my $newSelfsignCert= $newkeystore->{INSTANCE}->selfsign();
-			    	#CertNanny::Logging->log({MSG => Dumper($newSelfsignCert) , PRIO => 'debug'});
-			    	$newkeystore->{INSTANCE}->{OPTIONS}->{ENTRY}->{location} = $newSelfsignCert->{CERT} ; 	 
-				}else{
-					$newkeystore->{INSTANCE}->{OPTIONS}->{ENTRY}->{location} = $outCert ; 	 
-				}
+				CertNanny::Logging->log({MSG => "Initial enrollment started, generate new selfsigned cert ", PRIO => 'debug'});
+				my $newSelfsignCert= $newkeystore->{INSTANCE}->selfsign();
+			   	#CertNanny::Logging->log({MSG => Dumper($newSelfsignCert) , PRIO => 'debug'});
+			   	$newkeystore->{INSTANCE}->{OPTIONS}->{ENTRY}->{location} = $newSelfsignCert->{CERT} ; 	 
+			}else{
+				$newkeystore->{INSTANCE}->{OPTIONS}->{ENTRY}->{location} = $outCert ; 	 
+			}
 				
 				
-				$newkeystore->{CERT} = $newkeystore->{INSTANCE}->getcert();
+			$newkeystore->{CERT} = $newkeystore->{INSTANCE}->getcert();
 
-				if (defined $newkeystore->{CERT}) {
-					$newkeystore->{CERT}->{INFO} = $newkeystore->getcertinfo(%{$newkeystore->{CERT}});
-					my $subjectname = $newkeystore->{CERT}->{INFO}->{SubjectName};
-					my $serial = $newkeystore->{CERT}->{INFO}->{SerialNumber};
-							my $issuer = $newkeystore->{CERT}->{INFO}->{IssuerName};
-							CertNanny::Logging->debug("Certificate Information:\n\tSubjectName: $subjectname\n\tSerial: $serial\n\tIssuer: $issuer");
+			if (defined $newkeystore->{CERT}) {
+				$newkeystore->{CERT}->{INFO} = $newkeystore->getcertinfo(%{$newkeystore->{CERT}});
+				my $subjectname = $newkeystore->{CERT}->{INFO}->{SubjectName};
+				my $serial = $newkeystore->{CERT}->{INFO}->{SerialNumber};
+						my $issuer = $newkeystore->{CERT}->{INFO}->{IssuerName};
+						CertNanny::Logging->debug("Certificate Information:\n\tSubjectName: $subjectname\n\tSerial: $serial\n\tIssuer: $issuer");
 						
-							my %convopts = %{$newkeystore->{CERT}};
+						my %convopts = %{$newkeystore->{CERT}};
 						
-							$convopts{OUTFORMAT} = 'PEM';
-							$newkeystore->{CERT}->{RAW}->{PEM}  = $newkeystore->convertcert(%convopts)->{CERTDATA};
-							$convopts{OUTFORMAT} = 'DER';
-							$newkeystore->{CERT}->{RAW}->{DER}  = $newkeystore->convertcert(%convopts)->{CERTDATA};
-				}else{
-					CertNanny::Logging->error("Could not parse instance certificate");
-						return;
-				}
-				$newkeystore->{INSTANCE}->setcert($newkeystore->{CERT});
-						
-				#disable engine specific configuration 
-				$newkeystore->{INSTANCE}->{OPTIONS}->{ENTRY}->{keyfile} = $keyfile ;  
-				$newkeystore->{INSTANCE}->{OPTIONS}->{ENTRY}->{location} = $outCert ; 			
-				$newkeystore->{INSTANCE}->{OPTIONS}->{ENTRY}->{enroll}->{engine_section} = undef; 
-				$newkeystore->{INSTANCE}->{OPTIONS}->{ENTRY}->{enroll}->{sscep}->{engine} = undef; 
+						$convopts{OUTFORMAT} = 'PEM';
+						$newkeystore->{CERT}->{RAW}->{PEM}  = $newkeystore->convertcert(%convopts)->{CERTDATA};
+						$convopts{OUTFORMAT} = 'DER';
+						$newkeystore->{CERT}->{RAW}->{DER}  = $newkeystore->convertcert(%convopts)->{CERTDATA};
+			}else{
+				CertNanny::Logging->error("Could not parse instance certificate");
+					return;
+			}
 		
-				#Start the initial enrollment runining an native openSSL keystore renewal 
-				my $ret = $newkeystore->{INSTANCE}->renew();	
-			
-				my $renewalstate = $newkeystore->{INSTANCE}->renewalstate();
-				
-				if(defined $renewalstate)
-				{
-								CertNanny::Logging->debug("renewalstate is ". $renewalstate);
-				}
+			$newkeystore->{INSTANCE}->setcert($newkeystore->{CERT});
+						
+			#disable engine specific configuration 
+			$newkeystore->{INSTANCE}->{OPTIONS}->{ENTRY}->{keyfile} = $keyfile ;  
+			$newkeystore->{INSTANCE}->{OPTIONS}->{ENTRY}->{location} = $outCert ; 			
+			$newkeystore->{INSTANCE}->{OPTIONS}->{ENTRY}->{enroll}->{engine_section} = undef; 
+			$newkeystore->{INSTANCE}->{OPTIONS}->{ENTRY}->{enroll}->{sscep}->{engine} = undef; 
 		
-				if(defined $renewalstate and $renewalstate eq 'sendrequest') {
-					CertNanny::Logging->log({MSG => "Initial enrollment request send." , PRIO => 'info'});
-					$newkeystore->store_state() || croak "Could not write state file $newkeystore->{STATE}->{FILE}";
-	
-				}		
+			#Start the initial enrollment runining an native openSSL keystore renewal 
+			my $ret = $newkeystore->{INSTANCE}->renew();	
 			
-				
-				if(!defined $renewalstate  ) {
-					unlink  $selfsigncert;
-					CertNanny::Logging->log({MSG => "Initial enrollment completed successfully. Mode:" .$self->{ITEMS}->{$entryname}->{initialenroll}->{auth}->{mode} , PRIO => 'info'});				
-				}
+			my $renewalstate = $newkeystore->{INSTANCE}->{STATE}->{DATA}->{RENEWAL}->{STATUS};
+					
+			if(defined $renewalstate)
+			{
+							CertNanny::Logging->debug("renewalstate is ". $renewalstate);
+			}
+		
+			if(defined $renewalstate and $renewalstate eq 'sendrequest') {
+				CertNanny::Logging->log({MSG => "Initial enrollment request send." , PRIO => 'info'});
+				$newkeystore->store_state() || croak "Could not write state file $newkeystore->{STATE}->{FILE}";	
+			}		
+			
+
+			if(!defined $renewalstate  ) {
+				unlink  $selfsigncert;
+				CertNanny::Logging->log({MSG => "Initial enrollment completed successfully. Mode:" .$self->{ITEMS}->{$entryname}->{initialenroll}->{auth}->{mode} , PRIO => 'info'});				
+			}
 				 		
 				return 1;			
-			}else{
+		}else{
 							
-				CertNanny::Logging->log({MSG => "Initial enrollment authentication method ".$self->{ITEMS}->{$entryname}->{initialenroll}->{auth}->{mode}." not supported", PRIO => 'error'});			
-			}
+			CertNanny::Logging->log({MSG => "Initial enrollment authentication method ".$self->{ITEMS}->{$entryname}->{initialenroll}->{auth}->{mode}." not supported", PRIO => 'error'});			
+		}
 	}
 	
 #		my $keystore = $args{KEYSTORE};

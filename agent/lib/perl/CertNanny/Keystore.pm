@@ -1026,6 +1026,7 @@ sub checkvalidity {
     my $days = shift || 0;
    
     my $notAfter = isodatetoepoch($self->{CERT}->{INFO}->{NotAfter});
+   	  
     return unless defined $notAfter;
 
     my $cutoff = time + $days * 24 * 3600;
@@ -1457,8 +1458,8 @@ sub executehook {
 	
 	$args{'__ENTRY__'}    =  $self->{INSTANCE}->{OPTIONS}->{ENTRYNAME} || $self->{OPTIONS}->{ENTRYNAME};
 	# TODO: Test Subject/Serial Hook!
-	$args{'__SUBJECT__'}  = $self->{CERT}->{INFO}->{SubjectName} || 'UnknownSubject';
-	$args{'__SERIAL__'}   = $self->{CERT}->{INFO}->{SerialNumber} || 'UnknownSerial';
+	$args{'__SUBJECT__'}  = qq ( "$self->{CERT}->{INFO}->{SubjectName}" ) || 'UnknownSubject';
+	$args{'__SERIAL__'}   =  $self->{CERT}->{INFO}->{SerialNumber} || 'UnknownSerial';
 
 	# replace values passed to this function
 	foreach my $key (keys %args) {
@@ -1787,7 +1788,6 @@ sub sendrequest {
 			    	}
 			    	
 			         unlink $outp12 ;
-			    	 $self->renewalstate("completed");
 			    	 $rc = 1;
 			    }
 
@@ -1799,6 +1799,8 @@ sub sendrequest {
     
 	
 	if (defined $rc and $rc) {
+		
+		$self->renewalstate("completed");
 
 	    $self->executehook($self->{OPTIONS}->{ENTRY}->{hook}->{renewal}->{install}->{post},
 			       '__NOTAFTER__' => $self->{CERT}->{INFO}->{NotAfter},
@@ -1807,9 +1809,7 @@ sub sendrequest {
 			       '__NEWCERT_NOTBEFORE__' => $newcert->{INFO}->{NotBefore},
 		);
 
-	    # done
-	    $self->renewalstate("completed");
-	    
+	    # done    
 	    return $rc;
 	}
 		return;
