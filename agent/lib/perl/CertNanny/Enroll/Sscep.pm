@@ -37,7 +37,7 @@ sub new {
 	}
 	
 	#print ' $entryname sscep self is:' .Dumper($config) . $config->{'CONFIG'}->{'certmonitor'}->{$entryname}->{'enroll'}->{'sscep'}->{'monitorSysInfo'};
-	$self->{OPTIONS} = $self->defaultOptions($config->{'CONFIG'}->{'certmonitor'}->{$entryname}->{'enroll'}->{'sscep'}->{'monitorSysInfo'});
+	$self->{OPTIONS} = $self->defaultOptions($config->{'CONFIG'}->{'certmonitor'}->{$entryname}->{'enroll'}->{'sscep'}->{'monitorSysInfo'}, $config , $entryname );
 	$self->readConfig($entry_options->{enroll});
 	# SCEP url
 #	$self->{URL} = $config->{URL} or die("No SCEP URL given");
@@ -278,6 +278,8 @@ sub getNextCA {
 sub defaultOptions {
 	my $self = shift;
 	my $monitorSysInfo = shift;
+	my $config = shift;
+	my $entryname = shift;
 	my $monitor = '';
 	
 	CertNanny::Logging->debug("get defaultOptions $monitorSysInfo");	
@@ -314,6 +316,41 @@ sub defaultOptions {
 			'MaxPollCount' => 1
 		}
 		);
+		
+		
+		# user configurable meta data
+		
+		# this data structure is an example of configuration settings a user might
+		# set in certnanny.cfg, such as
+		# keystore.DEFAULT.enroll.sscep.meta.myarg = bar
+		# keystore.DEFAULT.enroll.sscep.meta.foo = sub { return 'bar' }
+		# keystore.DEFAULT.enroll.sscep.meta.blah = `whoami`
+		my $userconfig = $config->{'CONFIG'}->{'certmonitor'}->{$entryname}->{'enroll'}->{'sscep'}->{'meta'};
+	
+		my %custmetadata ;
+		
+		foreach my $key (keys %{$userconfig}) {
+		    my $value = $userconfig->{$key};
+		    if ($value =~ m{ \A \s* sub \s* \{ }xms) {
+		        eval {
+		            $value = eval $value;
+		            $value = &$value();
+		        };
+		    } elsif ($value =~ m{ \A \s* `(.*)` \s* \z }xms) {
+		        $value = `$1`;
+		    chomp $value;
+		    }
+		    $custmetadata{ 'CNMCUST' . uc($key) } = $value;
+		}
+		
+		# now send %metadata hash to SCEP server via GET request
+META:		foreach my $key (keys %custmetadata){
+			next META if $key eq 'CNMCUSTINHERIT';	
+			my $value = $custmetadata{$key};
+			$monitor.= '&'.$key.'='.$value;				
+		}
+		CertNanny::Logging->debug("Monitor Info: " . $monitor);	
+		
 		
 		if($monitor ne ''){
 			 $options{'sscep'} = {
