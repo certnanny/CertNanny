@@ -62,11 +62,12 @@ pod2usage(-msg => $msg, -verbose => 1) if ($config{help} or
 die "Could not read config file $config{cfg}. Stopped" 
     unless (-r $config{cfg});
 
-$config{keystore.DEFAULT.initialenroll.auth.challengepassword} = $config{challengepassword};
-
 my $monitor = CertNanny->getInstance(CONFIG => $config{cfg});
 $config{sleep} = 300 if !defined $config{sleep};
 $monitor->setOption("sleep", $config{sleep});
+if(defined $config{challengepassword} ){
+	$monitor->setOption('globalchallengepassword', $config{challengepassword});
+}
 
 
 foreach my $cmd (@ARGV) {
@@ -349,11 +350,12 @@ If a initial enrollment configuration is found, certnanny will try to request a 
 =item B<enroll>
  
 Check the configured keystores for inital enrollment configuration.
-If no certificate is found, run inital enrollment via the configured method.
+If no certificate is found, run inital enrollment via the configured method. 
+If a initialenroll configuration is found it will also be run with the renew command.
 
 The mendatory configuration is: 
 keystore.(keystorename).initialenroll.auth.mode =  [anonymous|password|certificate]
-keystore.(keystorename).initialenroll.profile = e.g. 09. TLS Client and TLS Server 
+keystore.(keystorename).initialenroll.profile = e.g. TLS Client and TLS Server 
 keystore.(keystorename).initialenroll.subject = CN=test.domain.com,OU=Nanny, O=NannyLand, C=DE
 
 you may specify additional subject alternative names to be added to the CSR data:
@@ -375,16 +377,23 @@ keystore.(keystorename).initialenroll.auth.pin = PIN
 2. Authmode [anonymous]
 Enrollment with a selfsigned certificate (annonymus enrollment)
 
+keystore.(keystorename).initialenroll.auth.mode =  anonymous
+keystore.(keystorename).initialenroll.profile = e.g. TLS Client and TLS Server 
+keystore.(keystorename).initialenroll.subject = CN=test.domain.com,OU=Nanny, O=NannyLand, C=DE
+
+you may specify additional subject alternative names to be added to the CSR data:
+keystore.(keystorename).initialenroll.san.1 = DNS:test.domain.com:Cert1
+keystore.(keystorename).initialenroll.san.2 = DNS:test2.domain.com:Cert1
+
 3. Authmode [password]
 The challenge password can be placed in the config: 
 keystore.(keystorename).initialenroll.auth.challengepassword = CHALLANGE
 or as a comand line parameter: 
 
-certnanny renew --cfg [...] --challengepassword  "myGlobalSecretChallange"
-
-A password provided via the commandline will be used for every keystore if not configured:
-
-keystore.(keystorename).initialenroll.auth.challengepassword = "myKeystoreSecretChallange"
+--challengepassword CHALLANGE 
+Will set the CHALLANGE globaly for every configured initial enroll keystore.
+Will be overwirtten by a config value. 
+keystore.(keystorename).initialenroll.auth.challengepassword = CHALLANGE
 
 =item B<install>
 
