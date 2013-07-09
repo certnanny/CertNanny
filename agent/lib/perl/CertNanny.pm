@@ -310,8 +310,10 @@ sub do_enroll{
 				if (! defined $newkeystore->{INSTANCE}->{OPTIONS}->{ENTRY}->{initialenroll}->{auth}->{challengepassword}){
 							
 					CertNanny::Logging->log({MSG => 'Using commandline argument challangePassword for initial enrollment' , PRIO => 'debug'});
-						
-					$newkeystore->{INSTANCE}->{OPTIONS}->{ENTRY}->{initialenroll}->{auth}->{challengepassword} = $self->{globalchallengepassword} ;				
+					if(exists $self->{globalchallengepassword} && $self->{globalchallengepassword} ne ''){
+							$newkeystore->{INSTANCE}->{OPTIONS}->{ENTRY}->{initialenroll}->{auth}->{challengepassword} = $self->{globalchallengepassword} ;				
+			
+					}	
 				}
 			}
 												

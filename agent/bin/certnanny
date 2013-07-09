@@ -65,7 +65,7 @@ die "Could not read config file $config{cfg}. Stopped"
 my $monitor = CertNanny->getInstance(CONFIG => $config{cfg});
 $config{sleep} = 300 if !defined $config{sleep};
 $monitor->setOption("sleep", $config{sleep});
-if(defined $config{challengepassword} ){
+if(defined $config{challengepassword} and $config{challengepassword} ne ''){
 	$monitor->setOption('globalchallengepassword', $config{challengepassword});
 }
 

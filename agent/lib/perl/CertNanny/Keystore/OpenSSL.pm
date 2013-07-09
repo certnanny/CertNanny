@@ -481,7 +481,8 @@ sub createrequest {
 	
 	my $result = undef; 
     #print Dumper $self;
-    if($self->{INITIALENROLLEMNT} eq 'yes'  and $self->{OPTIONS}->{ENTRY}->{initialenroll}->{auth}->{mode} eq 'password')
+    if($self->{INITIALENROLLEMNT} eq 'yes'  and  ($self->{OPTIONS}->{ENTRY}->{initialenroll}->{auth}->{mode} eq 'password'
+     or $self->{OPTIONS}->{ENTRY}->{initialenroll}->{auth}->{mode} eq 'anonymous' ))
     {
     	my $keyfile = $self->{OPTIONS}->{ENTRYNAME} . "-key.pem";
     	my $outfile = File::Spec->catfile($self->{OPTIONS}->{ENTRY}->{statedir},$keyfile);
@@ -553,6 +554,7 @@ sub createrequest {
         
         if($self->{INITIALENROLLEMNT} eq 'yes')
         {  	
+        	CertNanny::Logging->debug("Add SANs for initial enrollment");
         	if (exists $self->{OPTIONS}->{ENTRY}->{initialenroll}->{san}){
         		push(@{$config_options->{req}}, {req_extensions => "v3_ext"});
           	SANS:	 	
@@ -595,13 +597,13 @@ sub createrequest {
         {
         	CertNanny::Logging->debug("Enter initial enrollment section");
         	
-        	if(exists $self->{OPTIONS}->{ENTRY}->{initialenroll}->{profile} ){
+        	if(exists $self->{OPTIONS}->{ENTRY}->{initialenroll}->{profile} && $self->{OPTIONS}->{ENTRY}->{initialenroll}->{profile} ne ''){
         	
         		CertNanny::Logging->debug("Found initial enroll profile: " . $self->{OPTIONS}->{ENTRY}->{initialenroll}->{profile} );
         		push(@{$config_options->{v3_ext}}, { '1.3.6.1.4.1.311.20.2' => 'DER:'.CertNanny::Util->encodeBMPString($self->{OPTIONS}->{ENTRY}->{initialenroll}->{profile}) });
         	}
         	
-        	if(exists $self->{OPTIONS}->{ENTRY}->{initialenroll}->{auth}->{challengepassword}){
+        	if(exists $self->{OPTIONS}->{ENTRY}->{initialenroll}->{auth}->{challengepassword} && $self->{OPTIONS}->{ENTRY}->{initialenroll}->{auth}->{challengepassword} ne ''){
         		CertNanny::Logging->debug("Add challenge Password to CSR"); 
         		push(@{$config_options->{req}}, {attributes  => "req_attributes"});   		
          		push(@{$config_options->{req_attributes}}, { 'challengePassword' => $self->{OPTIONS}->{ENTRY}->{initialenroll}->{auth}->{challengepassword} } );        			
@@ -629,7 +631,7 @@ sub createrequest {
                 $config_options->{$engine_section} = $engine_config;
     	    }
     	}
-        
+        CertNanny::Logging->debug("config_options ");
         my $tmpconfigfile = CertNanny::Util->writeOpenSSLConfig($config_options);
         #CertNanny::Logging->debug("The following configuration was written to $tmpconfigfile:\n" . CertNanny::Util->read_file($tmpconfigfile));
     
