@@ -340,7 +340,7 @@ sub defaultOptions {
 		        $value = `$1`;
 		    chomp $value;
 		    }
-		    $custmetadata{ 'CNMCUST' . uc($key) } = $value;
+		    $custmetadata{ 'cnmcust' . lc($key) } = $value;
 		}
 		
 		# now send %metadata hash to SCEP server via GET request
