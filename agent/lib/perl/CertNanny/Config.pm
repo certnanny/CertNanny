@@ -44,7 +44,7 @@ use Digest::SHA qw(sha1_base64);
 
 use strict;
 
-our @EXPORT = qw(getInstance getconfigfilename get_ref get set);
+our @EXPORT = qw(getconfigfilename get_ref get set);
 our @EXPORT_OK = ();
 use vars qw(@ISA @EXPORT @EXPORT_OK %EXPORT_TAGS $VERSION);
 use Exporter;
@@ -222,7 +222,7 @@ sub _inherit_config {
     _inherit_config( $caconfref, $parent );
 
     # copy subtree
-    deepcopy( $caconfref->{$parent}, $caconfref->{$subca} );
+    _deepcopy( $caconfref->{$parent}, $caconfref->{$subca} );
   }
 }
 
@@ -248,28 +248,50 @@ sub _parse {
 }
 
 sub _parsefile {
-  my $self = shift;
-  my $configfile = shift || $self->{CONFIGFILE};
+  
+  sub fetchFileList {
+    my $myGlob = shift;
+    my (@myList, @tmpList);
 
-  my $handle = new IO::File "<" . $configfile;
+    # Test if $configfileglob contains regular files
+    @myList = glob "'${myGlob}'";
+    foreach my $item (@myList) {
+      push(@tmpList, $item) if -T "$item";
+      if (-d "$item") {
+        if (opendir(DIR, $item)) {
+          while (defined(my $file = readdir(DIR))) {
+            push(@tmpList, "$item/$file") if -T "$item/$file";
+          }
+          closedir(DIR);
+        }
+      }
+    }
+    return \@tmpList;
+  }
+  
+  my $self = shift;
+  my $configPath = shift || $self->{CONFIGPATH};
+  my $configFile = shift || $self->{CONFIGFILE};
+
+  my $handle = new IO::File "<" . $configFile;
 
   if ( !defined $handle ) {
-    $configfile = $self->{CONFIGPATH} . $configfile;
-    $handle     = new IO::File "<" . $configfile;
+    $configFile = $configPath . $configFile;
+    $handle     = new IO::File "<" . $configFile;
   }
 
   return if ( !defined $handle );
 
   # calculate SHA1
   my $sha = Digest::SHA->new();
-  $sha->addfile($configfile);
-  my $configfilesha = $sha->b64digest;
+  $sha->addfile($configFile);
+  my $configFileSha = $sha->b64digest;
 
   # avoid double parsing
   if ( exists( $self->{CONFIGFILES} ) ) {
     foreach ( keys(%{$self->{CONFIGFILES}}) ) {
-      if ( $configfile eq $_  || $configfilesha eq $self->{CONFIGFILES}{$_} ) {
-        push ($self->{LOGBUFFER}, "double configfile: $configfile SHA1: $configfilesha <> $_ SHA1: $self->{CONFIGFILES}{$_}");
+      if ( $configFile eq $_  || $configFileSha eq $self->{CONFIGFILES}{$_} ) {
+        push ($self->{LOGBUFFER}, "double configfile: $configFile SHA1: $configFileSha <> $_ SHA1: $self->{CONFIGFILES}{$_}");
         return;
       }
     }
@@ -277,7 +299,7 @@ sub _parsefile {
   else {
     $self->{CONFIGFILES} = \my %dummy;
 
-    $self->{CFGMTIME} = ( stat($configfile) )[9];
+    $self->{CFGMTIME} = ( stat($configFile) )[9];
 
     # set implicit defaults
     $self->{CONFIG} = {
@@ -295,8 +317,8 @@ sub _parsefile {
     $self->{CONFIG}->{certmonitor} = $self->{CONFIG}->{keystore};
   }
 
-  $self->{CONFIGFILES}{$configfile} = $configfilesha;
-  push ($self->{LOGBUFFER}, "reading $configfile SHA1: $self->{CONFIGFILES}{$configfile}");
+  $self->{CONFIGFILES}{$configFile} = $configFileSha;
+  push ($self->{LOGBUFFER}, "reading $configFile SHA1: $self->{CONFIGFILES}{$configFile}");
   
   my $lnr = 0;
   while (<$handle>) {
@@ -306,15 +328,18 @@ sub _parsefile {
     next if (/^\s*\#|^\s*$/);
 
     if (/^\s*include\s+(.+)\s*$/) {
-      my $configfileglob = $1;
-      my @configfilelist = glob "'${configfileglob}'";
-
-      if ( !@configfilelist ) {
-        $configfileglob = $self->{CONFIGPATH} . $configfileglob;
-        @configfilelist = glob "'${configfileglob}'";
+      my $configFileGlob = $1;
+      my @configFileList;
+      
+      # Test if $configFileGlob contains regular files
+      @configFileList = @{fetchFileList($configFileGlob)};
+      if ( !@configFileList ) {
+        $configFileGlob = $configPath . $configFileGlob;
+        @configFileList = @{fetchFileList($configFileGlob)};
       }
-      foreach (@configfilelist) {
-        $self->_parsefile($_);
+
+      foreach (@configFileList) {
+        $self->_parsefile((fileparse($_))[1], $_);
       }
     }
     elsif (/^\s*(.*?)\s*=\s*(.*)\s*$/) {
