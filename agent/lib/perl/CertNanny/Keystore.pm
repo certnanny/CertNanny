@@ -30,9 +30,9 @@ use Exporter;
 
 $VERSION = 0.10;
 
-# constructor parameters:
-# location - base name of keystore (required)
 sub new {
+  # constructor parameters:
+  # location - base name of keystore (required)
   my $proto = shift;
   my $class = ref($proto) || $proto;
   my %args  = (
@@ -153,8 +153,8 @@ sub new {
   # get previous renewal status
   #$self->retrieve_state() or return;
 
-# check if we can write to the file
-#$self->store_state() || croak "Could not write state file $self->{STATE}->{FILE}";
+  # check if we can write to the file
+  #$self->store_state() || croak "Could not write state file $self->{STATE}->{FILE}";
 
   return ($self);
 }
@@ -177,18 +177,18 @@ sub setcert {
   $self->{CERT} = shift;
 }
 
-# convert certificate to other formats
-# input: hash
-# CERTDATA => string containing certificate data OR
-# CERTFILE => file containing certificate data
-# CERTFORMAT => certificate encoding format (PEM or DER), default: DER
-# OUTFORMAT => desired output certificate format (PEM or DER), default: DER
-#
-# return: hash ref
-# CERTDATA => string containing certificate data
-# CERTFORMAT => certificate encoding format (PEM or DER)
-# or undef on error
 sub convertcert {
+  # convert certificate to other formats
+  # input: hash
+  # CERTDATA => string containing certificate data OR
+  # CERTFILE => file containing certificate data
+  # CERTFORMAT => certificate encoding format (PEM or DER), default: DER
+  # OUTFORMAT => desired output certificate format (PEM or DER), default: DER
+  #
+  # return: hash ref
+  # CERTDATA => string containing certificate data
+  # CERTFORMAT => certificate encoding format (PEM or DER)
+  # or undef on error
   my $self    = shift;
   my %options = (
     CERTFORMAT => 'DER',
@@ -256,25 +256,25 @@ sub convertcert {
   return $output;
 }
 
-# convert private keys to other formats
-# input: hash
-# KEYDATA => string containing private key data OR
-# KEYFILE => file containing private key
-# KEYTYPE => private key type (OpenSSL or PKCS8), default: OpenSSL
-# KEYFORMAT => private key encoding format (PEM or DER), default: DER
-# KEYPASS => private key pass phrase, may be undef or empty
-# OUTFORMAT => desired output key format (PEM or DER), default: DER
-# OUTTYPE => desired output private key type (OpenSSL or PKCS8),
-#            default: OpenSSL
-# OUTPASS => private key pass phrase, may be undef or empty
-#
-# return: hash
-# KEYDATA => string containing key data
-# KEYFORMAT => key encoding format (PEM or DER)
-# KEYTYPE => key type (OpenSSL or PKCS8)
-# KEYPASS => private key pass phrase
-# or undef on error
 sub convertkey {
+  # convert private keys to other formats
+  # input: hash
+  # KEYDATA => string containing private key data OR
+  # KEYFILE => file containing private key
+  # KEYTYPE => private key type (OpenSSL or PKCS8), default: OpenSSL
+  # KEYFORMAT => private key encoding format (PEM or DER), default: DER
+  # KEYPASS => private key pass phrase, may be undef or empty
+  # OUTFORMAT => desired output key format (PEM or DER), default: DER
+  # OUTTYPE => desired output private key type (OpenSSL or PKCS8),
+  #            default: OpenSSL
+  # OUTPASS => private key pass phrase, may be undef or empty
+  #
+  # return: hash
+  # KEYDATA => string containing key data
+  # KEYFORMAT => key encoding format (PEM or DER)
+  # KEYTYPE => key type (OpenSSL or PKCS8)
+  # KEYPASS => private key pass phrase
+  # or undef on error
   my $self    = shift;
   my %options = (
     KEYFORMAT => 'DER',
@@ -431,8 +431,8 @@ sub loglevel {
   return $self->{OPTIONS}->{LOGLEVEL};
 }
 
-# accessor method for renewal state
 sub renewalstate {
+  # accessor method for renewal state
   my $self = shift;
   if (@_) {
     $self->{STATE}->{DATA}->{RENEWAL}->{STATUS} = shift;
@@ -490,12 +490,12 @@ sub store_state {
   return 1;
 }
 
-# get error message
-# arg:
-# return: error message description caused by the last operation (cleared
-#         after each query)
-#TODO Is this used anywhere?
 sub geterror {
+  # get error message
+  # arg:
+  # return: error message description caused by the last operation (cleared
+  #         after each query)
+  #TODO Is this used anywhere?
   my $self = shift;
   my $arg  = shift;
 
@@ -511,8 +511,8 @@ sub geterror {
   $errmsg;
 }
 
-# dynamically load keystore instance module
 sub load_keystore_handler {
+  # dynamically load keystore instance module
   my $self = shift;
   my $arg  = shift;
 
@@ -525,10 +525,10 @@ sub load_keystore_handler {
   return 1;
 }
 
-# NOTE: this is UNSAFE (beware of race conditions). We cannot use a file
-# handle here because we are calling external programs to use these
-# temporary files.
 sub gettmpfile {
+  # NOTE: this is UNSAFE (beware of race conditions). We cannot use a file
+  # handle here because we are calling external programs to use these
+  # temporary files.
   my $self = shift;
 
   my $tmpdir = $self->{OPTIONS}->{tmp_dir};
@@ -542,26 +542,26 @@ sub gettmpfile {
   return ($tmpfile);
 }
 
-# File/keystore installation convenience method
-# This method is very careful about rolling back all modifications if
-# any error happened. Unless something really ugly happens, the original
-# state is always restored even if this method returns an error.
-# This includes permission problems, ownership, file system errors etc.
-# and even if multiple files are to be installed and the error occurs
-# after a portion of them have been installed successfully.
-#
-# options:
-# filespec-hashref or array containing filespec-hashrefs
-# examples:
-# $self->installfile({ FILENAME => 'foo', CONTENT => $data, DESCRIPTION => 'some file...'});
-# or
-# @files = (
-#    { FILENAME => 'foo', CONTENT => $data1, DESCRIPTION => 'some file...'},
-#    { FILENAME => 'bar', CONTENT => $data2, DESCRIPTION => 'other file...'},
-# );
-# $self->installfile(@files);
-#
 sub installfile {
+  # File/keystore installation convenience method
+  # This method is very careful about rolling back all modifications if
+  # any error happened. Unless something really ugly happens, the original
+  # state is always restored even if this method returns an error.
+  # This includes permission problems, ownership, file system errors etc.
+  # and even if multiple files are to be installed and the error occurs
+  # after a portion of them have been installed successfully.
+  #
+  # options:
+  # filespec-hashref or array containing filespec-hashrefs
+  # examples:
+  # $self->installfile({ FILENAME => 'foo', CONTENT => $data, DESCRIPTION => 'some file...'});
+  # or
+  # @files = (
+  #    { FILENAME => 'foo', CONTENT => $data1, DESCRIPTION => 'some file...'},
+  #    { FILENAME => 'bar', CONTENT => $data2, DESCRIPTION => 'other file...'},
+  # );
+  # $self->installfile(@files);
+  #
   my ( $self, @args ) = @_;
 
   my $error = 0;
@@ -744,39 +744,39 @@ WRITENEWFILES:
   return 1;
 }
 
-# parse DER encoded X.509v3 certificate and return certificate information
-# in a hash ref
-# Prerequisites: requires external openssl executable
-# options: hash
-#   CERTDATA => directly contains certificate data
-#   CERTFILE => cert file to parse
-#   CERTFORMAT => PEM|DER (default: DER)
-#
-# return: hash reference containing the certificate information
-# returns undef if both CERTDATA and CERTFILE are specified or on error
-#
-# Returned hash reference contains the following values:
-# Version => <cert version, optional> Values: 2, 3
-# SubjectName => <cert subject common name>
-# IssuerName => <cert issuer common name>
-# SerialNumber => <cert serial number> Format: xx:xx:xx... (hex, upper case)
-# NotBefore => <cert validity> Format: YYYYDDMMHHMMSS
-# NotAfter  => <cert validity> Format: YYYYDDMMHHMMSS
-# PublicKey => <cert public key> Format: Base64 encoded (PEM)
-# Certificate => <certifcate> Format: Base64 encoded (PEM)
-# BasicConstraints => <cert basic constraints> Text (free style)
-# KeyUsage => <cert key usage> Format: Text (free style)
-# CertificateFingerprint => <cert SHA1 fingerprint> Format: xx:xx:xx... (hex,
-#   upper case)
-#
-# optional:
-# SubjectAlternativeName => <cert alternative name>
-# IssuerAlternativeName => <issuer alternative name>
-# SubjectKeyIdentifier => <X509v3 Subject Key Identifier>
-# AuthorityKeyIdentifier => <X509v3 Authority Key Identifier>
-# CRLDistributionPoints => <X509v3 CRL Distribution Points>
-#
 sub getcertinfo {
+  # parse DER encoded X.509v3 certificate and return certificate information
+  # in a hash ref
+  # Prerequisites: requires external openssl executable
+  # options: hash
+  #   CERTDATA => directly contains certificate data
+  #   CERTFILE => cert file to parse
+  #   CERTFORMAT => PEM|DER (default: DER)
+  #
+  # return: hash reference containing the certificate information
+  # returns undef if both CERTDATA and CERTFILE are specified or on error
+  #
+  # Returned hash reference contains the following values:
+  # Version => <cert version, optional> Values: 2, 3
+  # SubjectName => <cert subject common name>
+  # IssuerName => <cert issuer common name>
+  # SerialNumber => <cert serial number> Format: xx:xx:xx... (hex, upper case)
+  # NotBefore => <cert validity> Format: YYYYDDMMHHMMSS
+  # NotAfter  => <cert validity> Format: YYYYDDMMHHMMSS
+  # PublicKey => <cert public key> Format: Base64 encoded (PEM)
+  # Certificate => <certifcate> Format: Base64 encoded (PEM)
+  # BasicConstraints => <cert basic constraints> Text (free style)
+  # KeyUsage => <cert key usage> Format: Text (free style)
+  # CertificateFingerprint => <cert SHA1 fingerprint> Format: xx:xx:xx... (hex,
+  #   upper case)
+  #
+  # optional:
+  # SubjectAlternativeName => <cert alternative name>
+  # IssuerAlternativeName => <issuer alternative name>
+  # SubjectKeyIdentifier => <X509v3 Subject Key Identifier>
+  # AuthorityKeyIdentifier => <X509v3 Authority Key Identifier>
+  # CRLDistributionPoints => <X509v3 CRL Distribution Points>
+  #
   my $self = shift;
   return CertNanny::Util->getcertinfo(@_);
 
@@ -1030,9 +1030,9 @@ sub getcertinfo {
 
 }
 
-# return certificate information for this keystore
-# optional arguments: list of entries to return
 sub getinfo {
+  # return certificate information for this keystore
+  # optional arguments: list of entries to return
   my $self     = shift;
   my @elements = @_;
 
@@ -1045,10 +1045,10 @@ sub getinfo {
   return $result;
 }
 
-# return true if certificate is still valid for more than <days>
-# return false otherwise
-# return undef on error
 sub checkvalidity {
+  # return true if certificate is still valid for more than <days>
+  # return false otherwise
+  # return undef on error
   my $self = shift;
   my $days = shift || 0;
 
@@ -1061,8 +1061,8 @@ sub checkvalidity {
   return ( $cutoff < $notAfter );
 }
 
-# handle renewal operation
 sub renew {
+  # handle renewal operation
   my $self = shift;
 
   $self->renewalstate("initial") unless defined $self->renewalstate();
@@ -1148,29 +1148,29 @@ sub renew {
   return 1;
 }
 
-###########################################################################
-# abstract methods to be implemented by the instances
-
-# get main certificate from keystore
-# caller must return a hash ref:
-# CERTFILE => file containing the cert OR
-# CERTDATA => string containg the cert data
-# CERTFORMAT => 'PEM' or 'DER'
 sub getcert {
+  ###########################################################################
+  # abstract methods to be implemented by the instances
+
+  # get main certificate from keystore
+  # caller must return a hash ref:
+  # CERTFILE => file containing the cert OR
+  # CERTDATA => string containg the cert data
+  # CERTFORMAT => 'PEM' or 'DER'
   return;
 }
 
-# get private key for main certificate from keystore
-# caller must return a hash ref containing the unencrypted private key in
-# OpenSSL format
-# Return:
-# hashref (as expected by convertkey()), containing:
-# KEYDATA => string containg the private key OR
-# KEYFILE => file containing the key data
-# KEYFORMAT => 'PEM' or 'DER'
-# KEYTYPE => format (e. g. 'PKCS8' or 'OpenSSL'
-# KEYPASS => key pass phrase (only if protected by pass phrase)
 sub getkey {
+  # get private key for main certificate from keystore
+  # caller must return a hash ref containing the unencrypted private key in
+  # OpenSSL format
+  # Return:
+  # hashref (as expected by convertkey()), containing:
+  # KEYDATA => string containg the private key OR
+  # KEYFILE => file containing the key data
+  # KEYFORMAT => 'PEM' or 'DER'
+  # KEYTYPE => format (e. g. 'PKCS8' or 'OpenSSL'
+  # KEYPASS => key pass phrase (only if protected by pass phrase)
   return;
 }
 
@@ -1182,16 +1182,16 @@ sub installcert {
   return;
 }
 
-# Import p12
-# Import a p12 with private key and certificate into target keystore
-# also adding the certificate chain if required / included
-# options:
-# hashref containing
-# PKCS12 => 'path/file.p12'
-# PIN  => 'file pin'
-# examples:
-# $self->importP12({ PKCS12FILE => 'foo.p12', PIN => 'secretpin'});
 sub importP12 {
+  # Import p12
+  # Import a p12 with private key and certificate into target keystore
+  # also adding the certificate chain if required / included
+  # options:
+  # hashref containing
+  # PKCS12 => 'path/file.p12'
+  # PIN  => 'file pin'
+  # examples:
+  # $self->importP12({ PKCS12FILE => 'foo.p12', PIN => 'secretpin'});
   ##needs to be implemented if keystore is used with inital enrollemnt
   return;
 }
@@ -1205,14 +1205,14 @@ sub generatekey {
   return;
 }
 
-# get all root certificates from the configuration that are currently
-# valid
-# return:
-# arrayref of hashes containing:
-#   CERTINFO => hash as returned by getcertinfo()
-#   CERTFILE => filename
-#   CERTFORMAT => cert format (PEM, DER)
 sub getrootcerts {
+  # get all root certificates from the configuration that are currently
+  # valid
+  # return:
+  # arrayref of hashes containing:
+  #   CERTINFO => hash as returned by getcertinfo()
+  #   CERTFILE => filename
+  #   CERTFORMAT => cert format (PEM, DER)
   my $self   = shift;
   my @result = ();
 
@@ -1314,13 +1314,13 @@ sub checkCert {
   };
 }
 
-# build a certificate chain for the specified certificate. the certificate
-# chain will NOT be verified cryptographically.
-# return:
-# arrayref containing ca certificate information, starting at the
-# root ca
-# undef on error (e. g. root certificate could not be found)
 sub buildcertificatechain {
+  # build a certificate chain for the specified certificate. the certificate
+  # chain will NOT be verified cryptographically.
+  # return:
+  # arrayref containing ca certificate information, starting at the
+  # root ca
+  # undef on error (e. g. root certificate could not be found)
   my $self = shift;
   my $cert = shift;
 
@@ -1494,15 +1494,15 @@ BUILDCHAIN:
   return \@chain;
 }
 
-# cryptographically verify certificate chain
-# TODO
 sub verifycertificatechain {
+  # cryptographically verify certificate chain
+  # TODO
 
   return 1;
 }
 
-# call an execution hook
 sub executehook {
+  # call an execution hook
   my $self = shift;
   my $hook = shift;
   my %args = (
@@ -1552,8 +1552,8 @@ sub executehook {
   }
 }
 
-# call warnexpiry hook for notification event
 sub warnexpiry {
+  # call warnexpiry hook for notification event
   my $self         = shift;
   my $notification = shift;
   return $self->executehook(
@@ -1564,12 +1564,12 @@ sub warnexpiry {
   );
 }
 
-# obtain CA certificates via SCEP
-# returns a hash containing the following information:
-# RACERT => SCEP RA certificate (scalar, filename)
-# CACERTS => CA certificate chain, starting at highes (root) level
-#            (array, filenames)
 sub getcacerts {
+  # obtain CA certificates via SCEP
+  # returns a hash containing the following information:
+  # RACERT => SCEP RA certificate (scalar, filename)
+  # CACERTS => CA certificate chain, starting at highes (root) level
+  #            (array, filenames)
   my $self = shift;
 
   # get root certificates
