@@ -43,6 +43,9 @@ use File::Glob qw(:globally :case);
 use Digest::SHA qw(sha1_base64);
 
 use strict;
+
+our @EXPORT = qw(getInstance getconfigfilename get_ref get set);
+our @EXPORT_OK = ();
 use vars qw(@ISA @EXPORT @EXPORT_OK %EXPORT_TAGS $VERSION);
 use Exporter;
 
@@ -51,6 +54,15 @@ $VERSION = 0.10;
 #@EXPORT      = qw(...);       # Symbols to autoexport (:DEFAULT tag)
 
 my $INSTANCE;
+
+sub getInstance {
+  unless ( defined $INSTANCE ) {
+    my $proto = shift;
+    $INSTANCE = CertNanny::Config->new(@_);
+  }
+
+  return $INSTANCE;
+}
 
 sub new {
   my $proto      = shift;
@@ -63,7 +75,7 @@ sub new {
   $self->{CONFIGFILE} = $configfile;
   $self->{CONFIGPATH} = ( fileparse($configfile) )[1];
 
-  $self->parse() || return;
+  $self->_parse() || return;
 
   return ($self);
 }
@@ -72,74 +84,18 @@ sub DESTROY {
   $INSTANCE = undef;
 }
 
-# get  file name
 sub getconfigfilename {
+  # get  file name
   my $self = shift;
   $self->{CONFIGFILE};
 }
 
-sub getInstance {
-  unless ( defined $INSTANCE ) {
-    my $proto = shift;
-    $INSTANCE = CertNanny::Config->new(@_);
-  }
-
-  return $INSTANCE;
-}
-
-# recursively deep-copy a hash tree, NOT overwriting already existing
-# values in destination tree
-sub deepcopy {
-  my $source = shift;
-  my $dest   = shift;
-
-  foreach my $key ( keys %{$source} ) {
-    if ( ref( $source->{$key} ) eq "HASH" ) {
-
-      # create new node if it does not exist yet
-      $dest->{$key} = {} unless exists $dest->{$key};
-      deepcopy( $source->{$key}, $dest->{$key} );
-    }
-    else {
-      if ( !exists $dest->{$key} ) {
-
-        # use default/parent value
-        $dest->{$key} = $source->{$key};
-      }
-
-      # else keep existing (configured) value
-    }
-  }
-
-  1;
-}
-
-# recursively determine CA inheritance settings
-sub inherit_config {
-  my $caconfref = shift;
-  my $subca     = shift;
-
-  # postprocess sub-ca settings (configuration inheritance)
-  if ( defined $caconfref->{$subca}->{INHERIT} ) {
-
-    # inherit settings from parent config
-    my $parent = $caconfref->{$subca}->{INHERIT};
-
-    # make sure the parent already inherited its values from its own
-    # parent
-    inherit_config( $caconfref, $parent );
-
-    # copy subtree
-    deepcopy( $caconfref->{$parent}, $caconfref->{$subca} );
-  }
-}
-
-# get nested configuration entry
-# arg1: variable name "xx.yy.zz"
-# arg2: optional options:
-#   undef: return variable value
-#   'ref': return reference to variable
 sub get_ref {
+  # get nested configuration entry
+  # arg1: variable name "xx.yy.zz"
+  # arg2: optional options:
+  #   undef: return variable value
+  #   'ref': return reference to variable
   my $self   = shift;
   my $var    = shift;
   my $option = shift;
@@ -169,29 +125,126 @@ sub get_ref {
   }
 }
 
-# replace internal variables
-sub replace_variables {
-  my $self      = shift;
-  my $configref = shift;
-  my $thiskey   = shift;
+sub get {
+  # get entire configuration or a single value
+  # arg: configuration variable to get
+  #      undef: get whole configuration tree
+  #      string: get configuration entry (does not return subtrees)
+  # mangle: postprocess returned text, values:
+  #      'FILE': apply File::Spec->canonpath
+  #      'LC':   return config entry lower case
+  #      'UC':   return config entry upper case
+  #      'UCFIRST': return config entry ucfirst
+  my $self   = shift;
+  my $arg    = shift;
+  my $mangle = shift;
 
-  # determine if this entry is a string or a hash array
-  if ( ref( $configref->{$thiskey} ) eq "HASH" ) {
-    foreach ( keys %{ $configref->{$thiskey} } ) {
-      replace_variables( $self, $configref->{$thiskey}, $_ );
-    }
+  if ( !defined $arg ) {
+    return $self->{CONFIG};
   }
   else {
-    # actually replace variables
-    while ( $configref->{$thiskey} =~ /\$\((.*?)\)/ ) {
-      my $var = $1;
-      my $target = get_ref( $self, $var );
-      $target = "" unless defined $target;
+    my $value = get_ref( $self, $arg );
 
-      $var =~ s/\./\\\./g;
-      $configref->{$thiskey} =~ s/\$\($var\)/$target/g;
+    return $value unless defined $mangle;
+
+    $value = "" if !defined $value;
+
+    if ( $value ne '' ) {
+
+# mangle only if value is not "", otherwise File::Spec converts "" into "\", which doesn't make much sense ...
+      return File::Spec->catfile( File::Spec->canonpath($value) )
+        if ( $mangle eq "FILE" );
+      return uc($value)      if ( $mangle eq "UC" );
+      return lc($value)      if ( $mangle eq "LC" );
+      return ucfirst($value) if ( $mangle eq "UCFIRST" );
+      return;    # don't know how to handle this mangle option
     }
   }
+
+  return;
+}
+
+sub set {
+  # set configuration value
+  # arg1: configuration variable to set
+  # arg2: value to set
+  my $self  = shift;
+  my $var   = shift;
+  my $value = shift;
+
+  return if ( !defined $var );
+  my $ref = get_ref( $self, $var, 'ref' );
+
+  $$ref = $value;
+  1;
+}
+
+sub _deepcopy {
+  # recursively deep-copy a hash tree, NOT overwriting already existing
+  # values in destination tree
+  my $source = shift;
+  my $dest   = shift;
+
+  foreach my $key ( keys %{$source} ) {
+    if ( ref( $source->{$key} ) eq "HASH" ) {
+
+      # create new node if it does not exist yet
+      $dest->{$key} = {} unless exists $dest->{$key};
+      _deepcopy( $source->{$key}, $dest->{$key} );
+    }
+    else {
+      if ( !exists $dest->{$key} ) {
+
+        # use default/parent value
+        $dest->{$key} = $source->{$key};
+      }
+
+      # else keep existing (configured) value
+    }
+  }
+
+  1;
+}
+
+sub _inherit_config {
+  # recursively determine CA inheritance settings
+  my $caconfref = shift;
+  my $subca     = shift;
+
+  # postprocess sub-ca settings (configuration inheritance)
+  if ( defined $caconfref->{$subca}->{INHERIT} ) {
+
+    # inherit settings from parent config
+    my $parent = $caconfref->{$subca}->{INHERIT};
+
+    # make sure the parent already inherited its values from its own
+    # parent
+    _inherit_config( $caconfref, $parent );
+
+    # copy subtree
+    deepcopy( $caconfref->{$parent}, $caconfref->{$subca} );
+  }
+}
+
+sub _parse {
+  my $self = shift;
+
+  $self->{LOGBUFFER} = \my @dummy;
+  $self->_parsefile();
+
+  # replace internal variables
+  foreach ( keys %{ $self->{CONFIG} } ) {
+    _replace_variables( $self, $self->{CONFIG}, $_ );
+  }
+
+  # postprocess sub-ca settings (configuration inheritance)
+  foreach my $toplevel (qw(certmonitor keystore)) {
+    foreach my $entry ( keys( %{ $self->{CONFIG}->{$toplevel} } ) ) {
+      _inherit_config( $self->{CONFIG}->{$toplevel}, $entry );
+    }
+  }
+
+  1;
 }
 
 sub _parsefile {
@@ -288,79 +341,29 @@ sub _parsefile {
   1;
 }
 
-sub parse {
-  my $self = shift;
-
-  $self->{LOGBUFFER} = \my @dummy;
-  $self->_parsefile();
-
+sub _replace_variables {
   # replace internal variables
-  foreach ( keys %{ $self->{CONFIG} } ) {
-    replace_variables( $self, $self->{CONFIG}, $_ );
-  }
+  my $self      = shift;
+  my $configref = shift;
+  my $thiskey   = shift;
 
-  # postprocess sub-ca settings (configuration inheritance)
-  foreach my $toplevel (qw(certmonitor keystore)) {
-    foreach my $entry ( keys( %{ $self->{CONFIG}->{$toplevel} } ) ) {
-      inherit_config( $self->{CONFIG}->{$toplevel}, $entry );
+  # determine if this entry is a string or a hash array
+  if ( ref( $configref->{$thiskey} ) eq "HASH" ) {
+    foreach ( keys %{ $configref->{$thiskey} } ) {
+      _replace_variables( $self, $configref->{$thiskey}, $_ );
     }
-  }
-
-  1;
-}
-
-# get entire configuration or a single value
-# arg: configuration variable to get
-#      undef: get whole configuration tree
-#      string: get configuration entry (does not return subtrees)
-# mangle: postprocess returned text, values:
-#      'FILE': apply File::Spec->canonpath
-#      'LC':   return config entry lower case
-#      'UC':   return config entry upper case
-#      'UCFIRST': return config entry ucfirst
-sub get {
-  my $self   = shift;
-  my $arg    = shift;
-  my $mangle = shift;
-
-  if ( !defined $arg ) {
-    return $self->{CONFIG};
   }
   else {
-    my $value = get_ref( $self, $arg );
+    # actually replace variables
+    while ( $configref->{$thiskey} =~ /\$\((.*?)\)/ ) {
+      my $var = $1;
+      my $target = get_ref( $self, $var );
+      $target = "" unless defined $target;
 
-    return $value unless defined $mangle;
-
-    $value = "" if !defined $value;
-
-    if ( $value ne '' ) {
-
-# mangle only if value is not "", otherwise File::Spec converts "" into "\", which doesn't make much sense ...
-      return File::Spec->catfile( File::Spec->canonpath($value) )
-        if ( $mangle eq "FILE" );
-      return uc($value)      if ( $mangle eq "UC" );
-      return lc($value)      if ( $mangle eq "LC" );
-      return ucfirst($value) if ( $mangle eq "UCFIRST" );
-      return;    # don't know how to handle this mangle option
+      $var =~ s/\./\\\./g;
+      $configref->{$thiskey} =~ s/\$\($var\)/$target/g;
     }
   }
-
-  return;
-}
-
-# set configuration value
-# arg1: configuration variable to set
-# arg2: value to set
-sub set {
-  my $self  = shift;
-  my $var   = shift;
-  my $value = shift;
-
-  return if ( !defined $var );
-  my $ref = get_ref( $self, $var, 'ref' );
-
-  $$ref = $value;
-  1;
 }
 
 1;
