@@ -17,6 +17,7 @@ use File::Spec;
 
 use File::Copy;
 use File::Temp;
+use File::stat;
 use File::Basename;
 use Carp;
 use Data::Dumper;
@@ -214,7 +215,7 @@ sub convertcert {
 	if (! CertNanny::Util->write_file(FILENAME => $infile,
 				CONTENT  => $options{CERTDATA},
 	    )) {
-	    CertNanny::Logging->error("convertcert(): Could not write temporary file");
+	    CertNanny::Logging->error("convertcert(): Could not write temporary file: $infile");
 	    return;
 	}
 
@@ -1134,6 +1135,185 @@ sub installcert {
     return;
 }
 
+#
+#get next TrustAnchor 
+#
+sub getNextTrustAnchor {
+	my $self = shift;
+	
+	my $scepracert; 
+	my $scepCertChain;
+	my $pemchain;
+  	my $certchainfile = CertNanny::Util::gettmpfile(); 
+	
+	CertNanny::Logging->debug("CertNanny::Keystore::getNextTrustAnchor " );
+	
+	
+	if (! $self->getcacerts()) {		
+			CertNanny::Logging->error("Could not get CA certs");
+  	}
+  	  	  	 
+	$scepracert->{INFO} = $self->getcertinfo(CERTFILE => $self->{STATE}->{DATA}->{SCEP}->{RACERT},
+					      CERTFORMAT => 'PEM'); 
+  	$scepCertChain = $self->buildcertificatechain($scepracert); 
+  	 
+  	 foreach my $cert ( @{$scepCertChain} ){
+  	 	#CertNanny::Logging->debug("Each ele: $cert " .ref ($cert) . Dumper($cert) );
+  	 	$pemchain .=  "-----BEGIN CERTIFICATE-----\n".$cert->{CERTINFO}->{Certificate}."-----END CERTIFICATE-----\n"
+
+  	 }  	 
+  	 
+  	if (! CertNanny::Util->write_file(
+		FILENAME => $certchainfile,
+		CONTENT  => $pemchain,
+		FORCE    => 1,
+		)) {
+		    CertNanny::Logging->error("Could not write certificatechain file");
+		    return;
+	}
+
+    my $enroller = $self->get_enroller();
+    my %certs = $enroller->getNextCA($certchainfile);
+    
+    if(%certs){
+    my $signerCertificate = $certs{SIGNERCERT};
+    my @newrootcerts = @{$certs{NEXTCACERTS}} ;
+    
+    # list of trusted root certificates
+    my @trustedroots = @{$self->{STATE}->{DATA}->{ROOTCACERTS}};
+    ### @trustedroots
+
+    my %rootcertfingerprint;
+    foreach my $entry (@trustedroots) {
+	my $fingerprint = $entry->{CERTINFO}->{CertificateFingerprint};
+	$rootcertfingerprint{$fingerprint}++;
+    }
+    
+    
+    CertNanny::Logging->debug("getNextTrustAnchor signer cert:" . $signerCertificate->{'SubjectName'});
+    
+    CertNanny::Logging->debug("DN: $signerCertificate->{'SubjectName'}");
+        # split DN into individual RDNs. This regex splits at the ','
+        # character if it is not escaped with a \ (negative look-behind)
+        my @RDN = split(/(?<!\\),\s*/, $signerCertificate->{'SubjectName'});
+               
+    
+    if( $RDN[0] =~ $self->{OPTIONS}->{ENTRY}->{rootcaupdate}->{signerSubjectRegex}  ){
+    	CertNanny::Logging->debug("Subject signer check successful " . $RDN[0] );   
+    }else{
+    	CertNanny::Logging->error("Subject signer check failed new root CA cert WILL NOT BE ACCEPTED" . $RDN[0] ); 
+   		return; 
+    }
+    
+    CertNanny::Logging->debug("getNextTrustAnchor signer issuerName:" . $signerCertificate->{'IssuerName'} );
+
+        # split DN into individual RDNs. This regex splits at the ','
+        # character if it is not escaped with a \ (negative look-behind)
+        my @IRDN = split(/(?<!\\),\s*/, $signerCertificate->{'IssuerName'});
+      
+    
+    if( $IRDN[0] =~ $self->{OPTIONS}->{ENTRY}->{rootcaupdate}->{signerIssuerSubjectRegex}  ){
+    	CertNanny::Logging->debug("signer certificate issuer subject check successful " . $IRDN[0] );   
+    }else{
+    	CertNanny::Logging->error("signer certificate issuer subject check failed rootcerts WILL NOT BE ACCEPTED" . $RDN[0] ); 
+   		return; 
+    }
+    my $signerCertInfo->{INFO} =  $signerCertificate ;
+
+    if(! $self->buildcertificatechain($signerCertInfo) ){
+    		CertNanny::Logging->error("signer certificate NOT trusted against lokal root CA certs, rootcerts WILL NOT BE ACCEPTED" . $RDN[0] ); 
+   		return; 
+    }; 
+      
+    
+    foreach my $newroot ( @newrootcerts )
+    {
+    	if(defined $newroot){
+    		CertNanny::Logging->debug("new root cert found:" . $newroot->{'CERTINFO'}->{'CertificateFingerprint'});
+    		
+    		my @fingerprint = split(/:/,$newroot->{'CERTINFO'}->{'CertificateFingerprint'});
+    		my $qname =  join("",@fingerprint);
+
+    		my $newRootCertFile = File::Spec->catfile($self->{OPTIONS}->{ENTRY}->{rootcaupdate}->{quarantinedir},$qname);	
+    		my $pemCACert =  "-----BEGIN CERTIFICATE-----\n".$newroot->{'CERTINFO'}->{'Certificate'}."-----END CERTIFICATE-----\n";
+    			
+    		
+    		if(-e $newRootCertFile){
+    			##check quaratine days , install into configured roots dir    	
+    			my $filestat = (stat($newRootCertFile));
+    			my $now = time();
+    			my $fileage = $filestat->ctime ;
+    			 
+   				 #CertNanny::Logging->debug("qfile age :" . $filestat->ctime . Dumper (stat($newRootCertFile) ) );
+   				 CertNanny::Logging->debug("now :" . $now );  				 
+   				 CertNanny::Logging->debug("sub age minus now:" . ($now - $fileage)  );
+   				   
+   				 my $quarantineTimeInSec = $self->{OPTIONS}->{ENTRY}->{rootcaupdate}->{quarantinetime}  * 86400 ;
+   				 
+   				 ##if file older then the specified quarantine days in sec 
+   				 if(($now - $fileage) > $quarantineTimeInSec )
+   				 {
+   				 	if(not defined $rootcertfingerprint{$newroot->{'CERTINFO'}->{'CertificateFingerprint'}}){
+   				 		
+   				 		CertNanny::Logging->info("install new root CA cert with fingerprint" . $newroot->{'CERTINFO'}->{'CertificateFingerprint'} . " into trusted roots" );
+   				 		my @CARDN = split(/(?<!\\),\s*/, $newroot->{'CERTINFO'}->{'SubjectName'});
+   				 	    my @certname = split(/=/, $CARDN[0]);
+	   				 	my @newCAfilePart = split(/ /, $certname[1]);
+	    		        my $newCAFileName =  join("-",@newCAfilePart);
+	    		        $newCAFileName .= ".pem";
+	    		        
+	    		        my $RootCertFile = File::Spec->catfile($self->{OPTIONS}->{ENTRY}->{'rootcacert'}->{1},$newCAFileName);	
+	    		        	
+		    			if (! CertNanny::Util->write_file(
+							FILENAME => $RootCertFile,
+							CONTENT  => $pemCACert,
+							FORCE    => 0,
+							)) {
+					    CertNanny::Logging->error("Could not write new Root CA into trusted roots dir " .$self->{OPTIONS}->{ENTRY}->{'rootcacert'}->{1} );
+					    return;
+						}
+						##delete new root CA cert from quarantine
+						unlink $newRootCertFile;
+						
+   				 	}else{
+   				 			CertNanny::Logging->debug("new root with fingerprint" . $newroot->{'CERTINFO'}->{'CertificateFingerprint'}. " already exists as trusted root cert"  );
+   				
+   				 	}  				 	
+   				 }else{
+   				 		CertNanny::Logging->debug("Quarantine for root CA cert with fingerprint " . $newroot->{'CERTINFO'}->{'CertificateFingerprint'} . "still pending"  );
+   				
+   				 }
+   				 	
+    					
+    		}else{
+    			
+    			if(not defined $rootcertfingerprint{$newroot->{'CERTINFO'}->{'CertificateFingerprint'}}){
+    				
+    			CertNanny::Logging->debug("Quarantine new root CA cert with fingerprint: " . $newroot->{'CERTINFO'}->{'CertificateFingerprint'});
+   			   			
+	    			if (! CertNanny::Util->write_file(
+						FILENAME => $newRootCertFile,
+						CONTENT  => $pemCACert,
+						FORCE    => 0,
+						)) {
+				    CertNanny::Logging->error("Could not write new Root CA into quarantine dir");
+				    return;
+					}
+    			}else{
+    				 CertNanny::Logging->debug("new root CA cert with fingerprint" . $newroot->{'CERTINFO'}->{'CertificateFingerprint'}. " already exists as trusted root cert");  				
+    			}
+    			
+    		}
+    		
+    	}
+    	
+    }
+    
+    }##if valid certs hash returned 
+	
+    return;
+}
+
 # Import p12 
 # Import a p12 with private key and certificate into target keystore
 # also adding the certificate chain if required / included
@@ -1460,6 +1640,7 @@ sub executehook {
 	# TODO: Test Subject/Serial Hook!
 	$args{'__SUBJECT__'}  = qq ( "$self->{CERT}->{INFO}->{SubjectName}" ) || 'UnknownSubject';
 	$args{'__SERIAL__'}   =  $self->{CERT}->{INFO}->{SerialNumber} || 'UnknownSerial';
+	$args{'__FINGERPRINT__'}   =  $self->{CERT}->{INFO}->{CertificateFingerprint} || 'UnknownFingerprint';
 
 	# replace values passed to this function
 	foreach my $key (keys %args) {
@@ -1818,6 +1999,9 @@ sub sendrequest {
     return 1;
 }
 
+
+
+
 sub get_enroller {
 	my $self = shift;
 	
@@ -1829,9 +2013,12 @@ sub get_enroller {
             print STDERR $@;
             return;
         }
+        
+        CertNanny::Logging->debug("getEnroller" . ref($self->{INSTANCE} ) );      
         my $entry_options = $self->{OPTIONS}->{ENTRY};
         my $config = $self->{OPTIONS}->{CONFIG};
         my $entryname = $self->{OPTIONS}->{ENTRYNAME};
+
 		eval "\$self->{OPTIONS}->{ENTRY}->{ENROLLER} = CertNanny::Enroll::$enrollertype->new(\$entry_options, \$config, \$entryname)";
 		if ($@) {
 		    print STDERR $@;
