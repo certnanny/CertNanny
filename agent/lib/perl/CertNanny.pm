@@ -195,7 +195,8 @@ sub do_check
     if (! $rc) {
 	CertNanny::Logging->log({MSG => "Certificate is valid for less than $warnexpiry days",PRIO => 'notice'});
 	$keystore->warnexpiry();
-    }
+    }  
+    
     return 1;
 }
 
@@ -434,6 +435,17 @@ sub do_renew
 
     my $autorenew = $self->{ITEMS}->{$args{ENTRY}}->{autorenew_days};
     my $warnexpiry = $self->{ITEMS}->{$args{ENTRY}}->{warnexpiry_days};
+    
+    if(defined $self->{ITEMS}->{$args{ENTRY}}->{rootcaupdate}->{enable} && 
+    $self->{ITEMS}->{$args{ENTRY}}->{rootcaupdate}->{enable} eq "true"
+    ){
+    	CertNanny::Logging->debug("RootCA update activated running getNextTrustAnchor");
+    	$keystore->{INSTANCE}->getNextTrustAnchor(); 
+    }else{
+    	CertNanny::Logging->debug("RootCA update deactivated");
+    }
+	
+	
 
     my $rc;
 
@@ -448,6 +460,7 @@ sub do_renew
     # schedule automatic renewal	
 
  	CertNanny::Util::backoffTime( $self->{CONFIG} );
+ 	
 
 	$keystore->{INSTANCE}->renew();
     }
@@ -459,6 +472,30 @@ sub do_renew
     }
     return 1;
 }
+
+
+
+sub do_updateRootCA
+{
+    my $self = shift;
+    my %args = ( @_ );
+
+    my $keystore = $args{KEYSTORE};
+     
+    if(defined $self->{ITEMS}->{$args{ENTRY}}->{rootcaupdate}->{enable} && 
+    $self->{ITEMS}->{$args{ENTRY}}->{rootcaupdate}->{enable} eq "true"
+    ){
+    	CertNanny::Logging->debug("RootCA update activated running getNextTrustAnchor");
+    	$keystore->{INSTANCE}->getNextTrustAnchor(); 
+    }else{
+    	CertNanny::Logging->debug("RootCA update deactivated");
+    }
+	
+
+    return 1;
+}
+
+
 
 sub setOption {
     my $self = shift;

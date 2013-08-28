@@ -308,7 +308,8 @@ Actions:
 
   check             Check all configured keystores
   renew             Run automatic renewal on all configured keystores
-  enroll			Run inital enrollment for configured keystores that do NOT have a certificate installed. 
+  enroll			Run inital enrollment for configured keystores that do NOT have a certificate installed.
+  updateRootCA		Run trusted root CA certificate update via SCEP 
   install           Install CertNanny as a Windows Service (applicable only on Windows platforms)
   uninstall         Uninstall CertNanny service (applicable only on Windows platforms)
     
@@ -394,6 +395,28 @@ or as a comand line parameter:
 Will set the CHALLANGE globaly for every configured initial enroll keystore.
 Will be overwirtten by a config value. 
 keystore.(keystorename).initialenroll.auth.challengepassword = CHALLANGE
+
+=item B<updateRootCA>
+If the SCEP server supports the SCEPs getnextcacert operation this feature allows to automatically que next Root CA certificates. 
+In order to use this feature a root CA certificate dir must be configured ! instead of explicit root CA files. 
+If rootcaupdate is enabled it will be envoked before each renew, or for root only keystores with the updateRootCA command. 
+
+Required configuration:
+keystore.LABEL.rootcacert.1 = .../trustedRootCAs 
+#Enable Automatic root CA update via SCEP  (required)
+keystore.DEFAULT.rootcaupdate.enable = true
+
+#Directory to quarantine new root CA certificates (required)
+keystore.DEFAULT.rootcaupdate.quarantinedir = .../quarantineRootCerts
+
+#Quarantinetime in days (required)
+keystore.DEFAULT.rootcaupdate.quarantinetime = 90 
+
+# Accepted Signer certificate Regex (required)
+# In order to prevent spoofing attacks it is required to supply a regular expersian that will be matched against the signer certificates subject and issuerName. 
+keystore.DEFAULT.rootcaupdate.signerSubjectRegex =  .*:scep$
+keystore.DEFAULT.rootcaupdate.signerIssuerSubjectRegex =  .* Issuer CA.*
+
 
 =item B<install>
 
@@ -849,7 +872,7 @@ any)
 =item *
 
 IMPORTANT: define at least one Root Certificate to use in your setup:
-
+IMPORTANT: if you plan to automatically update root CAs via SCEP make this a directory! 
 keystore.DEFAULT.rootcacert.1 = ...
 
 =back
@@ -1126,6 +1149,8 @@ or allow for automatic Root CA key rollover.  It is not useful (but does not
 harm) to include non-root CA certificates here, they are simply not considered
 by the program.  The first Root CA certificate must have the index 1.
 Subsequent entries are only read if the index numbers are adjacent.
+
+To enable rootCAupdate via SCEP configure a directory for root certs with the index 1. 
 
 =back
 
