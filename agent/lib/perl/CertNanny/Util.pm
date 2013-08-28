@@ -773,7 +773,7 @@ sub writeOpenSSLConfig {
 		print $configfile "[$section]\n";
         foreach my $entry_hash (@{$config_hash->{$section}}) {
             foreach my $key (keys(%{$entry_hash})) {
-                my $value = $entry_hash->{$key};
+                my $value = $entry_hash->{$key};                
             	if(-e $value and $^O eq "MSWin32") {
     	        	#on Windows paths have a backslash, so in the string it is \\.
     	        	#In the config it must keep the doubled backslash so the actual 

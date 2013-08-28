@@ -202,7 +202,6 @@ sub writeConfigFile {
 }
 
 sub getCA {
-	
 	my $self= shift;
 	my $config = shift;
 	unless(defined $self->{certs}->{RACERT} and defined $self->{certs}->{CACERTS}) {
@@ -271,8 +270,100 @@ sub getCA {
 	return %certs;
 }
 
+
+#Get next CA via SCEP
+# Pass a file location to the signers certificate chain for signature validation
+# This file will only be used if the returned signed PKCS7 reply is not including the complete chain
+# $enroller->getNextCA($certchainfile);
+#
 sub getNextCA {
-	return;
+	my $self= shift;
+	my $ChainRootCACertFile = shift;
+	
+	my $scepCertChain; 
+  	my $pemchain;
+  	
+    my $olddir = getcwd();
+	chdir $self->{certdir};
+
+  	CertNanny::Logging->debug( "CertNanny::Enroll::Scep::getNextCA");
+ 	  
+  	my $signerCertOutput = "signerCertGetNextCA.pem";
+   	my $targetCAfile = "nextRootCA";
+					 	
+		my %options = (
+		sscep_getnextca => {
+			ChainRootCACertFile => $ChainRootCACertFile,
+#			FingerPrint => $requestfile,
+			SignerCertificateFile => $signerCertOutput,
+		},
+		
+		sscep => {
+			CACertFile => $targetCAfile,
+		}
+	);
+
+		$self->readConfig(\%options);
+		my $config = $self->{OPTIONS};
+
+	    $self->writeConfigFile();
+	    
+	    if($self->execute("getnextca") != 0) {
+	    	CertNanny::Logging->debug( "error executing CertNanny::Enroll::Scep::getNextCA - may no be available at this time or not supported by target SCEP server" );
+	    	return;
+	    }
+	    
+	    	    # collect all ca certificates returned by the SCEP command
+	    my @nextcacerts = ();
+	    my $ii = 0;
+	
+	    my $certfile = File::Spec->catfile($self->{certdir}, $targetCAfile . "-$ii");
+	    CertNanny::Logging->debug("getNextCA(): Adding certfile to stack: $certfile");
+	    while (-r $certfile) {
+	        my $certformat = 'PEM'; # always returned by sscep
+	        my $certinfo = CertNanny::Util->getcertinfo(CERTFILE => $certfile,
+	                          CERTFORMAT => 'PEM');
+	    CertNanny::Logging->debug("info $certfile". Dumper($certinfo));
+	        if (defined $certinfo) {
+	            push (@nextcacerts, { CERTINFO => $certinfo });
+	        }
+	        $ii++;
+	        $certfile = File::Spec->catfile($self->{certdir}, $targetCAfile . "-$ii");
+	    }
+	
+		# delete next ca cert files
+	    $ii = 0;
+	    while (-e $targetCAfile . "-" . $ii) {
+		    my $file = $targetCAfile . "-" . $ii;
+		    CertNanny::Logging->debug("Unlinking $file");
+		    unlink $file;
+		    if (-e $file) {
+		        CertNanny::Logging->error("could not delete next CA certificate file $file, cannot proceed");
+		        return;
+		    }
+		    $ii++;
+	    }
+	
+	
+	
+	my $signercertfile = File::Spec->catfile($self->{certdir}, $signerCertOutput );
+	my $SignerCertinfo = CertNanny::Util->getcertinfo(CERTFILE => $signercertfile,
+	                          CERTFORMAT => 'PEM');
+	                          
+	unlink $signercertfile;
+	if (-e $signercertfile) {
+	   CertNanny::Logging->error("could not delete next CA signer certificate file $signercertfile, cannot proceed");
+	  return;
+   	}
+	                          
+	chdir $olddir;
+	                          
+	my %certs = (
+		NEXTCACERTS => \@nextcacerts,
+		SIGNERCERT => $SignerCertinfo
+	);
+
+	return %certs;
 }
 
 sub defaultOptions {
