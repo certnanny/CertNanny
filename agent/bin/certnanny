@@ -6,6 +6,7 @@
 # This software is distributed under the GNU General Public License - see the
 # accompanying LICENSE file for more details.
 #
+# Formated with perltidy -i=2 -l=0 -vmll -ole=unix -conv -lp -cti=1 --all-containers-tightness=2 -nsfs -csc -csci=10 -ce -bar -otr -vt=2 -vtc=2 -sot -sct -nbbc -blbs=2
 
 use strict;
 use warnings;
@@ -15,272 +16,260 @@ use File::Spec;
 
 use Pod::Usage;
 use Getopt::Long;
+use Data::Dumper;
 
 use FindBin;
-use lib "$FindBin::Bin/../lib/perl";
+
+#use lib "$FindBin::Bin/../lib/perl";
 
 use CertNanny;
-
+use CertNanny::Util;
+use CertNanny::Config;
+use CertNanny::Logging;
 
 if ($OSNAME eq "MSWin32") {
-    require Win32;
-    Win32->import();
-    require Win32::Daemon;
-    Win32::Daemon->import();
+  require Win32;
+  Win32->import();
+  require Win32::Daemon;
+  Win32::Daemon->import();
 } else {
-	foreach my $name (qw(SERVICE_STOPPED SERVICE_START_PENDING SERVICE_STOP_PENDING SERVICE_PAUSE_PENDING SERVICE_PAUSED SERVICE_CONTINUE_PENDING SERVICE_RUNNING SERVICE_CONTROL_NONE SERVICE_CONTROL_INTERROGATE SERVICE_CONTROL_SHUTDOWN)) {
-		no strict;
-		# declare a dummy function for symbols listed in Win32(::Daemon)
-		*{$name} = sub { 1; };
-		use strict;
-	}
-}
+  foreach my $name (qw(SERVICE_STOPPED SERVICE_START_PENDING SERVICE_STOP_PENDING SERVICE_PAUSE_PENDING SERVICE_PAUSED SERVICE_CONTINUE_PENDING SERVICE_RUNNING SERVICE_CONTROL_NONE SERVICE_CONTROL_INTERROGATE SERVICE_CONTROL_SHUTDOWN)) {
+    no strict;
 
+    # declare a dummy function for symbols listed in Win32(::Daemon)
+    *{$name} = sub {1;};
+    use strict;
+  }
+}
 
 ###########################################################################
 # main
 
-
-my %config;
+my %cmdLineParam;
 
 my $msg = "CertNanny, version $CertNanny::VERSION";
-GetOptions(\%config,
-	   qw(
-	      help|?
-	      man
-	      cfg|cfgfile|conf|config=s
-			win_user=s
-			win_password=s
-			challengepassword=s
-		  sleep=i
-	      )) or pod2usage(-msg => $msg, -verbose => 0);
+GetOptions(
+  \%cmdLineParam,
+  qw(
+    help|?
+    man
+    cfg|cfgfile|conf|config=s
+    win_user=s
+    win_password=s
+    challengepassword=s
+    sleep=i
+    ))
+  or pod2usage(-msg => $msg, -verbose => 0);   # strip all command line parameters off @ARGV what remains is the commands to be executed
 
-pod2usage(-exitstatus => 0, -verbose => 2) if $config{man};
-pod2usage(-msg => $msg, -verbose => 1) if ($config{help} or
-		 (! exists $config{cfg}));
+pod2usage(-exitstatus => 0, -verbose => 2) if $cmdLineParam{man};
+pod2usage(-msg => $msg, -verbose => 1)     if ($cmdLineParam{help} or (!exists $cmdLineParam{cfg}));
+      
+die "Could not read config file $cmdLineParam{cfg}. Stopped" unless (-r $cmdLineParam{cfg});
 
-die "Could not read config file $config{cfg}. Stopped" 
-    unless (-r $config{cfg});
+# Instantiate dependend singleton objects
+return 1 unless CertNanny::Config->getInstance(CONFIG => $cmdLineParam{cfg});
+CertNanny::Util->getInstance(CONFIG => CertNanny::Config->getInstance(CONFIG => $cmdLineParam{cfg}));
+CertNanny::Logging->getInstance(CONFIG => CertNanny::Config->getInstance(CONFIG => $cmdLineParam{cfg}));
+CertNanny::Logging->log2Console();
 
-my $monitor = CertNanny->getInstance(CONFIG => $config{cfg});
-$config{sleep} = 300 if !defined $config{sleep};
-$monitor->setOption("sleep", $config{sleep});
-if(defined $config{challengepassword} and $config{challengepassword} ne ''){
-	$monitor->setOption('globalchallengepassword', $config{challengepassword});
+# Instantiate CertNanny
+my $monitor = CertNanny->getInstance(CONFIG => $cmdLineParam{cfg});
+
+$cmdLineParam{sleep} = 300 if !defined $cmdLineParam{sleep};
+$monitor->setOption("sleep", $cmdLineParam{sleep});
+if (defined $cmdLineParam{challengepassword} and $cmdLineParam{challengepassword} ne '') {
+  $monitor->setOption('globalchallengepassword', $cmdLineParam{challengepassword});
 }
 
+foreach my $cmd (@ARGV) {   # command line parameters are already stripped off. @ARGV now only contains commands to be executed
+  if ($OSNAME eq 'MSWin32') {
 
-foreach my $cmd (@ARGV) {
-	if ($OSNAME eq 'MSWin32') {
-		# Windows Service related commands
-		my $servicename = $monitor->get_config_value("platform.windows.servicename") || "CertNanny";
-		if ($cmd eq "install") {
-			my $cfgpath = $config{cfg};
-			my $servicepath= File::Spec->catfile($FindBin::Bin, $FindBin::Script);
-			my $executable_name = $EXECUTABLE_NAME;
-			if($servicepath =~ /\w+\.exe/) {
-			    $executable_name = $servicepath;
-			}
-			my $params_str = "";
-			if($executable_name ne $servicepath) {
-			    $params_str = qq{"$servicepath"};
-			}
-			$params_str = qq{$params_str --cfg "$cfgpath" --sleep $config{sleep}};
-			my $ret = Win32::Daemon::CreateService({
-				machine =>  '',
-				name    =>  $servicename,
-				display =>  $servicename,
-				path    =>  $executable_name,
-				user    =>  $config{win_user} || "",
-				pwd     =>  $config{win_password} || "",
-				description => 'Automatic certificate renewal',
-				parameters =>$params_str,
-			});
-			
-			if ($ret) {
-				print "Service successfully added.\n";
-				exit 0;
-			} else {
-				print "Failed to add service: " . Win32::FormatMessage( Win32::Daemon::GetLastError() ) . "\n";
-				exit 1;
-			}
-		} elsif ($cmd eq "uninstall") {
-			if (Win32::Daemon::DeleteService('',$servicename)) {
-				print "Service successfully uninstalled.\n";
-				exit 0;
-			} else {
-				print "Failed to uninstall service: " . Win32::FormatMessage( Win32::Daemon::GetLastError() ) . "\n";
-				exit 1;
-			}
-		}
-	}
-	
-	
-	$monitor->$cmd(%config) || die "Invalid action: $cmd. Stopped";
-}
-if (scalar @ARGV > 0) {
-   # if we had commands as arguments, we're done, else we are a service and do a lot of stuff below :)
-	exit;
-}
+    # Windows Service related commands
+    my $servicename = $monitor->getConfigValue("platform.windows.servicename")
+      || "CertNanny";
+    if ($cmd eq "install") {
+      my $cfgpath         = $cmdLineParam{cfg};
+      my $servicepath     = File::Spec->catfile($FindBin::Bin, $FindBin::Script);
+      my $executable_name = $EXECUTABLE_NAME;
+      if ($servicepath =~ /\w+\.exe/) {
+        $executable_name = $servicepath;
+      }
+      my $params_str = "";
+      if ($executable_name ne $servicepath) {
+        $params_str = qq{"$servicepath"};
+      }
+      $params_str = qq{$params_str --cfg "$cfgpath" --sleep $cmdLineParam{sleep}};
+      my $ret = Win32::Daemon::CreateService({machine     => '',
+                                              name        => $servicename,
+                                              display     => $servicename,
+                                              path        => $executable_name,
+                                              user        => $cmdLineParam{win_user} || "",
+                                              pwd         => $cmdLineParam{win_password} || "",
+                                              description => 'Automatic certificate renewal',
+                                              parameters  => $params_str,});
+
+      if ($ret) {
+        print "Service successfully added.\n";
+        exit 0;
+      } else {
+        print "Failed to add service: " . Win32::FormatMessage(Win32::Daemon::GetLastError()) . "\n";
+        exit 1;
+      }
+    } elsif ($cmd eq "uninstall") {
+      if (Win32::Daemon::DeleteService('', $servicename)) {
+        print "Service successfully uninstalled.\n";
+        exit 0;
+      } else {
+        print "Failed to uninstall service: " . Win32::FormatMessage(Win32::Daemon::GetLastError()) . "\n";
+        exit 1;
+      }
+    }
+  } ## end if ($OSNAME eq 'MSWin32')
+
+  $monitor->$cmd(%cmdLineParam) || die "Invalid action: $cmd. Stopped";   # execute the command $cmd an give it all the command line parameters as a hash
+} ## end foreach my $cmd (@ARGV)
+
+# if we had commands as arguments, we're done, else we are a service and do a lot of stuff below :)
+exit if (scalar @ARGV > 0);
 
 if ($OSNAME eq 'MSWin32') {
   open my $LOG, '>>', 'c:\temp\debug.txt';
-  print $LOG "SERVICE_STOPPED = " . SERVICE_STOPPED() . "\n";
-  print $LOG "SERVICE_START_PENDING = " . SERVICE_START_PENDING() . "\n";
-  print $LOG "SERVICE_STOP_PENDING = " . SERVICE_STOP_PENDING() . "\n";
-  print $LOG "SERVICE_PAUSE_PENDING = " . SERVICE_PAUSE_PENDING() . "\n";
+  print $LOG "SERVICE_STOPPED          = " . SERVICE_STOPPED()          . "\n";
+  print $LOG "SERVICE_START_PENDING    = " . SERVICE_START_PENDING()    . "\n";
+  print $LOG "SERVICE_STOP_PENDING     = " . SERVICE_STOP_PENDING()     . "\n";
+  print $LOG "SERVICE_PAUSE_PENDING    = " . SERVICE_PAUSE_PENDING()    . "\n";
   print $LOG "SERVICE_CONTINUE_PENDING = " . SERVICE_CONTINUE_PENDING() . "\n";
-  print $LOG "SERVICE_STOP_PENDING = " . SERVICE_STOP_PENDING() . "\n";
-  print $LOG "SERVICE_RUNNING = " . SERVICE_RUNNING() . "\n";
-   my $State="";
-   my $PrevState = SERVICE_START_PENDING();
-  
-	#start service
-   if(Win32::Daemon::StartService())
-   {
-       print "Successfully started.\n";
-   }
-   else
-   {
-       print "Failed to start service: " . Win32::FormatMessage( Win32::Daemon::GetLastError() ) . "\n";
-      exit; 
-   }
-  
-  my $starttime=0;
-  
-  my $SERVICE_SLEEP_TIME = 1000; # 1 second
+  print $LOG "SERVICE_STOP_PENDING     = " . SERVICE_STOP_PENDING()     . "\n";
+  print $LOG "SERVICE_RUNNING          = " . SERVICE_RUNNING()          . "\n";
+  my $State     = "";
+  my $PrevState = SERVICE_START_PENDING();
 
+  #start service
+  if (Win32::Daemon::StartService()) {
+    print "Successfully started.\n";
+  } else {
+    print "Failed to start service: " . Win32::FormatMessage(Win32::Daemon::GetLastError()) . "\n";
+    exit;
+  }
 
-  while( SERVICE_STOPPED() != ( $State = Win32::Daemon::State() ) )
-  {
+  my $starttime = 0;
 
+  my $SERVICE_SLEEP_TIME = 1000;    # 1 second
+
+  while (SERVICE_STOPPED() != ($State = Win32::Daemon::State())) {
     print $LOG "state: " . $State . "\n";
-    
+
     # if ($State == 0 ) {
-#	    Win32::Daemon::State( SERVICE_RUNNING() );
-#	    $PrevState = SERVICE_RUNNING();
+    #	    Win32::Daemon::State( SERVICE_RUNNING() );
+    #	    $PrevState = SERVICE_RUNNING();
     #   }
 
-    if( SERVICE_START_PENDING() == $State )
-    {
+    if (SERVICE_START_PENDING() == $State) {
+
       # Initialization code
-      
-      Win32::Daemon::State( SERVICE_RUNNING() );
+      Win32::Daemon::State(SERVICE_RUNNING());
       $PrevState = SERVICE_RUNNING();
       next;
-    }
-    elsif( SERVICE_STOP_PENDING() == $State )
-    {
-      Win32::Daemon::State( SERVICE_STOPPED() );
+    } elsif (SERVICE_STOP_PENDING() == $State) {
+      Win32::Daemon::State(SERVICE_STOPPED());
       next;
-    }
-    elsif( SERVICE_PAUSE_PENDING() == $State )
-    {
+    } elsif (SERVICE_PAUSE_PENDING() == $State) {
+
       # "Pausing...";
-      Win32::Daemon::State( SERVICE_PAUSED() );
+      Win32::Daemon::State(SERVICE_PAUSED());
       $PrevState = SERVICE_PAUSED();
       next;
-    }
-    elsif( SERVICE_CONTINUE_PENDING() == $State )
-    {
+    } elsif (SERVICE_CONTINUE_PENDING() == $State) {
+
       # "Resuming...";
-      Win32::Daemon::State( SERVICE_RUNNING() );
+      Win32::Daemon::State(SERVICE_RUNNING());
       $PrevState = SERVICE_RUNNING();
       next;
-    }
-    elsif( SERVICE_STOP_PENDING() == $State )
-    {
+    } elsif (SERVICE_STOP_PENDING() == $State) {
+
       # "Stopping...";
-      Win32::Daemon::State( SERVICE_STOPPED() );
+      Win32::Daemon::State(SERVICE_STOPPED());
       $PrevState = SERVICE_STOPPED();
       next;
-    }
-    elsif( SERVICE_RUNNING() == $State )
-    {
-      my $currtime=time;	    
-
+    } elsif (SERVICE_RUNNING() == $State) {
+      my $currtime = time;
       print $LOG "currtime: " . $currtime . "\n";
 
-      if($currtime >= $starttime)
-      {
-	        print $LOG "currtime > starttime\n";
-	  	# reinstantiate CertNanny object (make sure that destructor gets called)
-	  	$monitor = undef;
-		$monitor = CertNanny->getInstance(CONFIG => $config{cfg});
-		print $LOG "new monitor object\n";
-		# The service is running as normal...
-		# ...add the main code here...
-		$monitor->redirect_stdout_stderr();
-		print $LOG "stdout/stderr redirect\n";
+      if ($currtime >= $starttime) {
+        print $LOG "currtime > starttime\n";
 
-		my $rc;
-		print $LOG "Starting renewal...";
-		eval {
-			$rc = $monitor->renew();
-		};
-		if($rc != 0) {
-		    print $LOG "There was an error executing CertNanny monitor object\n";
-		    print $LOG $@;
-		}
-		print $LOG "Renewal finished...";
+        # reinstantiate CertNanny object (make sure that destructor gets called)
+        $monitor = undef;
+        $monitor = CertNanny->getInstance(CONFIG => $cmdLineParam{cfg});
+        print $LOG "new monitor object\n";
 
-	 
-		#if the renewal was successful the starttime will be increased by one day (86400 seconds -> 24hours -> 3600 seconds per hour)
-		my $timeframe = $monitor->get_config_value("platform.windows.serviceinterval", "FILE") || 86400;
-		$starttime=$currtime+$timeframe;  
-      }      
+        # The service is running as normal...
+        # ...add the main code here...
+        $monitor->log2File();
+        print $LOG "stdout/stderr redirect\n";
+
+        my $rc;
+        print $LOG "Starting renewal...";
+        eval {$rc = $monitor->k_renew();};
+        if ($rc != 0) {
+          print $LOG "There was an error executing CertNanny monitor object\n";
+          print $LOG $@;
+        }
+        print $LOG "Renewal finished...";
+
+        #if the renewal was successful the starttime will be increased by one day (86400 seconds -> 24hours -> 3600 seconds per hour)
+        my $timeframe = $monitor->getConfigValue("platform.windows.serviceinterval", "FILE")
+          || 86400;
+        $starttime = $currtime + $timeframe;
+      } ## end if ($currtime >= $starttime)
       print $LOG "before sleep ...\n";
-      Win32::Sleep( $SERVICE_SLEEP_TIME );
+      Win32::Sleep($SERVICE_SLEEP_TIME);
       print $LOG "calling next ...\n";
       next;
-    }
-    else
-    {
+    } else {
+
       # Got an unhandled control message. Set the state to
       # whatever the previous state was.
-      Win32::Daemon::State( $PrevState );
+      Win32::Daemon::State($PrevState);
       next;
     }
 
     print $LOG "before outstanding commands checking ...\n";
-        # Check for any outstanding commands. Pass in a non zero value
-        # and it resets the Last Message to SERVICE_CONTROL_NONE.
-	eval {
-   	my $Message = Win32::Daemon::QueryLastMessage(1);
-	};
-	print $LOG "EVAL_ERROR? " . $EVAL_ERROR;
 
+    # Check for any outstanding commands. Pass in a non zero value
+    # and it resets the Last Message to SERVICE_CONTROL_NONE.
+    eval {my $Message = Win32::Daemon::QueryLastMessage(1);};
+    print $LOG "EVAL_ERROR? " . $EVAL_ERROR;
 
-        if( SERVICE_CONTROL_NONE() != ( my $Message = Win32::Daemon::QueryLastMessage( 1 ) ) )
-        {
-	
-    	  print $LOG "Message: $Message ...\n";
-          if( SERVICE_CONTROL_INTERROGATE() == $Message )
-          {
-            # Got here if the Service Control Manager is requesting
-            # the current state of the service. This can happen for
-            # a variety of reasons. Report the last state we set.
-            Win32::Daemon::State( $PrevState );
-          }
-        elsif( SERVICE_CONTROL_SHUTDOWN() == $Message )
-        {
-          # Yikes! The system is shutting down. We had better clean up
-          # and stop.
-          # Tell the SCM that we are preparing to shutdown and that we expect
-          # it to take 25 seconds (so don't terminate us for at least 1 second)...
-	  Win32::Daemon::State( SERVICE_STOP_PENDING(), 1000 );
-        }
+    if (SERVICE_CONTROL_NONE() != (my $Message = Win32::Daemon::QueryLastMessage(1))) {
+
+      print $LOG "Message: $Message ...\n";
+      if (SERVICE_CONTROL_INTERROGATE() == $Message) {
+
+        # Got here if the Service Control Manager is requesting
+        # the current state of the service. This can happen for
+        # a variety of reasons. Report the last state we set.
+        Win32::Daemon::State($PrevState);
+      } elsif (SERVICE_CONTROL_SHUTDOWN() == $Message) {
+
+        # Yikes! The system is shutting down. We had better clean up
+        # and stop.
+        # Tell the SCM that we are preparing to shutdown and that we expect
+        # it to take 25 seconds (so don't terminate us for at least 1 second)...
+        Win32::Daemon::State(SERVICE_STOP_PENDING(), 1000);
       }
-      # Snooze for awhile so we don't suck up cpu time...
-      print $LOG "before sleep ...\n";
-      Win32::Sleep( $SERVICE_SLEEP_TIME );
-      print $LOG "calling next ...\n";
-      next;
-   }
-   
-   # We are done so close down...
-   Win32::Daemon::StopService();
-}
+    } ## end if (SERVICE_CONTROL_NONE...)
+
+    # Snooze for awhile so we don't suck up cpu time...
+    print $LOG "before sleep ...\n";
+    Win32::Sleep($SERVICE_SLEEP_TIME);
+    print $LOG "calling next ...\n";
+    next;
+  } ## end while (SERVICE_STOPPED() ...)
+
+  # We are done so close down...
+  Win32::Daemon::StopService();
+} ## end if ($OSNAME eq 'MSWin32')
 
 __END__
 
@@ -307,8 +296,10 @@ Options:
 Actions:
 
   check             Check all configured keystores
+  sync              Synchronize CertNannys keystore with all configured keystores
   renew             Run automatic renewal on all configured keystores
-  enroll			Run inital enrollment for configured keystores that do NOT have a certificate installed. 
+  enroll            Run inital enrollment for configured keystores that do NOT have a certificate installed.
+  updateRootCA      Run trusted root CA certificate update via SCEP 
   install           Install CertNanny as a Windows Service (applicable only on Windows platforms)
   uninstall         Uninstall CertNanny service (applicable only on Windows platforms)
     
@@ -338,6 +329,11 @@ Uses the specified file for configuration. Mandatory.
  
 Check the configured keystores and print out warning if the expiry time
 is within the configured warning interval.
+
+=item B<sync>
+ 
+Synchronize CerNannys internal keystore with all configured keystores. If 
+s.th. is missing on the one or the other side, it is added.
 
 =item B<renew>
  
@@ -394,6 +390,27 @@ or as a comand line parameter:
 Will set the CHALLANGE globaly for every configured initial enroll keystore.
 Will be overwirtten by a config value. 
 keystore.(keystorename).initialenroll.auth.challengepassword = CHALLANGE
+
+=item B<updateRootCA>
+If the SCEP server supports the SCEPs getnextcacert operation this feature allows to automatically que next Root CA certificates. 
+In order to use this feature a root CA certificate dir must be configured ! instead of explicit root CA files. 
+If rootcaupdate is enabled it will be envoked before each renew, or for root only keystores with the updateRootCA command. 
+
+Required configuration:
+keystore.LABEL.rootcacert.1 = .../trustedRootCAs 
+#Enable Automatic root CA update via SCEP  (required)
+keystore.DEFAULT.rootcaupdate.enable = true
+
+#Directory to quarantine new root CA certificates (required)
+keystore.DEFAULT.rootcaupdate.quarantinedir = .../quarantineRootCerts
+
+#Quarantinetime in days (required)
+keystore.DEFAULT.rootcaupdate.quarantinetime = 90 
+
+# Accepted Signer certificate Regex (required)
+# In order to prevent spoofing attacks it is required to supply a regular expersian that will be matched against the signer certificates subject and issuerName. 
+keystore.DEFAULT.rootcaupdate.signerSubjectRegex =  .*:scep$
+keystore.DEFAULT.rootcaupdate.signerIssuerSubjectRegex =  .* Issuer CA.*
 
 =item B<install>
 
@@ -572,7 +589,7 @@ Windows service via the <install> option.
 
 The CertNanny script may be invoked in 'check' mode that will only 
 check if the configured keystores are valid for more than a configured 
-amount of time (may be used for monitorin integration).
+amount of time (may be used for monitoring integration).
 
 If the readonly warning time is configured a few days shorter than the 
 automatic renewal period, the system has some time to perform the 
@@ -830,6 +847,22 @@ pairs.
 Comment lines are indicated by a '#' symbol (only at the beginning of the 
 line, otherwise they are considered to be part of the value itself).
 
+Other configuration files can be included via 'include <Filename|Directoryname>'.
+
+Examples:
+
+include cmd.cfg
+Includes the configuation file cmd.cfg in the same directory as the invoking
+configuration file. 
+
+include *.cfg
+Includes all configuation file ending with .cfg in the same directory as the 
+invoking configuration file. 
+
+include Keystore
+Includes all configuation file in the directory Keystore relativ to the
+directory of the invoking configuration file. 
+
 A sample configuration file is included in etc/certnanny.cfg. New
 users should use this file and adapt the settings to their setup:
 
@@ -849,7 +882,7 @@ any)
 =item *
 
 IMPORTANT: define at least one Root Certificate to use in your setup:
-
+IMPORTANT: if you plan to automatically update root CAs via SCEP make this a directory! 
 keystore.DEFAULT.rootcacert.1 = ...
 
 =back
@@ -1127,6 +1160,8 @@ harm) to include non-root CA certificates here, they are simply not considered
 by the program.  The first Root CA certificate must have the index 1.
 Subsequent entries are only read if the index numbers are adjacent.
 
+To enable rootCAupdate via SCEP configure a directory for root certs with the index 1. 
+
 =back
 
 =head4 Hook definitions
@@ -1261,7 +1296,7 @@ encoding (PEM/DER), regardless of the 'format' setting. See 'format'.
 
 Example: /etc/apache/ssl.crt/server.crt
 
-=item keystore.LABEL.keyfile
+=item keystore.LABEL.key.file
 
 Specifies the location of the private key for the certificate.
 The software will automatically detect encoding (PEM/DER), regardless
@@ -1269,11 +1304,11 @@ of the 'format' setting. See 'format'.
 
 Example: /etc/apache/ssl.key/server.key
 
-=item keystore.LABEL.keyformat
+=item keystore.LABEL.key.format
 
 This setting is only evaluated when installing the new keystore.
 Overrides the .format setting when installing the key specified with
-.keyfile
+.key.file
 
 Allowed values: PEM, DER
 
@@ -1281,9 +1316,9 @@ Default: value specified with .format
 
 Example: 
     keystore.LABEL.format = DER
-    keystore.LABEL.keyformat = PEM
+    keystore.LABEL.key.format = PEM
 
-=item keystore.LABEL.keytype
+=item keystore.LABEL.key.type
 
 Specifies the private key format. Allowed values: OpenSSL, PKCS8
 
@@ -1291,7 +1326,7 @@ Default: OpenSSL
 
 Example: PKCS8
 
-=item keystore.LABEL.pin
+=item keystore.LABEL.key.pin
 
 Specifies the private key pin used to decrypt the private key. May
 be empty (unencrypted key).
