@@ -375,7 +375,7 @@ sub writeFile {
 
 sub getCertType {
   ###########################################################################
-  # Analyses certificate and decides wether it's DER or PEM format
+  # Analyses certificate and decides whether it's DER or PEM format
   #
   # Input:  String with Certificate
   # Output: String with Format
@@ -479,7 +479,7 @@ sub callOpenSSL {
 
 sub _sanityCheckIn {
   ###########################################################################
-  # Checks wether either CERTDATA or CERTFILE but at least one of them is
+  # Checks whether either CERTDATA or CERTFILE but at least one of them is
   # given
   #
   my $self = (shift)->getInstance();
@@ -871,7 +871,7 @@ sub getTmpFile {
   # NOTE: this is UNSAFE (beware of race conditions). We cannot use a file
   # handle here because we are calling external programs to use these
   # temporary files.
-  CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "create certificate symlinks");
+  CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "get a tmp file");
   my $self = (shift)->getInstance();
   
   my $tmpdir = $self->{CONFIG}->get('path.tmpdir', 'FILE');
@@ -882,7 +882,7 @@ sub getTmpFile {
   my $tmpfile = mktemp($template);
 
   push(@{$self->{TMPFILE}}, $tmpfile);
-  CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "create certificate symlinks");
+  CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "get a tmp file");
   return $tmpfile;
 } ## end sub getTmpFile
 
@@ -1080,6 +1080,7 @@ sub getMacAddresses {
 
 
 sub fetchFileList {
+  CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "fetch a file list");
   my $self   = (shift)->getInstance();
   my $myGlob = shift;
   
@@ -1099,6 +1100,7 @@ sub fetchFileList {
       }
     }
   } ## end foreach my $item (@myList)
+  CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "fetch a file list");
   return \@tmpList;
 } ## end sub fetchFileList
 

@@ -48,10 +48,10 @@ sub new {
   my $config    = $options->{CONFIG};
 
   # SANITY CHECKS
-  my $pin = $entry->{pin};
+  my $pin = $entry->{key}->{pin};
 
   # export the pin to this instance
-  $self->{PIN} = $entry->{pin};
+  $self->{PIN} = $entry->{key}->{pin};
 
   # sample sanity checks for configuration settings
   foreach my $parameter (qw(location)) {

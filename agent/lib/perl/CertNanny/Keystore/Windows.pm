@@ -67,11 +67,11 @@ sub new {
   # it will be configured in certnanny's config file, for others you
   # might want to deduce it from the keystore itself
   #my $pin = "";
-  #    $pin = $entry->{pin};
-  $entry->{pin} = "" if (!exists $entry->{pin});
+  #    $pin = $entry->{key}->{pin};
+  $entry->{key}->{pin} = "" if (!exists $entry->{key}->{pin});
 
   # export the pin to this instance
-  $self->{PIN} = $entry->{pin};
+  $self->{PIN} = $entry->{key}->{pin};
 
   # sample sanity checks for configuration settings
   foreach my $parameter (qw(location)) {

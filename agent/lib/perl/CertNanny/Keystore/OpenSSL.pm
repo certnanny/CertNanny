@@ -48,7 +48,7 @@ sub new {
   my $config    = $options->{CONFIG};
 
   # propagate PIN to class options
-  $self->{PIN} = $entry->{pin};
+  $self->{PIN} = $entry->{key}->{pin};
 
   if (defined $config->{INITIALENROLLEMNT} and $config->{INITIALENROLLEMNT} eq 'yes') {
     CertNanny::Logging->info("Initial enrollment mode, skip check for key and cert file");
@@ -56,8 +56,8 @@ sub new {
     # If it's not an Initial Enrollment, we need at least
     #   - keyfile
     #   - location
-    if (!defined $entry->{keyfile} || (!-r $entry->{keyfile}) && !defined $entry->{hsm}) {
-      croak("keystore.keyfile $entry->{keyfile} not defined, does not exist or unreadable");
+    if (!defined $entry->{key}->{file} || (!-r $entry->{key}->{file}) && !defined $entry->{hsm}) {
+      croak("keystore.key.file $entry->{key}->{file} not defined, does not exist or unreadable");
       return undef;
     }
 
@@ -88,7 +88,7 @@ sub new {
   } ## end foreach my $format (qw(FORMAT KEYFORMAT CACERTFORMAT ROOTCACERTFORMAT))
 
   # Keytype defaults to OpenSSL; valid is OpenSSL or PKCS8
-  $self->{KEYTYPE} = $entry->{keytype} || 'OpenSSL';
+  $self->{KEYTYPE} = $entry->{key}->{type} || 'OpenSSL';
   if ($self->{KEYTYPE} !~ m{ \A (?: OpenSSL | PKCS8 ) \z }xms) {
     croak("Incorrect keystore type $self->{KEYTYPE}");
     return undef;
@@ -254,8 +254,9 @@ sub installCert {
   my $entryname = $options->{ENTRYNAME};
   my $config    = $options->{CONFIG};
 
+  # Todo pgk: {KEYFILE} or {key}->{file} ?
   my $keyfile = $self->{STATE}->{DATA}->{RENEWAL}->{REQUEST}->{KEYFILE};
-  my $pin = $self->{PIN} || $entry->{pin} || "";
+  my $pin = $self->{PIN} || $entry->{key}->{pin} || "";
 
   # data structure representing the new keystore (containing all
   # new file contents to write)
@@ -290,7 +291,7 @@ sub installCert {
     }
 
     push(@newkeystore, {DESCRIPTION => "End entity private key",
-                        FILENAME    => $entry->{keyfile},
+                        FILENAME    => $entry->{key}->{file},
                         CONTENT     => $newkey->{KEYDATA}});
   } ## end unless ($self->k_hasEngine()...)
 
@@ -472,13 +473,13 @@ sub getKey {
   my $rc = undef;
 
   if ($self->k_hasEngine()) {
-    $rc = ($self->{HSM}->can('getKey')) ? $self->{HSM}->getKey() : $entry->{keyfile};
+    $rc = ($self->{HSM}->can('getKey')) ? $self->{HSM}->getKey() : $entry->{key}->{file};
   } else {
-    my $keydata = CertNanny::Util->readFile($entry->{keyfile});
+    my $keydata = CertNanny::Util->readFile($entry->{key}->{file});
     if (!defined $keydata || ($keydata eq "")) {
       CertNanny::Logging->error("getKey(): Could not read private key");
     } else {
-      my $pin       = $self->{PIN} || $self->{OPTIONS}->{ENTRY}->{pin};
+      my $pin       = $self->{PIN} || $self->{OPTIONS}->{ENTRY}->{key}->{pin};
       my $keyformat = ($keydata =~ m{ -----BEGIN.*KEY----- }xms) ? 'PEM' : 'DER';
 
       CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "get private key for main certificate from keystore");
@@ -550,7 +551,7 @@ sub createRequest {
     CertNanny::Logging->debug("Creating new CSR with HSM.");
     $result = $self->{HSM}->createRequest($result);
   } else {
-    my $pin = $self->{PIN} || $entry->{pin} || "";
+    my $pin = $self->{PIN} || $entry->{key}->{pin} || "";
     CertNanny::Logging->debug("Creating new CSR with native OpenSSL functionality.");
 
     my $openssl = $config->get('cmd.openssl', 'FILE');
@@ -723,7 +724,7 @@ sub selfSign {
   my $openssl      = $config->get('cmd.openssl', 'FILE');
   my $selfsigncert = $entryname . "-selfcert.pem";
   my $outfile      = File::Spec->catfile($entry->{statedir}, $selfsigncert);
-  my $pin          = $self->{PIN} || $entry->{pin} || "";
+  my $pin          = $self->{PIN} || $entry->{key}->{pin} || "";
 
   ######prepere openssl config file##########
 
@@ -773,7 +774,7 @@ sub selfSign {
 
   # generate request
   # Todo pgk: Testen runCommand
-  my @cmd = (qq("$openssl"), 'req', '-config', qq("$tmpconfigfile"), '-x509', '-new', '-sha1', '-out', qq("$outfile"), '-key', qq("$entry->{keyfile}"),);
+  my @cmd = (qq("$openssl"), 'req', '-config', qq("$tmpconfigfile"), '-x509', '-new', '-sha1', '-out', qq("$outfile"), '-key', qq("$entry->{key}->{file}"),);
 
   push(@cmd, ('-passin', 'env:PIN')) unless $pin eq "";
   $ENV{PIN} = $pin;
@@ -823,70 +824,73 @@ sub generateKey {
   my $entryname = $options->{ENTRYNAME};
   my $config    = $options->{CONFIG};
   
+  my $rc = undef;
+  my $outfile;
+  
   if ($entry->{type} ne 'OpenSSL') {
     # Only valid for OpenSSL Key all others should implement by themselfs or they get an error
     CertNanny::Logging->error("WRONG GENERATE KEY! ");
-    CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "generateKey");
-    return undef;
-  }
-  
-  my $keyfile = $entryname . "-key.pem";
-  my $outfile = File::Spec->catfile($entry->{statedir}, $keyfile);
-
-  my $pin        = $self->{PIN}        || $entry->{pin}        || "";
-  my $bits       = $self->{SIZE}       || $entry->{size}       || '2048';
-  my $engine     = $self->{ENGINE}     || $entry->{engine}     || 'no';
-  my $enginetype = $self->{ENGINETYPE} || $entry->{enginetype} || 'none';
-  my $enginename = $self->{ENGINENAME} || $entry->{enginename} || 'none';
-
-  #TODO sub generateKey Doku!
-  if ($self->k_hasEngine() and $self->{HSM}->can('genkey')) {
-    CertNanny::Logging->debug("Generating a new key using the configured HSM.");
-    my $hsm = $self->{HSM};
-    $outfile = $hsm->genkey();
-    unless ($outfile) {
-      CertNanny::Logging->error("HSM could not generate new key.");
-      CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "generateKey");
-      return undef;
-    }
   } else {
-    CertNanny::Logging->debug("Generating a new key using native OpenSSL functionality.");
-    # Todo pgk: Testen $config->get
-    my $openssl = $config->get('cmd.openssl', 'FILE');
-    if (!defined $openssl) {
-      CertNanny::Logging->error("No openssl shell specified");
-      CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "generateKey");
-      return undef;
-    }
+    my $keyfile = $entryname . "-key.pem";
+    $outfile = File::Spec->catfile($entry->{statedir}, $keyfile);
 
-    my @passout = ();
-    if (defined $pin and $pin ne "") {
-      @passout = ('-des3', '-passout', 'env:PIN');
-    }
+    # Todo Arkadius: Ist $self und $entry hier nicht dasselbe -> Groß-/Kleinschreibung der elemente ?!?
+    my $pin        = $self->{PIN}        || $entry->{key}->{pin} || "";
+    my $bits       = $self->{SIZE}       || $entry->{size}       || '2048';
+    my $engine     = $self->{ENGINE}     || $entry->{engine}     || 'no';
+    my $enginetype = $self->{ENGINETYPE} || $entry->{enginetype} || 'none';
+    my $enginename = $self->{ENGINENAME} || $entry->{enginename} || 'none';
 
-    my @engine_cmd;
-    if ($self->k_hasEngine()) {
-      CertNanny::Logging->debug("Since an engine is used, setting required command line parameters.");
+    #TODO sub generateKey Doku!
+    if ($self->k_hasEngine() and $self->{HSM}->can('genkey')) {
+      CertNanny::Logging->debug("Generating a new key using the configured HSM.");
       my $hsm = $self->{HSM};
-      push(@engine_cmd, '-engine', $hsm->engineid());
-      push(@engine_cmd, '-keyform', $hsm->keyform()) if $hsm->keyform();
-    }
+      $outfile = $hsm->genkey();
+      unless ($outfile) {
+        $rc = CertNanny::Logging->error("HSM could not generate new key.");
+      }
+    } else {
+      CertNanny::Logging->debug("Generating a new key using native OpenSSL functionality.");
+      # Todo pgk: Testen $config->get
+      my $openssl = $config->get('cmd.openssl', 'FILE');
+      if (!defined $openssl) {
+        $rc = CertNanny::Logging->error("No openssl shell specified");
+      }
 
-    # generate key
-    my @cmd = (qq("$openssl"), 'genrsa', '-out', qq("$outfile"), @passout, @engine_cmd, $bits);
-    $ENV{PIN} = $pin;
-    if (CertNanny::Util->runCommand(\@cmd) != 0) {
+      if (!$rc) {
+        my @passout = ();
+        if (defined $pin and $pin ne "") {
+          @passout = ('-des3', '-passout', 'env:PIN');
+        }
+
+        my @engine_cmd;
+        if ($self->k_hasEngine()) {
+          CertNanny::Logging->debug("Since an engine is used, setting required command line parameters.");
+          my $hsm = $self->{HSM};
+          push(@engine_cmd, '-engine', $hsm->engineid());
+          push(@engine_cmd, '-keyform', $hsm->keyform()) if $hsm->keyform();
+        }
+
+        # generate key
+        my @cmd = (qq("$openssl"), 'genrsa', '-out', qq("$outfile"), @passout, @engine_cmd, $bits);
+        $ENV{PIN} = $pin;
+        if (CertNanny::Util->runCommand(\@cmd) != 0) {
+          delete $ENV{PIN};
+          $rc = CertNanny::Logging->error("RSA key generation failed");
+        }
+      }
+    } ## end else [ if ($self->k_hasEngine()...)]
+    
+    if (!$rc) {
+      chmod 0600, $outfile;
       delete $ENV{PIN};
-      CertNanny::Logging->error("RSA key generation failed");
-      CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "generateKey");
-      return undef;
+      $rc = {KEYFILE => $outfile};
     }
-  } ## end else [ if ($self->k_hasEngine()...)]
-  chmod 0600, $outfile;
-  delete $ENV{PIN};
+  }
 
   CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "generateKey");
-  return ({KEYFILE => $outfile});
+  return $rc;
+  # return ({KEYFILE => $outfile});
 } ## end sub generateKey
 
 
@@ -932,7 +936,7 @@ sub createPKCS12 {
               CERTFILE     => $self->{STATE}->{DATA}->{RENEWAL}->{REQUEST}->{CERTFILE},
               CERTFORMAT   => 'PEM',
               KEYFILE      => $self->{STATE}->{DATA}->{RENEWAL}->{REQUEST}->{KEYFILE},
-              PIN          => $self->{PIN} || $self->{OPTIONS}->{ENTRY}->{pin},
+              PIN          => $self->{PIN} || $self->{OPTIONS}->{ENTRY}->{key}->{pin},
               @_);
 
   my $options   = $self->{OPTIONS};
@@ -1243,62 +1247,61 @@ sub installRoots {
   my $entryname = $options->{ENTRYNAME};
   my $config    = $options->{CONFIG};
   
-  my $rc = 0;
-  
-  my $rootCertList = $self->k_getRootCerts();
-  if (!defined($rootCertList)) {
-    $rc = CertNanny::Logging->error("No root certificates found in " . $config-get("keystore.$entryname.trustedrootca.authoritative.dir", 'FILE'));
-  }
+  my %locInstall = ('directory' => $config->get("keystore.$entryname.trustedrootca.generated.dir",       'FILE'),
+                    'file'      => $config->get("keystore.$entryname.trustedrootca.generated.file",      'FILE'),
+                    'chainfile' => $config->get("keystore.$entryname.trustedrootca.generated.chainfile", 'FILE'));
+
+  my $rc = (defined($args{TARGET}) and !defined($locInstall{lc($args{TARGET})}));
   # Todo pgk: Zugriff in k_getRootCerts aendern auf keystore.openssl.TrustedRootCA.AUTHORITATIVE.Dir
-  
+
   if (!$rc) {
-    my %locInstall = ('directory' => $config->get("keystore.$entryname.trustedrootca.generated.dir",       'FILE'),
-                      'file'      => $config->get("keystore.$entryname.trustedrootca.generated.file",      'FILE'),
-                      'chainfile' => $config->get("keystore.$entryname.trustedrootca.generated.chainfile", 'FILE'));
+    my $rootCertList = $self->k_getRootCerts();
+    if (!defined($rootCertList)) {
+      $rc = CertNanny::Logging->error("No root certificates found in " . $config-get("keystore.$entryname.trustedrootca.authoritative.dir", 'FILE'));
+    } else {
+      # write directory links: Links every certificate to the target directory
+      if (defined($locInstall{directory}) && (!defined($args{TARGET}) or ('DIRECTORY' =~ m/^$args{TARGET}/))) {
+	      # First clean up the Target directory and get rid of all old certs
+        $self->_createLocalCerts(TARGET  => $locInstall{directory},
+                                   CLEANUP => 1);
 
-    # write directory links: Links every certificate to the target directory
-    if (defined($locInstall{directory}) && (!defined($args{TARGET}) or ('DIRECTORY' =~ m/^$args{TARGET}/))) {
-	    # First clean up the Target directory and get rid of all old certs
-      $self->_createLocalCerts(TARGET  => $locInstall{directory},
-                                 CLEANUP => 1);
+        # For each cert install in target and execute postinstall Hook
+        foreach my $cert (@$rootCertList) {
+          $self->_createLocalCerts(SOURCE  => $cert->{CERTFILE},
+                                   TARGET  => $locInstall{directory},
+                                   CLEANUP => 0);
 
-      # For each cert install in target and execute postinstall Hook
-      foreach my $cert (@$rootCertList) {
-        $self->_createLocalCerts(SOURCE  => $cert->{CERTFILE},
-                                 TARGET  => $locInstall{directory},
-                                 CLEANUP => 0);
-
-        $self->_executeHook($entry->{hook}->{roots}->{install}->{post},
-                            '__TYPE__'        => 'DIRECTORY',
-                            '__CERTFILE__'    => $cert->{CERTFILE},
-                            '__FINGERPRINT__' => $cert->{CERTINFO}->{CertificateFingerprint},
-                            '__TARGET__'      => $locInstall{directory});
+          $self->_executeHook($entry->{hook}->{roots}->{install}->{post},
+                              '__TYPE__'        => 'DIRECTORY',
+                              '__CERTFILE__'    => $cert->{CERTFILE},
+                              '__FINGERPRINT__' => $cert->{CERTINFO}->{CertificateFingerprint},
+                              '__TARGET__'      => $locInstall{directory});
+        }  
       }  
-    }  
 
-    foreach my $target ('file', 'chainfile') {
-      if (!defined($args{TARGET}) or (uc($target) =~ m/^$args{TARGET}/)) {
-        # write file: Writes all certificates in one PEM file / Chainfile
-        if (defined($locInstall{$target})) {
-  	      # write in an tmp-file first just in case ...
-          my $tmpFile = CertNanny::Util->getTmpFile();
-          foreach my $cert (@$rootCertList) {
-            CertNanny::Util->writeFile(DSTFILE => $tmpFile,
-                                       SRCFILE => $cert->{CERTFILE}, 
-                                       APPEND  => 1);
+      foreach my $target ('file', 'chainfile') {
+        if (!defined($args{TARGET}) or (uc($target) =~ m/^$args{TARGET}/)) {
+          # write file: Writes all certificates in one PEM file / Chainfile
+          if (defined($locInstall{$target})) {
+  	        # write in an tmp-file first just in case ...
+            my $tmpFile = CertNanny::Util->getTmpFile();
+            foreach my $cert (@$rootCertList) {
+              CertNanny::Util->writeFile(DSTFILE => $tmpFile,
+                                         SRCFILE => $cert->{CERTFILE}, 
+                                         APPEND  => 1);
 
-            $self->_executeHook($entry->{hook}->{roots}->{install}->{post},
-                                '__TYPE__'        => uc($target),
-                                '__CERTFILE__'    => $cert->{CERTFILE},
-                                '__FINGERPRINT__' => $cert->{CERTINFO}->{CertificateFingerprint},
-                                '__TARGET__'      => $locInstall{$target});
-          }
-
-          if ($target eq 'chainfile') {
-            # in addition to the Root Certs, the chainfile also keeps the chain
-            if (!exists($self->{STATE}->{DATA}->{SCEP}->{CACERTS})) {
-              $self->k_getCaCerts();
+              $self->_executeHook($entry->{hook}->{roots}->{install}->{post},
+                                  '__TYPE__'        => uc($target),
+                                  '__CERTFILE__'    => $cert->{CERTFILE},
+                                  '__FINGERPRINT__' => $cert->{CERTINFO}->{CertificateFingerprint},
+                                  '__TARGET__'      => $locInstall{$target});
             }
+
+            if ($target eq 'chainfile') {
+              # in addition to the Root Certs, the chainfile also keeps the chain
+              if (!exists($self->{STATE}->{DATA}->{SCEP}->{CACERTS})) {
+                $self->k_getCaCerts();
+              }
 # Todo Arkadius Frage ok: Wie filtere ich die raus, die in das CheinFile gehoeren NEIN, es kommen neue dazu naemlich die Chain der intermediate CAs
 # Todo installRoots: buildcertChain liefert mit dem aktuellen cert nur undef zurueck :-(
 # intermediate CAs holen mit k_getCACerts falls nicht bereits geholt 
@@ -1307,31 +1310,32 @@ sub installRoots {
 # getCert : Endcert holen
 # danach buildcertChain
 # Anker und ggf andere Roots entfernen EE entfernen, und den Rest an chainfile anhaengen; Reihenfolge egal
-            if (my $chainArrRef = $self->k_buildCertificateChain($self->getCert())) {
-              # delete root
-              shift(@$chainArrRef);
-              # delete EE
-              pop(@$chainArrRef);
-              # all others add to chainfile
-              while (my $cert = shift($chainArrRef)) {
-                CertNanny::Util->writeFile(DSTFILE => $tmpFile,
-                                           SRCFILE => $cert->{CERTFILE}, 
-                                           APPEND  => 1);
+              if (my $chainArrRef = $self->k_buildCertificateChain($self->getCert())) {
+                # delete root
+                shift(@$chainArrRef);
+                # delete EE
+                pop(@$chainArrRef);
+                # all others add to chainfile
+                while (my $cert = shift($chainArrRef)) {
+                  CertNanny::Util->writeFile(DSTFILE => $tmpFile,
+                                             SRCFILE => $cert->{CERTFILE}, 
+                                             APPEND  => 1);
 
-                $self->_executeHook($entry->{hook}->{roots}->{install}->{post},
-                                    '__TYPE__'        => uc($target),
-                                    '__CERTFILE__'    => $cert->{CERTFILE},
-                                    '__FINGERPRINT__' => $cert->{CERTINFO}->{CertificateFingerprint},
-                                    '__TARGET__'      => $locInstall{$target});
-              }
+                  $self->_executeHook($entry->{hook}->{roots}->{install}->{post},
+                                      '__TYPE__'        => uc($target),
+                                      '__CERTFILE__'    => $cert->{CERTFILE},
+                                      '__FINGERPRINT__' => $cert->{CERTINFO}->{CertificateFingerprint},
+                                      '__TARGET__'      => $locInstall{$target});
+                }
+              }    
             }    
-          }    
 
-          # put tmp-file to the right location     
-          if (!File::Copy::copy($tmpFile, $locInstall{$target})) {
-            CertNanny::Logging->error("Could not install new TrusteRootCA File to " . $locInstall{$target} . ".");
-          }
-          eval {unlink($tmpFile)};
+            # put tmp-file to the right location     
+            if (!File::Copy::copy($tmpFile, $locInstall{$target})) {
+              CertNanny::Logging->error("Could not install new TrusteRootCA File to " . $locInstall{$target} . ".");
+            }
+            eval {unlink($tmpFile)};
+          }  
         }  
       }  
     }
@@ -1409,7 +1413,7 @@ sub _createLocalCerts {
         $certSHA1 = CertNanny::Util->getCertSHA1(CERTFILE => $certFile);
         $certSHA1 = $certSHA1->{CERTSHA1} if (defined($certSHA1));
         foreach $subject_hash (@subject_hashs) {
-          # find out, wether we already have this file in the linkdirectory
+          # find out, whether we already have this file in the linkdirectory
           my $makeTarget  = 1;
           my $counter     = 0;
           foreach my $targetFile (keys %certSHA1Hash) {

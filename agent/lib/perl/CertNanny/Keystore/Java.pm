@@ -67,15 +67,15 @@ sub new {
     croak("keystore file $entry->{location} not readable");
     return undef;
   }
-  if (!defined $entry->{pin}) {
-    croak("keystore.$entryname.pin not defined");
+  if (!defined $entry->{store}->{pin}) {
+    croak("keystore.$entryname.store.pin not defined");
     return undef;
   }
   
-  # optional keypin defaults to pin
-  if (!defined $entry->{keypin}) {
-    $entry->{keypin} = $entry->{pin};
-    CertNanny::Logging->info("keystore.$entryname.keypin not defined, defaulting to keystore.$entryname.pin");
+  # optional keypin defaults to storepin
+  if (!defined $entry->{key}->{pin}) {
+    $entry->{key}->{pin} = $entry->{store}->{pin};
+    CertNanny::Logging->info("keystore.$entryname.key.pin not defined, defaulting to keystore.$entryname.store.pin");
 
     # TODO sub new() check that keypin works if we are doing "renew"
   }
@@ -475,7 +475,7 @@ sub createRequest {
 
     $key->{OUTTYPE}   = 'OpenSSL';
     $key->{OUTFORMAT} = 'PEM';
-    $key->{OUTPASS}   = $entry->{keypin};
+    $key->{OUTPASS}   = $entry->{key}->{pin};
     $key              = $self->k_convertKey(%$key);
     if (!$key) {
       CertNanny::Logging->error("createRequest(): Could not convert key");
@@ -818,11 +818,11 @@ sub _buildKeytoolCmd {
   my $options = $self->{OPTIONS};
   my $entry   = $options->{ENTRY};
 
-  my @cmd = (qq("$options->{keytool}"), -storepass => qq{$entry->{pin}});
-  push(@cmd, -provider  => qq{"$entry->{provider}"}) if ($entry->{provider});
-  push(@cmd, -storetype => qq{"$entry->{format}"})   if ($entry->{format});
-  push(@cmd, -keystore  => qq{"$location"})          if ($location);
-  push(@cmd, -keypass   => qq($entry->{keypin}))     if ($entry->{keypin});
+  my @cmd = (qq("$options->{keytool}"), -storepass => qq("$entry->{store}->{pin}"));
+  push(@cmd, -provider  => qq("$entry->{provider}"))      if ($entry->{provider});
+  push(@cmd, -storetype => qq("$entry->{key}->{format}")) if ($entry->{key}->{format});
+  push(@cmd, -keystore  => qq("$location"))               if ($location);
+  push(@cmd, -keypass   => qq("$entry->{key}->{pin}"))    if ($entry->{key}->{pin});
   push(@cmd, @_);
   @cmd;
 } ## end sub _buildKeytoolCmd

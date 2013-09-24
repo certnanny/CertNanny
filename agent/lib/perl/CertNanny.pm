@@ -212,9 +212,9 @@ sub do_enroll {
     $entry->{initialenroll}->{targetType} = $entry->{type};
     $entry->{type}                        = 'OpenSSL';
     $entry->{location}                    = $entry->{initialenroll}->{auth}->{cert};
-    $entry->{format}                      = 'PEM';
-    $entry->{keyfile}                     = $entry->{initialenroll}->{auth}->{key};
-    $entry->{pin}                         = $entry->{initialenroll}->{auth}->{pin};
+    $entry->{key}->{format}               = 'PEM';
+    $entry->{key}->{file}                 = $entry->{initialenroll}->{auth}->{key};
+    $entry->{key}->{pin}                  = $entry->{initialenroll}->{auth}->{pin};
 
     if (exists $self->{ITEMS}->{$entryname}->{hsm}) {
       $self->{ITEMS}->{$entryname}->{hsm} = undef;
@@ -301,19 +301,18 @@ sub do_enroll {
       my $keyfile = File::Spec->catfile($newkeystore->{INSTANCE}->{OPTIONS}->{ENTRY}->{statedir}, $key);
 
       unless (-e $keyfile) {
-        # Todo pgk Testen: {KEYFILE}
-        my $newkey = $newkeystore->{INSTANCE}->generateKey()->{KEYFILE};
+        my $newkey = $newkeystore->{INSTANCE}->generateKey();
 
         CertNanny::Logging->debug("keyfile $newkey->{KEYFILE} ,  ");
-        $newkeystore->{INSTANCE}->{OPTIONS}->{ENTRY}->{keyfile} = $newkey->{KEYFILE};
-        CertNanny::Logging->debug("keyfile $newkeystore->{INSTANCE}->{OPTIONS}->{ENTRY}->{keyfile} ,  ");
-        $newkeystore->{INSTANCE}->{ENTRY}->{format} = 'PEM';
+        $newkeystore->{INSTANCE}->{OPTIONS}->{ENTRY}->{key}->{file} = $newkey->{KEYFILE};
+        CertNanny::Logging->debug("keyfile $newkeystore->{INSTANCE}->{OPTIONS}->{ENTRY}->{key}->{file} ,  ");
+        $newkeystore->{INSTANCE}->{ENTRY}->{key}->{format} = 'PEM';
       } else {
         CertNanny::Logging->debug("Key already generated");
         #CertNanny::Logging->debug('newkeystore with key : '.Dumper($newkeystore));
-        $newkeystore->{INSTANCE}->{OPTIONS}->{ENTRY}->{keyfile} = $keyfile;
-        $entry->{keyfile} = $entry->{initialenroll}->{auth}->{key};
-        $entry->{pin}     = $entry->{initialenroll}->{auth}->{pin};
+        $newkeystore->{INSTANCE}->{OPTIONS}->{ENTRY}->{key}->{file} = $keyfile;
+        $entry->{key}->{file} = $entry->{initialenroll}->{auth}->{key};
+        $entry->{key}->{pin}  = $entry->{initialenroll}->{auth}->{pin};
       } ## end else
 
       my $selfsigncert = $newkeystore->{INSTANCE}->{OPTIONS}->{ENTRYNAME} . "-selfcert.pem";
@@ -354,8 +353,8 @@ sub do_enroll {
       $newkeystore->{INSTANCE}->k_setCert($newkeystore->{CERT});
 
       #disable engine specific configuration
-      $newkeystore->{INSTANCE}->{OPTIONS}->{ENTRY}->{keyfile}  = $keyfile;
-      $newkeystore->{INSTANCE}->{OPTIONS}->{ENTRY}->{location} = $outCert;
+      $newkeystore->{INSTANCE}->{OPTIONS}->{ENTRY}->{key}->{file}               = $keyfile;
+      $newkeystore->{INSTANCE}->{OPTIONS}->{ENTRY}->{location}                  = $outCert;
       $newkeystore->{INSTANCE}->{OPTIONS}->{ENTRY}->{enroll}->{engine_section}  = undef;
       $newkeystore->{INSTANCE}->{OPTIONS}->{ENTRY}->{enroll}->{sscep}->{engine} = undef;
 

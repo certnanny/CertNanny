@@ -39,16 +39,16 @@ sub new() {
   $entry_options->{enroll}->{$engine_section}->{engine_id}    = $self->engineid();
   $entry_options->{enroll}->{$engine_section}->{dynamic_path} = $hsm_options->{dynamic_path};
   $entry_options->{enroll}->{$engine_section}->{MODULE_PATH}  = $hsm_options->{MODULE_PATH};
-  if ($hsm_options->{keytype} ne "file") {
-    $entry_options->{enroll}->{sscep_engine_pkcs11}->{PIN} = $entry_options->{pin};
+  if ($hsm_options->{key}->{type} ne "file") {
+    $entry_options->{enroll}->{sscep_engine_pkcs11}->{PIN} = $entry_options->{key}->{pin};
   }
 
-  unless (defined $hsm_options->{keytype} and (grep $_ eq $hsm_options->{keytype}, @avail_keytypes)) {
-    CertNanny::Logging->error(qq("$hsm_options->{keytype} is not an available keytype."));
+  unless (defined $hsm_options->{key}->{type} and (grep $_ eq $hsm_options->{key}->{type}, @avail_keytypes)) {
+    CertNanny::Logging->error(qq("$hsm_options->{key}->{type} is not an available keytype."));
     return undef;
   }
 
-  if ($hsm_options->{keytype} eq "file") {
+  if ($hsm_options->{key}->{type} eq "file") {
     CertNanny::Logging->error("File-type keys are not supported yet due to an incomplete engine, sorry.");
     return undef;
   } else {
@@ -74,12 +74,12 @@ sub new() {
       CertNanny::Logging->info("hsm.key.login is set, but it will be overwritten by PIN setting.");
     }
 
-    unless ($entry_options->{pin}) {
-      CertNanny::Logging->error("You need to set the keystore option pin to your login pin.");
+    unless ($entry_options->{key}->{pin}) {
+      CertNanny::Logging->error("You need to set the keystore option key.pin to your login pin.");
       return undef;
     }
-    $hsm_options->{key}->{login} = $entry_options->{pin};
-    $hsm_options->{key}->{id}    = $entry_options->{keyfile};
+    $hsm_options->{key}->{login} = $entry_options->{key}->{pin};
+    $hsm_options->{key}->{id}    = $entry_options->{key}->{file};
 
     #check mandatory params
     foreach my $param (qw(slot login id)) {
@@ -89,7 +89,7 @@ sub new() {
       }
     }
 
-  } ## end else [ if ($hsm_options->{keytype...})]
+  } ## end else [ if ($hsm_options->{key}->{type...})]
 
   $self->{hsm_options} = $hsm_options;
   $self->{ENTRY}       = $entry_options;
@@ -257,7 +257,7 @@ sub availparams() {
 
 sub engineid() {
   my $self    = shift;
-  my $keytype = $self->{hsm_options}->{keytype};
+  my $keytype = $self->{hsm_options}->{key}->{type};
   if (defined $keytype and $keytype eq "file") {
     return "cs";
   } else {
@@ -268,7 +268,7 @@ sub engineid() {
 
 sub keyform() {
   my $self    = shift;
-  my $keytype = $self->{hsm_options}->{keytype};
+  my $keytype = $self->{hsm_options}->{key}->{type};
   if (defined $keytype and $keytype eq "file") {
     return undef;
   } else {
@@ -280,7 +280,7 @@ sub keyform() {
 sub getEngineConfiguration() {
   my $self        = shift;
   my $hsm_options = $self->{hsm_options};
-  my $keytype     = $hsm_options->{keytype};
+  my $keytype     = $hsm_options->{key}->{type};
   my @config      = ();
   if (CertNanny::Util->staticEngine($self->engineid())) {
     CertNanny::Logging->debug("getEngineConfiguration(): Engine reports to be statically compiled with OpenSSL, not return a configuration as none should be needed.");
@@ -321,7 +321,7 @@ sub getKey() {
     return undef;
   }
 
-  my $old_key = $entry_options->{keyfile};
+  my $old_key = $entry_options->{key}->{file};
   $old_key =~ s/%i/$old_key_number/;
 
   unless ($old_key) {
@@ -396,7 +396,8 @@ sub checkKeySanity() {
 
   # 3: delete keys that are *NEWER* than the current one (old ones are backups)
   my $current_key_label = $self->{all_keys}->{$current_key_id};
-  my $key_pattern       = $self->{ENTRY}->{keyfile};
+  # Todo pgk : Alle Hashkeys nach lowercase aendern!!!!!
+  my $key_pattern       = $self->{ENTRY}->{key}->{file};
   $key_pattern =~ s/%i/(\\d+)/;
   $current_key_label =~ m/$key_pattern/;
   my $current_key_number = $1;

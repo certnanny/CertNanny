@@ -45,8 +45,8 @@ sub new() {
     return undef;
   }
 
-  unless (defined $hsm_options->{keytype} and (grep $_ eq $hsm_options->{keytype}, @avail_keytypes)) {
-    CertNanny::Logging->error(qq("$hsm_options->{keytype} is not an available keytype."));
+  unless (defined $hsm_options->{key}->{type} and (grep $_ eq $hsm_options->{key}->{type}, @avail_keytypes)) {
+    CertNanny::Logging->error(qq("$hsm_options->{key}->{type} is not an available keytype."));
     return undef;
   }
 
@@ -70,8 +70,8 @@ sub genkey() {
   my @cmd;
   push(@cmd, $self->{hsm_options}->{generatekey});
   push(@cmd, '-b');
-  push(@cmd, $self->{hsm_options}->{keytype});
-  if ($self->{hsm_options}->{keytype} eq "embed") {
+  push(@cmd, $self->{hsm_options}->{key}->{type});
+  if ($self->{hsm_options}->{key}->{type} eq "embed") {
     my $keyfile = $self->{ENTRYNAME} . "-key.pem";
     my $outfile = File::Spec->catfile($self->{ENTRY}->{statedir}, $keyfile);
     push(@cmd, "embedsavefile=$outfile");
@@ -107,7 +107,7 @@ sub genkey() {
 
 sub keyform() {
   my $self = shift;
-  if ($self->{hsm_options}->{keytype} eq "hwcrhk") {
+  if ($self->{hsm_options}->{key}->{type} eq "hwcrhk") {
     return "engine";
   } else {
     return undef;
@@ -124,6 +124,7 @@ sub engineid() {
 sub createRequest() {
   my $self        = shift;
   my $result      = shift;
+  # Todo pgk: {KEYFILE} oder {key}->{file}
   my $keyfile     = $result->{KEYFILE};
   my $requestfile = $keyfile;
   $requestfile =~ s/-key.pem$/-key_req.pem/;

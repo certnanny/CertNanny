@@ -1186,7 +1186,6 @@ sub k_getRootCerts {
   my $entryname = $options->{ENTRYNAME};
   my $config    = $options->{CONFIG};
 
-  CertNanny::Logging->debug("Start " . (caller(0))[3] . ": Getting all configured Roots");
   my @result = ();
   my $res;
   # Todo Arkadius: That should do the job as well and more compact. traversing the indices is no longer needed
@@ -1250,7 +1249,7 @@ sub k_getRootCerts {
 sub _checkCert {
   ###########################################################################
   #
-  # check wether cert is valid
+  # check whether cert is valid
   #
   # Input: caller must provide:
   #           $1 certificate file
@@ -1260,7 +1259,7 @@ sub _checkCert {
   #           CERTFILE => filename
   #           CERTFORMAT => cert format (PEM, DER)
   #  
-  CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "check wether cert is valid");
+  CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "check whether cert is valid");
   my $self     = shift;
   my $certfile = shift;
 
@@ -1298,7 +1297,7 @@ sub _checkCert {
            CERTFORMAT => $certformat};
   }
   
-  CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "check wether cert is valid");
+  CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "check whether cert is valid");
   return $rc;
 #    return {CERTINFO   => $certinfo,
 #            CERTFILE   => $certfile,
@@ -1517,17 +1516,22 @@ sub k_syncRootCAs {
   #     |- CERTINFO  
   #       ...
 
+  # First fetch available root certificates
   my $rootCertList = $self->k_getRootCerts();
   if (!defined($rootCertList)) {
     $rc = CertNanny::Logging->error("No root certificates found in " . $config-get("keystore.$entryname.trustedrootca.authoritative.dir", 'FILE'));
   }
   
   if (!$rc) {
-    # First Fetch available root certificates into
     my $availableRootCAs = {};
     # Foreach available root cert get the SHA1
     foreach my $certRef (@{$rootCertList}) {
-      $availableRootCAs->{CertNanny::Util->getCertSHA1(%{$certRef})->{CERTSHA1}} = $certRef;
+      my $certSHA1 = CertNanny::Util->getCertSHA1(%{$certRef})->{CERTSHA1};
+      if (exists($availableRootCAs->{$certSHA1})) {
+        CertNanny::Logging->debug("Identical root certificate in <" . $availableRootCAs->{$certSHA1}->{CERTFILE} . "> and <" . $certRef->{CERTFILE} . ">");
+      } else {
+        $availableRootCAs->{$certSHA1} = $certRef;
+      }
     }
 
     # then compare against DIR, FILE and CHAINFILE in case of an 
@@ -1538,15 +1542,15 @@ sub k_syncRootCAs {
   
       my $rebuild = 0;
       # comparison $installedRootCAs to $availableRootCAs
-      foreach (keys ($installedRootCAs)) {
-        $rebuild ||= !exists($availableRootCAs->{$_});
+      foreach my $certSHA1 (keys ($installedRootCAs)) {
+        $rebuild ||= !exists($availableRootCAs->{$certSHA1});
         last if $rebuild;
       }  
 
       if (!$rebuild) {
         # comparison $availableRootCAs to $installedRootCAs
-        foreach (keys ($availableRootCAs)) {
-          $rebuild ||= !exists($installedRootCAs->{$_});
+        foreach my $certSHA1 (keys ($availableRootCAs)) {
+          $rebuild ||= !exists($installedRootCAs->{$certSHA1});
           last if $rebuild;
         }
       }
@@ -1655,9 +1659,13 @@ sub k_getCaCerts {
 
 
 sub _sendRequest {
+  CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "Sending request");
   my $self = shift;
 
-  CertNanny::Logging->info("Sending request");
+  my $options   = $self->{OPTIONS};
+  my $entry     = $options->{ENTRY};
+  my $entryname = $options->{ENTRYNAME};
+  my $config    = $options->{CONFIG};
 
   #my $enroller = $self->_getEnroller();
   #return $enroller->enroll();
@@ -1665,52 +1673,47 @@ sub _sendRequest {
 
   if (!$self->k_getCaCerts()) {
     CertNanny::Logging->error("Could not get CA certs");
-
     #return undef;
   }
 
   my $requestfile      = $self->{STATE}->{DATA}->{RENEWAL}->{REQUEST}->{REQUESTFILE};
   my $requestkeyfile   = $self->{STATE}->{DATA}->{RENEWAL}->{REQUEST}->{KEYFILE};
-  my $pin              = $self->{PIN} || $self->{OPTIONS}->{ENTRY}->{pin};
-  my $scepsignaturekey = $self->{OPTIONS}->{ENTRY}->{scepsignaturekey};
+  my $pin              = $self->{PIN} || $entry->{key}->{pin};
+  my $scepsignaturekey = $entry->{scepsignaturekey};
   my $scepracert = $self->{STATE}->{DATA}->{SCEP}->{RACERT};
 
   if (!exists $self->{STATE}->{DATA}->{RENEWAL}->{REQUEST}->{CERTFILE}) {
-    my $certfile = $self->{OPTIONS}->{ENTRYNAME} . "-cert.pem";
-    $self->{STATE}->{DATA}->{RENEWAL}->{REQUEST}->{CERTFILE} =
-      File::Spec->catfile($self->{OPTIONS}->{ENTRY}->{statedir}, $certfile);
+    my $certfile = $entryname . "-cert.pem";
+    $self->{STATE}->{DATA}->{RENEWAL}->{REQUEST}->{CERTFILE} = File::Spec->catfile($entry->{statedir}, $certfile);
   }
 
   my $newcertfile = $self->{STATE}->{DATA}->{RENEWAL}->{REQUEST}->{CERTFILE};
   my $rc          = 0;
 
-  CertNanny::Logging->debug("request: $requestfile");
-  CertNanny::Logging->debug("keyfile: $requestkeyfile");
-  CertNanny::Logging->debug("sscep: "                . $self->{OPTIONS}->{CONFIG}->get('cmd.sscep'));
-  CertNanny::Logging->debug("scepurl: "              . $self->{OPTIONS}->{ENTRY}->{enroll}->{sscep}->{url});
-  CertNanny::Logging->debug("scepsignaturekey: $scepsignaturekey");
-  CertNanny::Logging->debug("scepchecksubjectname: " . $self->{OPTIONS}->{ENTRY}->{scepchecksubjectname} || 'no');
-  CertNanny::Logging->debug("scepracert: $scepracert");
-  CertNanny::Logging->debug("newcertfile: $newcertfile");
-  CertNanny::Logging->debug("openssl: "              . $self->{OPTIONS}->{'cmd.openssl'});
+  CertNanny::Logging->debug("request:              $requestfile");
+  CertNanny::Logging->debug("keyfile:              $requestkeyfile");
+  CertNanny::Logging->debug("sscep:                " . $config->get('cmd.sscep'));
+  CertNanny::Logging->debug("scepurl:              " . $entry->{enroll}->{sscep}->{url});
+  CertNanny::Logging->debug("scepsignaturekey:     $scepsignaturekey");
+  CertNanny::Logging->debug("scepchecksubjectname: " . $entry->{scepchecksubjectname} || 'no');
+  CertNanny::Logging->debug("scepracert:           $scepracert");
+  CertNanny::Logging->debug("newcertfile:          $newcertfile");
+  CertNanny::Logging->debug("openssl:              " . $options->{'cmd.openssl'});
   my $newkey;
 
   unless ($self->k_hasEngine()) {
 
     # get unencrypted new key in PEM format
-    $newkey = $self->k_convertKey(
-      KEYFILE   => $requestkeyfile,
-      KEYPASS   => $pin,
-      KEYFORMAT => 'PEM',
-      KEYTYPE   => 'OpenSSL',
-      OUTFORMAT => 'PEM',
-      OUTTYPE   => 'OpenSSL',
-
-      # no pin
-                               );
-
+    $newkey = $self->k_convertKey(KEYFILE   => $requestkeyfile,
+                                  KEYPASS   => $pin,
+                                  KEYFORMAT => 'PEM',
+                                  KEYTYPE   => 'OpenSSL',
+                                  OUTFORMAT => 'PEM',
+                                  OUTTYPE   => 'OpenSSL');   # no pin
+                             
     if (!defined $newkey) {
       CertNanny::Logging->error("Could not convert new key");
+      CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "Sending request");
       return undef;
     }
 
@@ -1721,9 +1724,9 @@ sub _sendRequest {
 
     if (!CertNanny::Util->writeFile(DSTFILE    => $requestkeyfile,
                                     SRCCONTENT => $newkey->{KEYDATA},
-                                    FORCE      => 1,)
-      ) {
+                                    FORCE      => 1)) {
       CertNanny::Logging->error("Could not write unencrypted copy of new file to temp file");
+      CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "Sending request");
       return undef;
     }
   } ## end unless ($self->k_hasEngine)
@@ -1738,6 +1741,7 @@ sub _sendRequest {
 
     if (!defined $oldkey) {
       CertNanny::Logging->error("Could not get old key from certificate instance");
+      CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "Sending request");
       return undef;
     }
 
@@ -1756,6 +1760,7 @@ sub _sendRequest {
 
       if (!defined $oldkey_pem_unencrypted) {
         CertNanny::Logging->error("Could not convert (old) private key");
+        CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "Sending request");
         return undef;
       }
 
@@ -1767,6 +1772,7 @@ sub _sendRequest {
                                       FORCE      => 1,)
         ) {
         CertNanny::Logging->error("Could not write temporary key file (old key)");
+        CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "Sending request");
         return undef;
       }
     } else {
@@ -1781,20 +1787,19 @@ sub _sendRequest {
                                     FORCE      => 1,)
       ) {
       CertNanny::Logging->error("Could not write temporary cert file (old certificate)");
+      CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "Sending request");
       return undef;
     }
 
     CertNanny::Logging->debug("Old certificate: $oldcertfile");
   } ## end if ($scepsignaturekey ...)
 
-  my %options = (
-    sscep_enroll => {PrivateKeyFile => $requestkeyfile,
-                     CertReqFile    => $requestfile,
-                     SignKeyFile    => $oldkeyfile,
-                     SignCertFile   => $oldcertfile,
-                     LocalCertFile  => $newcertfile},
-
-    sscep => {CACertFile => $scepracert,});
+  my %options = (sscep_enroll => {PrivateKeyFile => $requestkeyfile,
+                                  CertReqFile    => $requestfile,
+                                  SignKeyFile    => $oldkeyfile,
+                                  SignCertFile   => $oldcertfile,
+                                  LocalCertFile  => $newcertfile},
+                 sscep        => {CACertFile => $scepracert,});
 
   my $enroller = $self->_getEnroller();
   $enroller->enroll(%options);
@@ -1820,10 +1825,11 @@ sub _sendRequest {
 
     if (!defined $self->{STATE}->{DATA}->{CERTCHAIN}) {
       CertNanny::Logging->error("Could not build certificate chain, probably trusted root certificate was not configured");
+      CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "Sending request");
       return undef;
     }
 
-    $self->_executeHook($self->{OPTIONS}->{ENTRY}->{hook}->{renewal}->{install}->{pre},
+    $self->_executeHook($entry->{hook}->{renewal}->{install}->{pre},
                         '__NOTAFTER__'          => $self->{CERT}->{CERTINFO}->{NotAfter},
                         '__NOTBEFORE__'         => $self->{CERT}->{CERTINFO}->{NotBefore},
                         '__NEWCERT_NOTAFTER__'  => $newcert->{CERTINFO}->{NotAfter},
@@ -1834,16 +1840,15 @@ sub _sendRequest {
 
       CertNanny::Logging->debug("Install cert in initial entrollment build p12 first to import into the final location. ");
 
-      my $importp12 = $self->{OPTIONS}->{ENTRYNAME} . "-import.p12";
-      my $outp12 = File::Spec->catfile($self->{OPTIONS}->{ENTRY}->{statedir}, $importp12);
+      my $importp12 = $entryname . "-import.p12";
+      my $outp12 = File::Spec->catfile($entry->{statedir}, $importp12);
 
       chmod 0600, $outp12;
 
-      my $conf =
-        CertNanny::Config->new($self->{OPTIONS}->{CONFIG}->{CONFIGFILE});
+      # Todo Arkadius: Macht das sinn? Config ist singleton. Besser $config direkt verwenden
+      my $conf = CertNanny::Config->new($self->{OPTIONS}->{CONFIG}->{CONFIGFILE});
       ##reset location to be passed correctly to the post install hook
-      $self->{OPTIONS}->{ENTRY}->{location} =
-        $conf->{CONFIG}->{certmonitor}->{$self->{OPTIONS}->{ENTRYNAME}}->{location};
+      $entry->{location} = $conf->{CONFIG}->{certmonitor}->{$entryname}->{location};
 
       my %args = (FILENAME     => $outp12,
                   FRIENDLYNAME => 'cert1',
@@ -1851,30 +1856,28 @@ sub _sendRequest {
                   KEYFILE      => $self->{STATE}->{DATA}->{RENEWAL}->{REQUEST}->{KEYFILE},
                   CERTFORMAT   => 'PEM',
                   CERTFILE     => $self->{STATE}->{DATA}->{RENEWAL}->{REQUEST}->{CERTFILE},
-                  EXPORTPIN    => $conf->{CONFIG}->{certmonitor}->{$self->{OPTIONS}->{ENTRYNAME}}->{pin});
+                  EXPORTPIN    => $conf->{CONFIG}->{certmonitor}->{$entryname}->{key}->{pin});
 
 # Todo Testen createPKCS12: Passt das noch? Die Methode war im Keystore als Dummy implementiert und nur in den Keys ausprogrammiert, wird aber über $self aufgerufen?!?
 # Todo Testen createPKCS12: Was passiert hier? keine Zuweisung des Ergebnisses ....
       $self->createPKCS12(%args);
       CertNanny::Logging->debug("Created importp12 file :" . $importp12);
-      my $target = $self->{OPTIONS}->{ENTRY}->{initialenroll}->{targetType};
+      my $target = $entry->{initialenroll}->{targetType};
       CertNanny::Logging->debug("Target keystore:" . $target);
 
       eval {
         eval "require CertNanny::Keystore::$target";
-
       };
       if ($@) {
-
         croak "Could not load $target keystore Aborted. $@";
+        CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "Sending request");
         return 0;
       }
 
       eval {
-
         my %p12args = (FILENAME  => $outp12,
                        PIN       => $self->{PIN},
-                       ENTRYNAME => $self->{OPTIONS}->{ENTRYNAME},
+                       ENTRYNAME => $entryname,
                        CONF      => $conf);
 
         # create pkcs12 file
@@ -1885,40 +1888,35 @@ sub _sendRequest {
         # CONF => keystore config to be implemented
 
         eval "CertNanny::Keystore::${target}::importP12( %p12args )";
-
         if ($@) {
-
           croak "Problem calling importP12 $@";
+          CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "Sending request");
           return 0;
         }
-
       };
       if ($@) {
-
         croak "Could not execute $target keystore importP12 function. Aborted. $@";
+        CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "Sending request");
         return 0;
       } else {
-
         CertNanny::Logging->debug("Compleated clean up after initial enrollment and p12 import.");
-        if (   $self->{OPTIONS}->{ENTRY}->{initialenroll}->{auth}->{mode} eq "password"
-            or $self->{OPTIONS}->{ENTRY}->{initialenroll}->{auth}->{mode} eq "anonymous") {
+        if (   $entry->{initialenroll}->{auth}->{mode} eq "password"
+            or $entry->{initialenroll}->{auth}->{mode} eq "anonymous") {
 
-          my $selfsigncert = $self->{OPTIONS}->{ENTRYNAME} . "-selfcert.pem";
-          my $outCert = File::Spec->catfile($self->{OPTIONS}->{ENTRY}->{statedir}, $selfsigncert);
+          my $selfsigncert = $entryname . "-selfcert.pem";
+          my $outCert = File::Spec->catfile($entry->{statedir}, $selfsigncert);
           CertNanny::Logging->debug("delete selfsign cert: " . $outCert);
 
           if (-e $outCert) {
             unlink $outCert;
             CertNanny::Logging->debug("deleted " . $outCert);
           }
-        } ## end if ($self->{OPTIONS}->...)
+        } ## end if ($entry->...)
 
         unlink $outp12;
         $rc = 1;
       } ## end else [ if ($@) ]
-
     } else {
-
       $rc = $self->installCert(CERTFILE   => $newcertfile,
                                CERTFORMAT => 'PEM');
     }
@@ -1927,18 +1925,21 @@ sub _sendRequest {
 
       $self->_renewalState("completed");
 
-      $self->_executeHook($self->{OPTIONS}->{ENTRY}->{hook}->{renewal}->{install}->{post},
+      $self->_executeHook($entry->{hook}->{renewal}->{install}->{post},
                           '__NOTAFTER__'          => $self->{CERT}->{CERTINFO}->{NotAfter},
                           '__NOTBEFORE__'         => $self->{CERT}->{CERTINFO}->{NotBefore},
                           '__NEWCERT_NOTAFTER__'  => $newcert->{CERTINFO}->{NotAfter},
                           '__NEWCERT_NOTBEFORE__' => $newcert->{CERTINFO}->{NotBefore},);
 
       # done
+      CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "Sending request");
       return $rc;
     } ## end if (defined $rc and $rc)
+    CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "Sending request");
     return undef;
   } ## end if (-r $newcertfile)
 
+  CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "Sending request");
   return 1;
 } ## end sub _sendRequest
 
@@ -1955,8 +1956,13 @@ sub _getEnroller {
   CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "get enroller");
   my $self = shift;
 
-  unless (defined $self->{OPTIONS}->{ENTRY}->{ENROLLER}) {
-    my $enrollertype_cfg = $self->{OPTIONS}->{ENTRY}->{enroll}->{type} || 'sscep';
+  my $options   = $self->{OPTIONS};
+  my $entry     = $options->{ENTRY};
+  my $entryname = $options->{ENTRYNAME};
+  my $config    = $options->{CONFIG};
+
+  unless (defined $entry->{ENROLLER}) {
+    my $enrollertype_cfg = $entry->{enroll}->{type} || 'sscep';
     my $enrollertype     = ucfirst($enrollertype_cfg);
     eval "use CertNanny::Enroll::$enrollertype";
     if ($@) {
@@ -1966,19 +1972,16 @@ sub _getEnroller {
     }
 
     CertNanny::Logging->debug("getEnroller" . ref($self->{INSTANCE}));
-    my $entry_options = $self->{OPTIONS}->{ENTRY};
-    my $config        = $self->{OPTIONS}->{CONFIG};
-    my $entryname     = $self->{OPTIONS}->{ENTRYNAME};
-    eval "\$self->{OPTIONS}->{ENTRY}->{ENROLLER} = CertNanny::Enroll::$enrollertype->new(\$entry_options, \$config, \$entryname)";
+    eval "\$entry->{ENROLLER} = CertNanny::Enroll::$enrollertype->new(\$entry, \$config, \$entryname)";
     if ($@) {
       print STDERR $@;
       CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "get enroller");
       return undef;
     }
-  } ## end unless (defined $self->{OPTIONS...})
+  } ## end unless (defined $entry->{ENROLLER})
 
   CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "get enroller");
-  return $self->{OPTIONS}->{ENTRY}->{ENROLLER};
+  return $entry->{ENROLLER};
 } ## end sub _getEnroller
 
 

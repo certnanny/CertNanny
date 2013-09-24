@@ -130,10 +130,10 @@ sub new {
   # might want to deduce it from the keystore itself
   my $pin = "";
 
-  #    $pin = $entry->{pin};
+  #    $pin = $entry->{key}->{pin};
 
   # export the pin to this instance
-  $self->{PIN} = $entry->{pin};
+  $self->{PIN} = $entry->{key}->{pin};
 
   # SANITY CHECKS
   # sample sanity checks for configuration settings
@@ -292,7 +292,7 @@ sub getKey {
   #my $foo = $self->{OPTIONS}->{ENTRY}->{someothersetting};
 
   # somehow deduce the PIN...
-  # my $pin = $self->{PIN} || $self->{OPTIONS}->{ENTRY}->{pin};
+  # my $pin = $self->{PIN} || $self->{OPTIONS}->{ENTRY}->{key}->{pin};
 
   my $key;
 
@@ -396,7 +396,7 @@ sub selfSign {
   my $openssl      = $config->get('cmd.openssl', 'FILE');
   my $selfsigncert = $entryname . "-selfcert.pem";
   my $outfile      = File::Spec->catfile($entry->{statedir}, $selfsigncert);
-  my $pin          = $self->{PIN} || $entry->{pin} || "";
+  my $pin          = $self->{PIN} || $entry->{key}->{pin} || "";
 
   ######prepere openssl config file##########
 
@@ -543,7 +543,7 @@ sub _createPKCS12 {
               CERTFILE     => $self->{STATE}->{DATA}->{RENEWAL}->{REQUEST}->{CERTFILE},
               CERTFORMAT   => 'PEM',
               KEYFILE      => $self->{STATE}->{DATA}->{RENEWAL}->{REQUEST}->{KEYFILE},
-              PIN          => $self->{PIN} || $self->{OPTIONS}->{ENTRY}->{pin},
+              PIN          => $self->{PIN} || $self->{OPTIONS}->{ENTRY}->{key}->{pin},
               @_);
 
   my $options   = $self->{OPTIONS};
