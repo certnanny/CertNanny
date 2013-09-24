@@ -42,9 +42,14 @@ use File::Basename;
 use File::Glob qw(:globally :case);
 use Digest::SHA qw(sha1_base64);
 
+use Data::Dumper;
+
+use CertNanny::Util;
+use CertNanny::Logging;
+
 use strict;
 
-our @EXPORT = qw(getconfigfilename get_ref get set);
+our @EXPORT    = qw(getConfigFilename getRef get set getFlagRef getFlag setFlag);
 our @EXPORT_OK = ();
 use vars qw(@ISA @EXPORT @EXPORT_OK %EXPORT_TAGS $VERSION);
 use Exporter;
@@ -55,75 +60,156 @@ $VERSION = 0.10;
 
 my $INSTANCE;
 
-sub getInstance {
-  unless ( defined $INSTANCE ) {
-    my $proto = shift;
-    $INSTANCE = CertNanny::Config->new(@_);
-  }
 
-  return $INSTANCE;
+sub getInstance {
+  $INSTANCE ||= (shift)->new(@_);
 }
+
 
 sub new {
-  my $proto      = shift;
-  my $class      = ref($proto) || $proto;
-  my $configfile = shift || 'certnanny.cfg';
+  if (!defined $INSTANCE) {
+    my $proto = shift;
+    my $class = ref($proto) || $proto;
+    my %args = (@_);    # argument pair list
 
-  my $self = {};
-  bless $self, $class;
+    my $self = {};
+    bless $self, $class;
+    $INSTANCE = $self;
 
-  $self->{CONFIGFILE} = $configfile;
-  $self->{CONFIGPATH} = ( fileparse($configfile) )[1];
+    $self->{CONFIGFILE} = $args{CONFIG} || 'certnanny.cfg';
+    $self->{CONFIGPATH} = (fileparse($self->{CONFIGFILE}))[1];
 
-  $self->_parse() || return;
+    $self->_parse() || return undef;
+  }
+  return $INSTANCE;
+} ## end sub new
 
-  return ($self);
-}
 
 sub DESTROY {
   $INSTANCE = undef;
 }
 
-sub getconfigfilename {
-  # get  file name
-  my $self = shift;
+
+sub getConfigFilename {
+  # get configuration file name
+  my $self = (shift)->getInstance();
   $self->{CONFIGFILE};
 }
 
-sub get_ref {
-  # get nested configuration entry
+
+sub _getRef {
+  # get nested configuration/flag entry
   # arg1: variable name "xx.yy.zz"
   # arg2: optional options:
+  # arg3: CONFIG | CFGFLAG
   #   undef: return variable value
   #   'ref': return reference to variable
-  my $self   = shift;
+  my $self   = (shift)->getInstance();
   my $var    = shift;
   my $option = shift;
+  my $where  = shift;
 
-  my @var = split( /\./, $var );    # internal variable path
+  my @var = split(/\./, $var);    # internal variable path
 
-  my $target = $self->{CONFIG};
+  my $target = $self->{$where};
   my $tmp    = pop @var;
   foreach (@var) {
-    if ( !exists $target->{$_} ) {
+    if (!exists $target->{$_}) {
       $target = undef;
       last;
     }
     $target = $target->{$_};
   }
-  if ( defined $option and $option eq 'ref' ) {
+  if (defined $option and $option eq 'ref') {
     $target->{$tmp} = undef unless exists $target->{$tmp};
     $target = \$target->{$tmp};
     return $target;
-  }
-  else {
+  } else {
     # get value
-    $target = $target->{$tmp} if exists $target->{$tmp};
-    $target = undef
-      unless ( defined $target and ( ref($target) ne "HASH" ) );
+    if ($where eq 'CFGFLAG') {
+      if (defined $target) {
+        if (exists $target->{$tmp}) {
+          $target = (ref($target->{$tmp}) eq "HASH") ? $target->{$tmp} : 1;
+        } else {
+          $target = undef;
+        }  
+      }
+      $target = 1               if (defined $target and (ref($target) ne "HASH"))
+    } else {
+      $target = $target->{$tmp} if exists $target->{$tmp};
+      $target = undef           if (!defined $target or (ref($target) eq "HASH"));
+    }
     return $target;
   }
-}
+} ## end sub _getRef
+
+
+sub getRef {
+  # get nested configuration entry
+  # arg1: variable name "xx.yy.zz"
+  # arg2: optional options:
+  #   undef: return variable value
+  #   'ref': return reference to variable
+  my $self   = (shift)->getInstance();
+  my $var    = shift;
+  my $option = shift;
+  
+  return $self->_getRef($var, $option, 'CONFIG');
+} ## end sub getRef
+
+
+sub getFlagRef {
+  # get nested flag entry
+  # arg1: variable name "xx.yy.zz"
+  # arg2: optional options:
+  #   undef: return variable value
+  #   'ref': return reference to variable
+  my $self   = (shift)->getInstance();
+  my $var    = shift;
+  my $option = shift;
+  
+  return $self->_getRef($var, $option, 'CFGFLAG');
+} ## end sub getFlagRef
+
+
+sub _get {
+  # get entire configuration/flag or a single value
+  # arg1: configuration/flag variable to get
+  #       undef: get whole configuration/flag tree
+  #       string: get configuration/flag entry (does not return subtrees)
+  # arg2: mangle: postprocess returned text, values:
+  #               'FILE': apply File::Spec->canonpath
+  #               'LC':   return config entry lower case
+  #               'UC':   return config entry upper case
+  #               'UCFIRST': return config entry ucfirst
+  # arg3: CONFIG | CFGFLAG
+  my $self   = (shift)->getInstance();
+  my $arg    = shift;
+  my $mangle = shift;
+  my $where  = shift;
+
+  if (!defined $arg) {
+    return $self->{$where};
+  } else {
+    my $value = $self->_getRef($arg, '', $where);
+
+    return $value unless defined $mangle and ($where eq 'CONFIG');
+
+    $value = "" if !defined $value;
+
+    if ($value ne '') {
+      # mangle only if value is not "", otherwise File::Spec converts "" into "\", which doesn't make much sense ...
+      return File::Spec->catfile(File::Spec->canonpath($value)) if ($mangle eq "FILE");
+      return uc($value)                                         if ($mangle eq "UC");
+      return lc($value)                                         if ($mangle eq "LC");
+      return ucfirst($value)                                    if ($mangle eq "UCFIRST");
+      return $value;    # don't know how to handle this mangle option
+    } ## end if ($value ne '')
+  } ## end else [ if (!defined $arg) ]
+
+  return undef;
+} ## end sub _get
+
 
 sub get {
   # get entire configuration or a single value
@@ -135,65 +221,92 @@ sub get {
   #      'LC':   return config entry lower case
   #      'UC':   return config entry upper case
   #      'UCFIRST': return config entry ucfirst
-  my $self   = shift;
+  my $self   = (shift)->getInstance();
   my $arg    = shift;
   my $mangle = shift;
+  
+  return $self->_get($arg, $mangle, 'CONFIG');
+} ## end sub get
 
-  if ( !defined $arg ) {
-    return $self->{CONFIG};
+
+sub getFlag {
+  # get entire flag or a single value
+  # arg: configuration variable to get
+  #      undef: get whole configuration tree
+  #      string: get configuration entry (does not return subtrees)
+  # mangle: postprocess returned text, values:
+  #      'FILE': apply File::Spec->canonpath
+  #      'LC':   return config entry lower case
+  #      'UC':   return config entry upper case
+  #      'UCFIRST': return config entry ucfirst
+  my $self   = (shift)->getInstance();
+  my $arg    = shift;
+  
+  return $self->_get($arg, undef, 'CFGFLAG');
+} ## end sub getFlag
+
+
+sub _set {
+  # set configuration/flag value
+  # arg1: configuration variable to set
+  # arg2: value to set
+  # arg3: CONFIG | CFGFLAG
+  my $self   = (shift)->getInstance();
+  my $var   = shift;
+  my $value = shift;
+  my $where = shift;
+
+  return undef if (!defined $var);
+  my $ref = $self->_getRef($var, 'ref', $where);
+
+  if (!$value && $where eq 'CFGFLAG') {
+    delete($$ref->{$var});
+  } else {
+    $$ref = $value;
   }
-  else {
-    my $value = get_ref( $self, $arg );
+  1;
+} ## end sub _set
 
-    return $value unless defined $mangle;
-
-    $value = "" if !defined $value;
-
-    if ( $value ne '' ) {
-
-# mangle only if value is not "", otherwise File::Spec converts "" into "\", which doesn't make much sense ...
-      return File::Spec->catfile( File::Spec->canonpath($value) )
-        if ( $mangle eq "FILE" );
-      return uc($value)      if ( $mangle eq "UC" );
-      return lc($value)      if ( $mangle eq "LC" );
-      return ucfirst($value) if ( $mangle eq "UCFIRST" );
-      return;    # don't know how to handle this mangle option
-    }
-  }
-
-  return;
-}
 
 sub set {
   # set configuration value
   # arg1: configuration variable to set
   # arg2: value to set
-  my $self  = shift;
+  my $self   = (shift)->getInstance();
   my $var   = shift;
   my $value = shift;
+  
+  return $self->_set($var, $value, 'CONFIG');
+} ## end sub set
 
-  return if ( !defined $var );
-  my $ref = get_ref( $self, $var, 'ref' );
 
-  $$ref = $value;
-  1;
-}
+sub setFlag {
+  # set flag
+  # arg1: configuration variable to set
+  # arg2: 1: set (default) 0: unset
+  my $self   = (shift)->getInstance();
+  my $var   = shift;
+  my $value = shift || 1;
 
-sub _deepcopy {
+  return $self->_set($var, $value, 'CFGFLAG');
+} ## end sub setFlag
+
+
+sub _deepCopy {
   # recursively deep-copy a hash tree, NOT overwriting already existing
   # values in destination tree
+  my $self   = (shift)->getInstance();
   my $source = shift;
   my $dest   = shift;
 
-  foreach my $key ( keys %{$source} ) {
-    if ( ref( $source->{$key} ) eq "HASH" ) {
+  foreach my $key (keys %{$source}) {
+    if (ref($source->{$key}) eq "HASH") {
 
       # create new node if it does not exist yet
       $dest->{$key} = {} unless exists $dest->{$key};
-      _deepcopy( $source->{$key}, $dest->{$key} );
-    }
-    else {
-      if ( !exists $dest->{$key} ) {
+      $self->_deepCopy($source->{$key}, $dest->{$key});
+    } else {
+      if (!exists $dest->{$key}) {
 
         # use default/parent value
         $dest->{$key} = $source->{$key};
@@ -201,86 +314,69 @@ sub _deepcopy {
 
       # else keep existing (configured) value
     }
-  }
+  } ## end foreach my $key (keys %{$source...})
 
   1;
-}
+} ## end sub _deepCopy
 
-sub _inherit_config {
+
+sub _inheritConfig {
   # recursively determine CA inheritance settings
+  my $self      = (shift)->getInstance();
   my $caconfref = shift;
   my $subca     = shift;
 
   # postprocess sub-ca settings (configuration inheritance)
-  if ( defined $caconfref->{$subca}->{INHERIT} ) {
+  if (defined $caconfref->{$subca}->{INHERIT}) {
 
     # inherit settings from parent config
     my $parent = $caconfref->{$subca}->{INHERIT};
 
     # make sure the parent already inherited its values from its own
     # parent
-    _inherit_config( $caconfref, $parent );
+    $self->_inheritConfig($caconfref, $parent);
 
     # copy subtree
-    _deepcopy( $caconfref->{$parent}, $caconfref->{$subca} );
-  }
-}
+    $self->_deepCopy($caconfref->{$parent}, $caconfref->{$subca});
+  } ## end if (defined $caconfref...)
+} ## end sub _inheritConfig
+
 
 sub _parse {
-  my $self = shift;
+  my $self = (shift)->getInstance();
 
-  $self->{LOGBUFFER} = \my @dummy;
-  $self->_parsefile();
+  # $self->{LOGBUFFER} = \my @dummy;
+  $self->_parseFile();
 
   # replace internal variables
-  foreach ( keys %{ $self->{CONFIG} } ) {
-    _replace_variables( $self, $self->{CONFIG}, $_ );
+  foreach (keys %{$self->{CONFIG}}) {
+    _replaceVariables($self, $self->{CONFIG}, $_);
   }
 
   # postprocess sub-ca settings (configuration inheritance)
   foreach my $toplevel (qw(certmonitor keystore)) {
-    foreach my $entry ( keys( %{ $self->{CONFIG}->{$toplevel} } ) ) {
-      _inherit_config( $self->{CONFIG}->{$toplevel}, $entry );
+    foreach my $entry (keys(%{$self->{CONFIG}->{$toplevel}})) {
+      $self->_inheritConfig($self->{CONFIG}->{$toplevel}, $entry);
     }
   }
 
   1;
-}
+} ## end sub _parse
 
-sub _parsefile {
-  
-  sub fetchFileList {
-    my $myGlob = shift;
-    my (@myList, @tmpList);
 
-    # Test if $configfileglob contains regular files
-    @myList = glob "'${myGlob}'";
-    foreach my $item (@myList) {
-      push(@tmpList, $item) if -T "$item";
-      if (-d "$item") {
-        if (opendir(DIR, $item)) {
-          while (defined(my $file = readdir(DIR))) {
-            push(@tmpList, "$item/$file") if -T "$item/$file";
-          }
-          closedir(DIR);
-        }
-      }
-    }
-    return \@tmpList;
-  }
-  
-  my $self = shift;
+sub _parseFile {
+  my $self       = (shift)->getInstance();
   my $configPath = shift || $self->{CONFIGPATH};
   my $configFile = shift || $self->{CONFIGFILE};
 
   my $handle = new IO::File "<" . $configFile;
 
-  if ( !defined $handle ) {
+  if (!defined $handle) {
     $configFile = $configPath . $configFile;
     $handle     = new IO::File "<" . $configFile;
   }
 
-  return if ( !defined $handle );
+  return undef if (!defined $handle);
 
   # calculate SHA1
   my $sha = Digest::SHA->new();
@@ -288,38 +384,32 @@ sub _parsefile {
   my $configFileSha = $sha->b64digest;
 
   # avoid double parsing
-  if ( exists( $self->{CONFIGFILES} ) ) {
-    foreach ( keys(%{$self->{CONFIGFILES}}) ) {
-      if ( $configFile eq $_  || $configFileSha eq $self->{CONFIGFILES}{$_} ) {
-        push ($self->{LOGBUFFER}, "double configfile: $configFile SHA1: $configFileSha <> $_ SHA1: $self->{CONFIGFILES}{$_}");
-        return;
+  if (exists($self->{CONFIGFILES})) {
+    foreach (keys(%{$self->{CONFIGFILES}})) {
+      if ($configFile eq $_ || $configFileSha eq $self->{CONFIGFILES}{$_}) {
+        CertNanny::Logging->error("double configfile: $configFile SHA1: $configFileSha <> $_ SHA1: $self->{CONFIGFILES}{$_}");
+        return undef;
       }
     }
-  }
-  else {
+  } else {
     $self->{CONFIGFILES} = \my %dummy;
 
-    $self->{CFGMTIME} = ( stat($configFile) )[9];
+    $self->{CFGMTIME} = (stat($configFile))[9];
 
     # set implicit defaults
-    $self->{CONFIG} = {
-      keystore => {
-        DEFAULT => {
-          autorenew_days   => 30,
-          warnexpiry_days  => 20,
-          type             => 'none',
-          scepsignaturekey => 'new',
-        },
-      },
-    };
+    $self->{CONFIG}  = {keystore => {DEFAULT => {autorenew_days   => 30,
+                                                 warnexpiry_days  => 20,
+                                                 type             => 'none',
+                                                 scepsignaturekey => 'new',},},};
+    $self->{CFGFLAG} = {};
 
     # backward compatibility
     $self->{CONFIG}->{certmonitor} = $self->{CONFIG}->{keystore};
-  }
+  } ## end else [ if (exists($self->{CONFIGFILES...}))]
 
   $self->{CONFIGFILES}{$configFile} = $configFileSha;
-  push ($self->{LOGBUFFER}, "reading $configFile SHA1: $self->{CONFIGFILES}{$configFile}");
-  
+  CertNanny::Logging->info("reading $configFile SHA1: $self->{CONFIGFILES}{$configFile}");
+
   my $lnr = 0;
   while (<$handle>) {
     chomp;
@@ -330,65 +420,83 @@ sub _parsefile {
     if (/^\s*include\s+(.+)\s*$/) {
       my $configFileGlob = $1;
       my @configFileList;
-      
+
       # Test if $configFileGlob contains regular files
-      @configFileList = @{fetchFileList($configFileGlob)};
-      if ( !@configFileList ) {
+      @configFileList = @{CertNanny::Util->fetchFileList($configFileGlob)};
+      if (!@configFileList) {
         $configFileGlob = $configPath . $configFileGlob;
-        @configFileList = @{fetchFileList($configFileGlob)};
+        @configFileList = @{CertNanny::Util->fetchFileList($configFileGlob)};
       }
 
       foreach (@configFileList) {
-        $self->_parsefile((fileparse($_))[1], $_);
+        $self->_parseFile((fileparse($_))[1], $_);
       }
-    }
-    elsif (/^\s*(.*?)\s*=\s*(.*)\s*$/) {
-      my @path = split( /\./, $1 );
-      my $val  = $2;
+   } elsif (/^\s*(.+?)\s*=\s*(\S.*?)\s*(\s#\s.*)?$/ || /^\s*(\S.*?)\s*=?\s*(\s#\s.*)?$/) {
+      my @path = split(/\./, $1);
+      my ($val, $var);
+      if (defined($2) && $2 !~ /^\s*#\s.*$/) {
+        $val = $2;
+        $var = $self->{CONFIG};
+      } else {
+        $var = $self->{CFGFLAG};
+      }
       my $key  = pop(@path);
+      if ("$key" ne "DEFAULT") {
+        $key = lc($key);
+      }
 
-      my $var = $self->{CONFIG};
-      foreach (@path) {
-        if ( !exists $var->{$_} ) {
-          $var->{$_} = {};
-          $var->{$_}->{INHERIT} = "DEFAULT";
+      my $doDupCheck;
+      foreach my $confPart (@path) {
+        if ("$confPart" eq "DEFAULT") {
+          $doDupCheck = 0;
+        } else {
+          $doDupCheck = 1;
+          $confPart = lc($confPart);
         }
-        $var = $var->{$_};
+        if (!exists $var->{$confPart}) {
+          $var->{$confPart} = {};
+          $var->{$confPart}->{INHERIT} = "DEFAULT";
+        }
+        $var = $var->{$confPart};
+      }
+      if ($doDupCheck && defined($var->{$key})) {
+        print STDERR "Config file error: duplicate value definition in line $lnr ($_)\n";
       }
       $var->{$key} = $val;
+    } else {
+      print STDERR "Config file error: parse error in line $lnr ($_)\n";
     }
-    else {
-      print STDERR "Config file error: parse error in line $lnr\n";
-    }
-  }
+  } ## end while (<$handle>)
   $handle->close();
 
   1;
-}
+} ## end sub _parseFile
 
-sub _replace_variables {
+
+sub _replaceVariables {
   # replace internal variables
-  my $self      = shift;
+  my $self      = (shift)->getInstance();
   my $configref = shift;
   my $thiskey   = shift;
 
   # determine if this entry is a string or a hash array
-  if ( ref( $configref->{$thiskey} ) eq "HASH" ) {
-    foreach ( keys %{ $configref->{$thiskey} } ) {
-      _replace_variables( $self, $configref->{$thiskey}, $_ );
+  if (ref($configref->{$thiskey}) eq "HASH") {
+    foreach (keys %{$configref->{$thiskey}}) {
+      _replaceVariables($self, $configref->{$thiskey}, $_);
     }
-  }
-  else {
+  } else {
+
     # actually replace variables
-    while ( $configref->{$thiskey} =~ /\$\((.*?)\)/ ) {
-      my $var = $1;
-      my $target = get_ref( $self, $var );
-      $target = "" unless defined $target;
+    while ($configref->{$thiskey} =~ /\$\((.*?)\)/) {
+      my $var    = $1;
+      my $lcvar  = lc($var);
+      my $target = getRef($self, $lcvar);
+      $target     = "" unless defined $target;
 
       $var =~ s/\./\\\./g;
       $configref->{$thiskey} =~ s/\$\($var\)/$target/g;
     }
-  }
-}
+  } ## end else [ if (ref($configref->{$thiskey...}))]
+} ## end sub _replaceVariables
 
 1;
