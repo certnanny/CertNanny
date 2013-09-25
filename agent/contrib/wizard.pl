@@ -3,16 +3,21 @@ use Wx::Perl::Packager;
 use strict;
 use warnings;
 
-
 use Wx qw(wxBITMAP_TYPE_BMP);
 
 package WizTest;
 use base qw(Wx::App);   # Inherit from Wx::App
 use Wx::Event qw(EVT_WIZARD_FINISHED EVT_WIZARD_PAGE_CHANGED EVT_WIZARD_PAGE_CHANGING);
-use Win32::OLE;
-use Win32::OLE::Const;
+use English;
 use Data::Dumper;
 $| = 1;
+
+if ($OSNAME eq "MSWin32") {
+    require Win32::OLE;
+    Win32::OLE->import();
+    require Win32::OLE::Const;
+    Win32::OLE::Const->import();
+}
 
 sub OnInit {
 	my $self = shift;
