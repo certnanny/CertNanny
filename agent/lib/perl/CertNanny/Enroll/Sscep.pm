@@ -17,106 +17,108 @@ use Exporter;
 use Data::Dumper;
 use Net::Domain;
 use POSIX;
+
 #use Cwd;
 
 
 sub new {
-	my $proto = shift;
-	my $class = ref($proto)  || $proto;
-	my $entry_options = shift;
-	my $config = shift;
-    my $entryname = shift;
-	my $self = {};
-	
-	bless $self, $class;
-	# type is determined, now delete it so only sections will be scanned.
-	delete $entry_options->{enroll}->{type};
-	##if monitorSysInfo is not set we set it to be enabled by default 
-	if (!exists $config->{'CONFIG'}->{'certmonitor'}->{$entryname}->{'enroll'}->{'sscep'}->{'monitorSysInfo'} ){
-		$config->{'CONFIG'}->{'certmonitor'}->{$entryname}->{'enroll'}->{'sscep'}->{'monitorSysInfo'} = 'yes' ;
-	}
-	
-	#print ' $entryname sscep self is:' .Dumper($config) . $config->{'CONFIG'}->{'certmonitor'}->{$entryname}->{'enroll'}->{'sscep'}->{'monitorSysInfo'};
-	$self->{OPTIONS} = $self->defaultOptions($config->{'CONFIG'}->{'certmonitor'}->{$entryname}->{'enroll'}->{'sscep'}->{'monitorSysInfo'}, $config , $entryname );
-	$self->readConfig($entry_options->{enroll});
-	# SCEP url
-#	$self->{URL} = $config->{URL} or die("No SCEP URL given");
-    if(! defined $self->{OPTIONS}->{sscep}->{URL}) {
-	    CertNanny::Logging->error("scepurl not specified for keystore");
-	    return;
-    }
-	
-	
-	$self->{OPTIONS}->{sscep}->{Verbose} = "true" if $config->get("loglevel") >= 5;
-	$self->{OPTIONS}->{sscep}->{Debug} = "true" if $config->get("loglevel") >= 6;
-	
-	$self->{certdir} = $entry_options->{scepcertdir};
-	if(! defined $self->{certdir}) {	
-	    CertNanny::Logging->error("scepcertdir not specified for keystore");
-	    return;
-	}
-	$self->{entryname} = $entryname;
-	$self->{cmd} = $config->get('cmd.sscep', 'FILE');
-	$self->{config_filename} = File::Spec->catfile($self->{certdir}, $self->{entryname}."_sscep.cnf");
-	
-	if(defined $self->{OPTIONS}->{sscep}->{engine}) {
-		my $engine_section = $self->{OPTIONS}->{sscep}->{engine};
-		$self->{OPTIONS}->{$engine_section}->{engine_usage} = "both";
-	}
-	
-	return $self;
-}
+  my $proto         = shift;
+  my $class         = ref($proto) || $proto;
+  my $entry_options = shift;
+  my $config        = shift;
+  my $entryname     = shift;
+  my $self          = {};
+
+  bless $self, $class;
+
+  # type is determined, now delete it so only sections will be scanned.
+  delete $entry_options->{enroll}->{type};
+  ##if monitorsysinfo is not set we set it to be enabled by default
+  if (!exists $config->{CONFIG}->{certmonitor}->{$entryname}->{enroll}->{sscep}->{monitorsysinfo}) {
+    $config->{CONFIG}->{certmonitor}->{$entryname}->{enroll}->{sscep}->{monitorsysinfo} = 'yes';
+  }
+
+  #print ' $entryname sscep self is:' .Dumper($config) . $config->{CONFIG}->{certmonitor}->{$entryname}->{enroll}->{sscep}->{monitorsysinfo};
+  $self->{OPTIONS} = $self->defaultOptions($config->{CONFIG}->{certmonitor}->{$entryname}->{enroll}->{sscep}->{monitorsysinfo}, $config, $entryname);
+  $self->readConfig($entry_options->{enroll});
+
+  # SCEP url
+  #	$self->{url} = $config->{url} or die("No SCEP URL given");
+  if (!defined $self->{OPTIONS}->{sscep}->{url}) {
+    CertNanny::Logging->error("scepurl not specified for keystore");
+    return undef;
+  }
+
+  $self->{OPTIONS}->{sscep}->{verbose} = "true" if $config->get("loglevel") >= 5;
+  $self->{OPTIONS}->{sscep}->{debug}   = "true" if $config->get("loglevel") >= 6;
+
+  $self->{certdir} = $entry_options->{scepcertdir};
+  if (!defined $self->{certdir}) {
+    CertNanny::Logging->error("scepcertdir not specified for keystore");
+    return undef;
+  }
+  $self->{entryname}       = $entryname;
+  $self->{cmd}             = $config->get('cmd.sscep', 'FILE');
+  $self->{config_filename} = File::Spec->catfile($self->{certdir}, $self->{entryname} . "_sscep.cnf");
+
+  if (defined $self->{OPTIONS}->{sscep}->{engine}) {
+    my $engine_section = $self->{OPTIONS}->{sscep}->{engine};
+    $self->{OPTIONS}->{$engine_section}->{engine_usage} = "both";
+  }
+
+  return $self;
+} ## end sub new
+
 
 sub setOption {
-	my $self = shift;
-	my $key = shift;
-	my $value = shift;
-	my $section = shift;
-	
-	#must provide all three params
-	return 0 if(!($key and $value and $section));
-	
-	$self->{OPTIONS}->{$section}->{$key} = $value;
-	CertNanny::Logging->debug("Option $key in section $section set to $value.");
-	return 1;
-}
+  my $self    = shift;
+  my $key     = shift;
+  my $value   = shift;
+  my $section = shift;
+
+  #must provide all three params
+  return 0 if (!($key and $value and $section));
+
+  $self->{OPTIONS}->{$section}->{$key} = $value;
+  CertNanny::Logging->debug("Option $key in section $section set to $value.");
+  return 1;
+} ## end sub setOption
+
 
 sub readConfig {
-	my $self = shift;
-	my $config = shift;
-	foreach my $section ( keys %{$config}) {
-        next if $section eq "INHERIT";
-        while (my ($key, $value) = each(%{$config->{$section}})) {
-            next if $key eq "INHERIT";
-            $self->{OPTIONS}->{$section}->{$key} = $value if $value;
-        }
+  my $self   = shift;
+  my $config = shift;
+  foreach my $section (keys %{$config}) {
+    next if $section eq "INHERIT";
+    while (my ($key, $value) = each(%{$config->{$section}})) {
+      next if $key eq "INHERIT";
+      $self->{OPTIONS}->{$section}->{$key} = $value if $value;
     }
-    
-    return 1;
-}
+  }
+
+  return 1;
+} ## end sub readConfig
+
 
 sub execute {
-	my $self = shift;
-	my $operation = shift;
-	
-	my @cmd = (qq("$self->{cmd}"),
-           $operation,
-           '-f',
-           qq("$self->{config_filename}")
-	);
-	
-	my $cmd = join(' ', @cmd);
-	CertNanny::Logging->debug("Exec: $cmd in ".getcwd());
-	open FH, "$cmd |" or die "Couldn't execute $cmd: $!\n"; 
-	while(defined(my $line = <FH>)) {
-	    chomp($line);
-	    print "$line\n";
-	}
-	close FH;
-	my $exitval = $? >> 8;
-	CertNanny::Logging->debug("sscep returned $exitval\n");
-	return $exitval;
-}
+  my $self      = shift;
+  my $operation = shift;
+
+  my @cmd = (qq("$self->{cmd}"), $operation, '-f', qq("$self->{config_filename}"));
+
+  my $cmd = join(' ', @cmd);
+  CertNanny::Logging->debug("Exec: $cmd in " . getcwd());
+  open FH, "$cmd |" or die "Couldn't execute $cmd: $!\n";
+  while (defined(my $line = <FH>)) {
+    chomp($line);
+    print "$line\n";
+  }
+  close FH;
+  my $exitval = $? >> 8;
+  CertNanny::Logging->debug("sscep returned $exitval\n");
+  return $exitval;
+} ## end sub execute
+
 # Enroll needs
 # PrivateKeyFile
 # CertReqFile
@@ -125,333 +127,315 @@ sub execute {
 # LocalCertFile
 # EncCertFile
 sub enroll {
-	my $self = shift;
-	my %options = (@_,);
-	#($volume,$directories,$file) = File::Spec->splitpath( $path );
-	my $olddir = getcwd();
-	chdir $self->{certdir};
-	foreach my $section (keys %options) {
-		while (my ($key, $value) = each(%{$options{$section}})) {
-            $options{$section}->{$key} = File::Spec->abs2rel($value);
-        }
-	}
+  my $self    = shift;
+  my %options = (@_,);
 
-	CertNanny::Logging->info("Sending request");
+  #($volume,$directories,$file) = File::Spec->splitpath( $path );
+  my $olddir = getcwd();
+  chdir $self->{certdir};
+  foreach my $section (keys %options) {
+    while (my ($key, $value) = each(%{$options{$section}})) {
+      $options{$section}->{$key} = File::Spec->abs2rel($value);
+    }
+  }
 
-	#print Dumper $self->{STATE}->{DATA};
+  CertNanny::Logging->info("Sending request");
 
-	my %certs = $self->getCA();
-	if ( !%certs ) {
-		CertNanny::Logging->error("Could not get CA certs");
-		return;
-	}
-	my $rc;
-	eval {
-		local $SIG{ALRM} = sub { die "alarm\n" };    # NB: \n required
-		eval { alarm 120 };    # eval not supported in perl 5.7.1 on win32
-		$self->readConfig(\%options);
-		$self->writeConfigFile();
-		$rc = $self->execute("enroll");
-		eval { alarm 0 };      # eval not supported in perl 5.7.1 on win32
-		CertNanny::Logging->info("Return code: $rc");
-	};
-	
-	chdir $olddir;
-	
-	if ($@) {
+  #print Dumper $self->{STATE}->{DATA};
 
-		# timed out
-		die unless $@ eq "alarm\n";    # propagate unexpected errors
-		CertNanny::Logging->info("Timed out.");
-		return;
-	}
+  my %certs = $self->getCA();
+  if (!%certs) {
+    CertNanny::Logging->error("Could not get CA certs");
+    return undef;
+  }
+  my $rc;
+  eval {
+    local $SIG{ALRM} = sub {die "alarm\n"};    # NB: \n required
+    eval {alarm 120};                          # eval not supported in perl 5.7.1 on win32
+    $self->readConfig(\%options);
+    $self->writeConfigFile();
+    $rc = $self->execute("enroll");
+    eval {alarm 0};                            # eval not supported in perl 5.7.1 on win32
+    CertNanny::Logging->info("Return code: $rc");
+  };
 
-	if ( $rc == 3 ) {
+  chdir $olddir;
 
-		# request is pending
-		CertNanny::Logging->info("Request is still pending");
-		return 1;
-	}
+  if ($@) {
 
-	if ( $rc != 0 ) {
-		CertNanny::Logging->error("Could not run SCEP enrollment");
-		return;
-	}
-	return 1;
-}
+    # timed out
+    die unless $@ eq "alarm\n";                # propagate unexpected errors
+    CertNanny::Logging->info("Timed out.");
+    return undef;
+  }
+
+  if ($rc == 3) {
+
+    # request is pending
+    CertNanny::Logging->info("Request is still pending");
+    return 1;
+  }
+
+  if ($rc != 0) {
+    CertNanny::Logging->error("Could not run SCEP enrollment");
+    return undef;
+  }
+  return 1;
+} ## end sub enroll
+
 
 sub writeConfigFile {
-	my $self = shift;
-	
-	my $openssl_cfg;
-	
-	foreach my $section (keys %{$self->{OPTIONS}}) {
-	    $openssl_cfg->{$section} = [];
-	    foreach my $key (keys %{$self->{OPTIONS}->{$section}}) {
-	        my $value = $self->{OPTIONS}->{$section}->{$key};
-	        push(@{$openssl_cfg->{$section}}, {$key => $value});
-	    }
-	}
-	
-	my $rc = CertNanny::Util->writeOpenSSLConfig($openssl_cfg, $self->{config_filename});
-	unless($rc) {
-	    CertNanny::Logging->error("Could not write sscep config file.");
-	    return;
-	}
-	return 1;
-}
+  my $self = shift;
+
+  my $openssl_cfg;
+
+  foreach my $section (keys %{$self->{OPTIONS}}) {
+    $openssl_cfg->{$section} = [];
+    foreach my $key (keys %{$self->{OPTIONS}->{$section}}) {
+      my $value = $self->{OPTIONS}->{$section}->{$key};
+      push(@{$openssl_cfg->{$section}}, {$key => $value});
+    }
+  }
+
+  my $rc = CertNanny::Util->writeOpenSSLConfig($openssl_cfg, $self->{config_filename});
+  unless ($rc) {
+    CertNanny::Logging->error("Could not write sscep config file.");
+    return undef;
+  }
+  return 1;
+} ## end sub writeConfigFile
+
 
 sub getCA {
-	my $self= shift;
-	my $config = shift;
-	unless(defined $self->{certs}->{RACERT} and defined $self->{certs}->{CACERTS}) {
-		my $olddir = getcwd();
-		chdir $self->{certdir};
-		$config->{sscep}->{CACertFile} =  'cacert';
-		
-		$self->readConfig($config);
-		$config = $self->{OPTIONS};
-		
-		# delete existing ca certs
-	    my $ii = 0;
-	    while (-e $config->{sscep}->{CACertFile} . "-" . $ii) {
-		    my $file = $config->{sscep}->{CACertFile} . "-" . $ii;
-		    CertNanny::Logging->debug("Unlinking $file");
-		    unlink $file;
-		    if (-e $file) {
-		        CertNanny::Logging->error("could not delete CA certificate file $file, cannot proceed");
-		        return;
-		    }
-		    $ii++;
-	    }
-	    
-	    CertNanny::Logging->info("Requesting CA certificates");
-	    
-	    $self->writeConfigFile();
-	    if($self->execute("getca") != 0) {
-	    	return;
-	    }
-	    
-	    my $scepracert = File::Spec->catfile($self->{certdir}, $config->{sscep}->{CACertFile} . "-0");
-	    
-	    # collect all ca certificates returned by the SCEP command
-	    my @cacerts = ();
-	    $ii = 1;
-	
-	    my $certfile = File::Spec->catfile($self->{certdir}, $config->{sscep}->{CACertFile} . "-$ii");
-	    CertNanny::Logging->debug("getCA(): Adding certfile to stack: $certfile");
-	    while (-r $certfile) {
-	        my $certformat = 'PEM'; # always returned by sscep
-	        my $certinfo = CertNanny::Util->getcertinfo(CERTFILE => $certfile,
-	                          CERTFORMAT => 'PEM');
-	    
-	        if (defined $certinfo) {
-	            push (@cacerts, { CERTINFO => $certinfo,
-	                      CERTFILE => $certfile,
-	                      CERTFORMAT => $certformat,
-	                  });
-	        }
-	        $ii++;
-	        $certfile = File::Spec->catfile($self->{certdir}, $config->{sscep}->{CACertFile} . "-$ii");
-	    }
-	    
-	    $self->{certs}->{CACERTS} = \@cacerts;
-		$self->{certs}->{RACERT} = $scepracert;
-		chdir $olddir;
-	}
-	
-	my %certs = (
-		CACERTS => $self->{certs}->{CACERTS},
-	);
-	
-	if ( -r $self->{certs}->{RACERT} ) {
-		$certs{RACERT} = $self->{certs}->{RACERT};		
-	}
-	return %certs;
-}
 
-
-#Get next CA via SCEP
-# Pass a file location to the signers certificate chain for signature validation
-# This file will only be used if the returned signed PKCS7 reply is not including the complete chain
-# $enroller->getNextCA($certchainfile);
-#
-sub getNextCA {
-	my $self= shift;
-	my $ChainRootCACertFile = shift;
-	
-	my $scepCertChain; 
-  	my $pemchain;
-  	
+  my $self   = shift;
+  my $config = shift;
+  unless (defined $self->{certs}->{RACERT} and defined $self->{certs}->{CACERTS}) {
     my $olddir = getcwd();
-	chdir $self->{certdir};
+    chdir $self->{certdir};
+    $config->{sscep}->{CACertFile} = 'cacert';
 
-  	CertNanny::Logging->debug( "CertNanny::Enroll::Scep::getNextCA");
- 	  
-  	my $signerCertOutput = "signerCertGetNextCA.pem";
-   	my $targetCAfile = "nextRootCA";
-					 	
-		my %options = (
-		sscep_getnextca => {
-			ChainRootCACertFile => $ChainRootCACertFile,
-#			FingerPrint => $requestfile,
-			SignerCertificateFile => $signerCertOutput,
-		},
-		
-		sscep => {
-			CACertFile => $targetCAfile,
-		}
-	);
+    $self->readConfig($config);
+    $config = $self->{OPTIONS};
 
-		$self->readConfig(\%options);
-		my $config = $self->{OPTIONS};
+    # delete existing ca certs
+    my $ii = 0;
+    while (-e $config->{sscep}->{CACertFile} . "-" . $ii) {
+      my $file = $config->{sscep}->{CACertFile} . "-" . $ii;
+      CertNanny::Logging->debug("Unlinking $file");
+      unlink $file;
+      if (-e $file) {
+        CertNanny::Logging->error("could not delete CA certificate file $file, cannot proceed");
+        return undef;
+      }
+      $ii++;
+    } ## end while (-e $config->{sscep...})
 
-	    $self->writeConfigFile();
-	    
-	    if($self->execute("getnextca") != 0) {
-	    	CertNanny::Logging->debug( "error executing CertNanny::Enroll::Scep::getNextCA - may no be available at this time or not supported by target SCEP server" );
-	    	return;
-	    }
-	    
-	    	    # collect all ca certificates returned by the SCEP command
-	    my @nextcacerts = ();
-	    my $ii = 0;
-	
-	    my $certfile = File::Spec->catfile($self->{certdir}, $targetCAfile . "-$ii");
-	    CertNanny::Logging->debug("getNextCA(): Adding certfile to stack: $certfile");
-	    while (-r $certfile) {
-	        my $certformat = 'PEM'; # always returned by sscep
-	        my $certinfo = CertNanny::Util->getcertinfo(CERTFILE => $certfile,
-	                          CERTFORMAT => 'PEM');
-	    CertNanny::Logging->debug("info $certfile". Dumper($certinfo));
-	        if (defined $certinfo) {
-	            push (@nextcacerts, { CERTINFO => $certinfo });
-	        }
-	        $ii++;
-	        $certfile = File::Spec->catfile($self->{certdir}, $targetCAfile . "-$ii");
-	    }
-	
-		# delete next ca cert files
-	    $ii = 0;
-	    while (-e $targetCAfile . "-" . $ii) {
-		    my $file = $targetCAfile . "-" . $ii;
-		    CertNanny::Logging->debug("Unlinking $file");
-		    unlink $file;
-		    if (-e $file) {
-		        CertNanny::Logging->error("could not delete next CA certificate file $file, cannot proceed");
-		        return;
-		    }
-		    $ii++;
-	    }
-	
-	
-	
-	my $signercertfile = File::Spec->catfile($self->{certdir}, $signerCertOutput );
-	my $SignerCertinfo = CertNanny::Util->getcertinfo(CERTFILE => $signercertfile,
-	                          CERTFORMAT => 'PEM');
-	                          
-	unlink $signercertfile;
-	if (-e $signercertfile) {
-	   CertNanny::Logging->error("could not delete next CA signer certificate file $signercertfile, cannot proceed");
-	  return;
-   	}
-	                          
-	chdir $olddir;
-	                          
-	my %certs = (
-		NEXTCACERTS => \@nextcacerts,
-		SIGNERCERT => $SignerCertinfo
-	);
+    CertNanny::Logging->info("Requesting CA certificates");
 
-	return %certs;
-}
+    $self->writeConfigFile();
+    if ($self->execute("getca") != 0) {
+      return undef;
+    }
+
+    my $scepracert = File::Spec->catfile($self->{certdir}, $config->{sscep}->{CACertFile} . "-0");
+
+    # collect all ca certificates returned by the SCEP command
+    my @cacerts = ();
+    $ii = 1;
+
+    my $certfile = File::Spec->catfile($self->{certdir}, $config->{sscep}->{CACertFile} . "-$ii");
+    CertNanny::Logging->debug("getCA(): Adding certfile to stack: $certfile");
+    while (-r $certfile) {
+      my $certformat = 'PEM';    # always returned by sscep
+      my $certinfo = CertNanny::Util->getCertInfoHash(CERTFILE   => $certfile,
+                                                      CERTFORMAT => 'PEM');
+
+      if (defined $certinfo) {
+        push(@cacerts,
+             {CERTINFO   => $certinfo,
+              CERTFILE   => $certfile,
+              CERTFORMAT => $certformat,});
+      }
+      $ii++;
+      $certfile = File::Spec->catfile($self->{certdir}, $config->{sscep}->{CACertFile} . "-$ii");
+    } ## end while (-r $certfile)
+
+    $self->{certs}->{CACERTS} = \@cacerts;
+    $self->{certs}->{RACERT}  = $scepracert;
+    chdir $olddir;
+  } ## end unless (defined $self->{certs...})
+
+  my %certs = (CACERTS => $self->{certs}->{CACERTS},);
+
+  if (-r $self->{certs}->{RACERT}) {
+    $certs{RACERT} = $self->{certs}->{RACERT};
+  }
+  return %certs;
+} ## end sub getCA
+
+
+sub getNextCA {
+  # Get next CA via SCEP
+  # Pass a file location to the signers certificate chain for signature validation
+  # This file will only be used if the returned signed PKCS7 reply is not including the complete chain
+  # $enroller->getNextCA($certchainfile);
+  #
+  my $self                = shift;
+  my $ChainRootCACertFile = shift;
+
+  my $scepCertChain;
+  my $pemchain;
+
+  my $olddir = getcwd();
+  chdir $self->{certdir};
+
+  CertNanny::Logging->debug("CertNanny::Enroll::Scep::getNextCA");
+
+  my $signerCertOutput = "signerCertGetNextCA.pem";
+  my $targetCAfile     = "nextRootCA";
+
+  my %options = (
+    sscep_getnextca => {
+      ChainRootCACertFile => $ChainRootCACertFile,
+      # FingerPrint => $requestfile,
+      SignerCertificateFile => $signerCertOutput,},
+    sscep => {CACertFile => $targetCAfile,});
+
+  $self->readConfig(\%options);
+  my $config = $self->{OPTIONS};
+
+  $self->writeConfigFile();
+
+  if ($self->execute("getnextca") != 0) {
+    CertNanny::Logging->debug("error executing CertNanny::Enroll::Scep::getNextCA - may no be available at this time or not supported by target SCEP server");
+    return undef;
+  }
+
+  # collect all ca certificates returned by the SCEP command
+  my @nextcacerts = ();
+  my $ii          = 0;
+
+  my $certfile = File::Spec->catfile($self->{certdir}, $targetCAfile . "-$ii");
+  CertNanny::Logging->debug("getNextCA(): Adding certfile to stack: $certfile");
+  while (-r $certfile) {
+    my $certformat = 'PEM';    # always returned by sscep
+    my $certinfo = CertNanny::Util->getCertInfoHash(CERTFILE   => $certfile,
+                                                    CERTFORMAT => 'PEM');
+    CertNanny::Logging->debug("info $certfile" . Dumper($certinfo));
+    if (defined $certinfo) {
+      push(@nextcacerts, {CERTINFO => $certinfo});
+    }
+    $ii++;
+    $certfile = File::Spec->catfile($self->{certdir}, $targetCAfile . "-$ii");
+  } ## end while (-r $certfile)
+
+  # delete next ca cert files
+  $ii = 0;
+  while (-e $targetCAfile . "-" . $ii) {
+    my $file = $targetCAfile . "-" . $ii;
+    CertNanny::Logging->debug("Unlinking $file");
+    unlink $file;
+    if (-e $file) {
+      CertNanny::Logging->error("could not delete next CA certificate file $file, cannot proceed");
+      return undef;
+    }
+    $ii++;
+  } ## end while (-e $targetCAfile ....)
+
+  my $signercertfile = File::Spec->catfile($self->{certdir}, $signerCertOutput);
+  my $SignerCertinfo = CertNanny::Util->getCertInfoHash(CERTFILE   => $signercertfile,
+                                                        CERTFORMAT => 'PEM');
+
+  unlink $signercertfile;
+  if (-e $signercertfile) {
+    CertNanny::Logging->error("could not delete next CA signer certificate file $signercertfile, cannot proceed");
+    return undef;
+  }
+
+  chdir $olddir;
+
+  my %certs = (NEXTCACERTS => \@nextcacerts,
+               SIGNERCERT  => $SignerCertinfo);
+
+  return %certs;
+} ## end sub getNextCA
+
 
 sub defaultOptions {
-	my $self = shift;
-	my $monitorSysInfo = shift;
-	my $config = shift;
-	my $entryname = shift;
-	my $monitor = '';
-	
-	CertNanny::Logging->debug("get defaultOptions $monitorSysInfo");	
-	
-	if(defined $monitorSysInfo and $monitorSysInfo ne '' and $monitorSysInfo ne 'no' )
-	{
-		my @macs = CertNanny::Util->getmacaddresses();
-	    my $macaddresses = "macaddress=" ; 
-	    
-	    foreach my $mac (@macs)
-	    {
-	    	if($mac ne '00:00:00:00:00:00'){
-	    		$macaddresses.=$mac.',';
-	    	}
-	    }
-	    $macaddresses = substr($macaddresses , 0 , -1) ; #remove last ","
-			    
-	    $monitor = $macaddresses.'&cnversion='.$CertNanny::VERSION ;
-	    $monitor .= '&sysfqdn='.Net::Domain::hostfqdn();
-	    $monitor .= '&sysname='.(POSIX::uname())[0];
-	    $monitor .= '&sysrelease='.(POSIX::uname())[2];
-	    $monitor .= '&sysarch='.(POSIX::uname())[4];
-	    
-	    CertNanny::Logging->debug("Add monitor information $monitor");		
-	}
-		
-	my %options = (
-		sscep_engine_capi => {
-			'new_key_location' => 'REQUEST',
-		},
-		
-		sscep_enroll => {
-			'PollInterval' => 5,
-			'MaxPollCount' => 1
-		}
-		);
-		
-		
-		# user configurable meta data
-		
-		# this data structure is an example of configuration settings a user might
-		# set in certnanny.cfg, such as
-		# keystore.DEFAULT.enroll.sscep.meta.myarg = bar
-		# keystore.DEFAULT.enroll.sscep.meta.foo = sub { return 'bar' }
-		# keystore.DEFAULT.enroll.sscep.meta.blah = `whoami`
-		my $userconfig = $config->{'CONFIG'}->{'certmonitor'}->{$entryname}->{'enroll'}->{'sscep'}->{'meta'};
-	
-		my %custmetadata ;
-		
-		foreach my $key (keys %{$userconfig}) {
-		    my $value = $userconfig->{$key};
-		    if ($value =~ m{ \A \s* sub \s* \{ }xms) {
-		        eval {
-		            $value = eval $value;
-		            $value = &$value();
-		        };
-		    } elsif ($value =~ m{ \A \s* `(.*)` \s* \z }xms) {
-		        $value = `$1`;
-		    chomp $value;
-		    }
-		    $custmetadata{ 'cnmcust' . lc($key) } = $value;
-		}
-		
-		# now send %metadata hash to SCEP server via GET request
-META:		foreach my $key (keys %custmetadata){
-			next META if $key eq 'CNMCUSTINHERIT';	
-			my $value = $custmetadata{$key};
-			$monitor.= '&'.$key.'='.$value;				
-		}
-		CertNanny::Logging->debug("Monitor Info: " . $monitor);	
-		
-		
-		if($monitor ne ''){
-			 $options{'sscep'} = {
-				MonitorInformation => $monitor
-			};	
-		}
-		
-	
-	return \%options;
-}
+  my $self           = shift;
+  my $monitorSysInfo = shift;
+  my $config         = shift;
+  my $entryname      = shift;
+  my $monitor        = '';
+
+  CertNanny::Logging->debug("get defaultOptions $monitorSysInfo");
+
+  if (defined $monitorSysInfo and $monitorSysInfo ne '' and $monitorSysInfo ne 'no') {
+    my @macs         = CertNanny::Util->getMacAddresses();
+    my $macaddresses = "macaddress=";
+
+    foreach my $mac (@macs) {
+      if ($mac ne '00:00:00:00:00:00') {
+        $macaddresses .= $mac . ',';
+      }
+    }
+    $macaddresses = substr($macaddresses, 0, -1);    #remove last ","
+
+    $monitor = $macaddresses . '&cnversion=' . $CertNanny::VERSION;
+    $monitor .= '&sysfqdn=' . Net::Domain::hostfqdn();
+    $monitor .= '&sysname=' . (POSIX::uname())[0];
+    $monitor .= '&sysrelease=' . (POSIX::uname())[2];
+    $monitor .= '&sysarch=' . (POSIX::uname())[4];
+
+    CertNanny::Logging->debug("Add monitor information $monitor");
+  } ## end if (defined $monitorSysInfo...)
+
+  my %options = (
+    sscep_engine_capi => {'new_key_location' => 'REQUEST',},
+
+    sscep_enroll => {'PollInterval' => 5,
+                     'MaxPollCount' => 1});
+
+  # user configurable meta data
+
+  # this data structure is an example of configuration settings a user might
+  # set in certnanny.cfg, such as
+  # keystore.DEFAULT.enroll.sscep.meta.myarg = bar
+  # keystore.DEFAULT.enroll.sscep.meta.foo = sub { return 'bar' }
+  # keystore.DEFAULT.enroll.sscep.meta.blah = `whoami`
+  my $userconfig = $config->{CONFIG}->{certmonitor}->{$entryname}->{enroll}->{sscep}->{meta};
+
+  my %custmetadata;
+
+  foreach my $key (keys %{$userconfig}) {
+    my $value = $userconfig->{$key};
+    if ($value =~ m{ \A \s* sub \s* \{ }xms) {
+      eval {
+        $value = eval $value;
+        $value = &$value();
+      };
+    } elsif ($value =~ m{ \A \s* `(.*)` \s* \z }xms) {
+      $value = `$1`;
+      chomp $value;
+    }
+    $custmetadata{'CNMCUST' . uc($key)} = $value;
+  } ## end foreach my $key (keys %{$userconfig...})
+
+  # now send %metadata hash to SCEP server via GET request
+META: foreach my $key (keys %custmetadata) {
+    next META if $key eq 'CNMCUSTINHERIT';
+    my $value = $custmetadata{$key};
+    $monitor .= '&' . $key . '=' . $value;
+  }
+  CertNanny::Logging->debug("Monitor Info: " . $monitor);
+
+  if ($monitor ne '') {
+    $options{sscep} = {MonitorInformation => $monitor};
+  }
+
+  return \%options;
+} ## end sub defaultOptions
 
 1;
 

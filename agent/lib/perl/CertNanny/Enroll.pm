@@ -12,17 +12,21 @@ use Exporter;
 
 $VERSION = 0.10;
 
+
 sub new() {
-	
+
 }
+
 
 sub enroll() {
 
 }
 
+
 sub getCA() {
 
 }
+
 
 sub getNextCA() {
 }
