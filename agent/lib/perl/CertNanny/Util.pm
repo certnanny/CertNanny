@@ -539,7 +539,7 @@ sub getCertSHA1 {
   $base64 = MIME::Base64::encode_base64($$cert{CERTDATA});
   return undef if !$base64;
   
-  my $sha = Digest::SHA::sha1_base64($base64);
+  $sha = Digest::SHA::sha1_base64($base64);
   return undef if !$sha;
   
   return {CERTSHA1 => $sha};
@@ -994,7 +994,7 @@ sub backoffTime {
   if (exists $config->{CONFIG}->{conditionalwait}->{time}) {
     CertNanny::Logging->debug("wait extendedt time in seconds between 0 and " . $config->{CONFIG}->{conditionalwait}->{time});
 
-    my $date = CertNanny::Util::epochToIsoDate(time(), 1);
+    my $date = $self->epochToIsoDate(time(), 1);
     my $currentDate = substr($date, 0, 8);
     my $now = time();
 

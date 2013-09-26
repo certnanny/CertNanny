@@ -421,6 +421,8 @@ sub do_renew {
     # schedule automatic renewal
     CertNanny::Util->backoffTime($self->{CONFIG});
     $keystore->{INSTANCE}->k_renew();
+  }else{
+  	    CertNanny::Logging->debug("Certificate is still valid for more than $self->{ITEMS}->{ $args{ENTRY} }->{warnexpiry_days} days");
   }
 
   if (!$keystore->{INSTANCE}->k_checkValidity($self->{ITEMS}->{$args{ENTRY}}->{warnexpiry_days})) {

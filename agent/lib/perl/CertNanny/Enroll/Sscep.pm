@@ -44,7 +44,7 @@ sub new {
 
   # SCEP url
   #	$self->{url} = $config->{url} or die("No SCEP URL given");
-  if (!defined $self->{OPTIONS}->{sscep}->{url}) {
+  if (!defined $self->{OPTIONS}->{sscep}->{URL}) {
     CertNanny::Logging->error("scepurl not specified for keystore");
     return undef;
   }

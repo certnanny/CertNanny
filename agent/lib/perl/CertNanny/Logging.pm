@@ -39,7 +39,7 @@ my $dbgInfo = 1;
 BEGIN {
   open($stdOutFake, ">&", STDOUT);
   open($stdErrFake, ">&", STDERR);
-  $logTarget = 0;  # 0: Off   1: Console   2: File
+  $logTarget = 2;  # 0: Off   1: Console   2: File
 }
 
 sub getInstance {

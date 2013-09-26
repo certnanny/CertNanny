@@ -53,6 +53,9 @@ sub new {
   if (defined $config->{INITIALENROLLEMNT} and $config->{INITIALENROLLEMNT} eq 'yes') {
     CertNanny::Logging->info("Initial enrollment mode, skip check for key and cert file");
   } else {
+  	#If not an initial enrollment set default to no 
+  	$config->{INITIALENROLLEMNT} =  'no'; 
+  	
     # If it's not an Initial Enrollment, we need at least
     #   - keyfile
     #   - location
@@ -265,8 +268,8 @@ sub installCert {
   ######################################################################
   ### private key...
   my $newkey;
-  unless ($self->k_hasEngine() and $self->{HSM}->keyform() ne "file") {
-    unless ($self->k_hasEngine()) {
+  unless ($self->_hasEngine() and $self->{HSM}->keyform() ne "file") {
+    unless ($self->_hasEngine()) {
       $newkey = $self->k_convertKey(KEYFILE   => $keyfile,
                                     KEYFORMAT => 'PEM',
                                     KEYTYPE   => 'OpenSSL',
@@ -293,7 +296,7 @@ sub installCert {
     push(@newkeystore, {DESCRIPTION => "End entity private key",
                         FILENAME    => $entry->{key}->{file},
                         CONTENT     => $newkey->{KEYDATA}});
-  } ## end unless ($self->k_hasEngine()...)
+  } ## end unless ($self->_hasEngine()...)
 
   ######################################################################
   ### certificate...
@@ -472,7 +475,7 @@ sub getKey {
 
   my $rc = undef;
 
-  if ($self->k_hasEngine()) {
+  if ($self->_hasEngine()) {
     $rc = ($self->{HSM}->can('getKey')) ? $self->{HSM}->getKey() : $entry->{key}->{file};
   } else {
     my $keydata = CertNanny::Util->readFile($entry->{key}->{file});
@@ -532,8 +535,9 @@ sub createRequest {
 
   my $result = undef;
 
-  if ($self->{INITIALENROLLEMNT} eq 'yes' and ($entry->{initialenroll}->{auth}->{mode} eq 'password' or
-                                               $entry->{initialenroll}->{auth}->{mode} eq 'anonymous')) {
+  if (defined  $config->{INITIALENROLLEMNT} and 
+ 	  $config->{INITIALENROLLEMNT} eq 'yes' and 
+ 	  ($entry->{initialenroll}->{auth}->{mode} eq 'password' or $entry->{initialenroll}->{auth}->{mode} eq 'anonymous')) {
     $result = {KEYFILE => File::Spec->catfile($entry->{statedir}, $entryname . "-key.pem")};
     CertNanny::Logging->debug("Skip key generation in initialenrollment its already generated for selfsign certificate");
   } else {
@@ -547,7 +551,7 @@ sub createRequest {
 
   $result->{REQUESTFILE} = File::Spec->catfile($entry->{statedir}, $entryname . ".csr");
 
-  if ($self->k_hasEngine() and $self->{HSM}->can('createRequest')) {
+  if ($self->_hasEngine() and $self->{HSM}->can('createRequest')) {
     CertNanny::Logging->debug("Creating new CSR with HSM.");
     $result = $self->{HSM}->createRequest($result);
   } else {
@@ -562,7 +566,7 @@ sub createRequest {
 
     my $DN;
     #for inital enrollment we override the DN to use the configured desiered DN rather then the preset enrollment certificates DN
-    if ($self->{INITIALENROLLEMNT} eq 'yes') {
+    if ($config->{INITIALENROLLEMNT} eq 'yes') {
       $DN = $entry->{initialenroll}->{subject};
     } else {
       $DN = $self->{CERT}->{CERTINFO}->{SubjectName};
@@ -590,7 +594,7 @@ sub createRequest {
 
     # handle subject alt names from inital configuration information
     my $newsans = '';
-    if ($self->{INITIALENROLLEMNT} eq 'yes') {
+    if ($config->{INITIALENROLLEMNT} eq 'yes') {
       CertNanny::Logging->debug("Add SANs for initial enrollment");
       if (exists $entry->{initialenroll}->{san}) {
         push(@{$config_options->{req}}, {req_extensions => "v3_ext"});
@@ -630,7 +634,7 @@ sub createRequest {
       push(@{$config_options->{v3_ext}}, {subjectAltName => $san});
     }
 
-    if ($self->{INITIALENROLLEMNT} eq 'yes') {
+    if ($config->{INITIALENROLLEMNT} eq 'yes') {
       CertNanny::Logging->debug("Enter initial enrollment section");
 
       if (exists $entry->{initialenroll}->{profile} && $entry->{initialenroll}->{profile} ne '') {
@@ -647,7 +651,7 @@ sub createRequest {
     } ## end if ($self->{INITIALENROLLEMNT...})
 
     my @engine_cmd;
-    if ($self->k_hasEngine()) {
+    if ($self->_hasEngine()) {
       my $hsm = $self->{HSM};
       CertNanny::Logging->debug("Setting required engine parameters for HSM.");
       my $engine_id = $hsm->engineid();
@@ -730,7 +734,7 @@ sub selfSign {
 
   my $DN;
   #for inital enrollment we override the DN to use the configured desiered DN rather then the preset enrollment certificates DN
-  if ($self->{INITIALENROLLEMNT} eq 'yes') {
+  if ($config->{INITIALENROLLEMNT} eq 'yes') {
     $DN = $entry->{initialenroll}->{subject};
   } else {
     $DN = Net::Domain::hostfqdn();
@@ -842,7 +846,7 @@ sub generateKey {
     my $enginename = $self->{ENGINENAME} || $entry->{enginename} || 'none';
 
     #TODO sub generateKey Doku!
-    if ($self->k_hasEngine() and $self->{HSM}->can('genkey')) {
+    if ($self->_hasEngine() and $self->{HSM}->can('genkey')) {
       CertNanny::Logging->debug("Generating a new key using the configured HSM.");
       my $hsm = $self->{HSM};
       $outfile = $hsm->genkey();
@@ -864,7 +868,7 @@ sub generateKey {
         }
 
         my @engine_cmd;
-        if ($self->k_hasEngine()) {
+        if ($self->_hasEngine()) {
           CertNanny::Logging->debug("Since an engine is used, setting required command line parameters.");
           my $hsm = $self->{HSM};
           push(@engine_cmd, '-engine', $hsm->engineid());
@@ -1257,7 +1261,7 @@ sub installRoots {
   if (!$rc) {
     my $rootCertList = $self->k_getRootCerts();
     if (!defined($rootCertList)) {
-      $rc = CertNanny::Logging->error("No root certificates found in " . $config-get("keystore.$entryname.trustedrootca.authoritative.dir", 'FILE'));
+      $rc = CertNanny::Logging->error("No root certificates found in " . $config-get("keystore.$entryname.TrustedRootCA.AUTHORITATIVE.Dir", 'FILE'));
     } else {
       # write directory links: Links every certificate to the target directory
       if (defined($locInstall{directory}) && (!defined($args{TARGET}) or ('DIRECTORY' =~ m/^$args{TARGET}/))) {
@@ -1540,11 +1544,11 @@ sub _writeCAChainFile {
 } ## end sub writeCAChainFile
 
 
-#sub hasEngine {
-#  my $self = shift;
-#  
-#  return defined $self->{HSM};
-#}
+sub _hasEngine {
+  my $self = shift;
+
+  return defined $self->{HSM};
+}
 
 
 1;

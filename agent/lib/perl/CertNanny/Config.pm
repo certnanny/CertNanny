@@ -442,16 +442,16 @@ sub _parseFile {
       }
       my $key  = pop(@path);
       if ("$key" ne "DEFAULT") {
-        $key = lc($key);
+        #$key = lc($key);
       }
 
       my $doDupCheck;
-      foreach my $confPart (@path) {
+         foreach my $confPart (@path) {
         if ("$confPart" eq "DEFAULT") {
           $doDupCheck = 0;
         } else {
           $doDupCheck = 1;
-          $confPart = lc($confPart);
+          $confPart = $confPart;
         }
         if (!exists $var->{$confPart}) {
           $var->{$confPart} = {};
@@ -489,7 +489,7 @@ sub _replaceVariables {
     # actually replace variables
     while ($configref->{$thiskey} =~ /\$\((.*?)\)/) {
       my $var    = $1;
-      my $lcvar  = lc($var);
+      my $lcvar  = $var;
       my $target = getRef($self, $lcvar);
       $target     = "" unless defined $target;
 
