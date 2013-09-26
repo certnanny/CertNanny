@@ -1155,9 +1155,12 @@ sub getInstalledRoots {
   # Output: caller gets a hash ref:
   #           Hashkey is the SHA1 of the certificate
   #           Hashcontent ist the parsed certificate
-  #             - CERTFILE  certificate file
-  #             - CERTDATA  certificate data
-  #             - CERTINFO  parsed certificat info
+  #             - CERTDATA      mandatory: certificate data
+  #             - CERTINFO      mandatory: parsed certificat info
+  #             - CERTFILE       optional (present): certificate file
+  #             - CERTALIAS      optional (not present): certificate alias name
+  #             - CERTCREATEDATE optional (not present): certificate creation date
+  #             - CERTTYPE       optional (not present): certificate type
   #
   # Reads the config Parameters
   #   keystore.<name>.TrustedRootCA.GENERATED.Dir
@@ -1189,7 +1192,7 @@ sub getInstalledRoots {
 
                 
   my ($certRef, $certData, $certSha1);
-  my $found = {};
+  my $certFound = {};
 
   foreach my $locName (keys %locSearch) {  
     # Look for root certificates in keystore.openssl.TrustedRootCA.GENERATED.Dir / File / ChainFile
@@ -1201,9 +1204,9 @@ sub getInstalledRoots {
           $certRef = $self->getCert(CERTFILE => $certFile);
           while ($certData = $certRef->{CERTDATA}) {
             $certSha1 = CertNanny::Util->getCertSHA1(%{$certRef});
-            $found->{$certSha1->{CERTSHA1}}->{CERTFILE} = $certFile;
-            $found->{$certSha1->{CERTSHA1}}->{CERTDATA} = $certData;
-            $found->{$certSha1->{CERTSHA1}}->{CERTINFO} = CertNanny::Util->getCertInfoHash(CERTDATA   => $certData,
+            $certFound->{$certSha1->{CERTSHA1}}->{CERTFILE} = $certFile;
+            $certFound->{$certSha1->{CERTSHA1}}->{CERTDATA} = $certData;
+            $certFound->{$certSha1->{CERTSHA1}}->{CERTINFO} = CertNanny::Util->getCertInfoHash(CERTDATA   => $certData,
                                                                                            CERTFORMAT => 'PEM');
             $certRef  = $self->getCert(CERTDATA => $certRef->{CERTREST});
           }
@@ -1212,7 +1215,7 @@ sub getInstalledRoots {
     }
   }
   CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "get all installed root certificates");
-  return $found;
+  return $certFound;
 } ## end sub getInstalledRoots
 
 

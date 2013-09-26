@@ -441,18 +441,16 @@ sub _parseFile {
         $var = $self->{CFGFLAG};
       }
       my $key  = pop(@path);
-      if ("$key" ne "DEFAULT") {
-        #$key = lc($key);
-      }
 
       my $doDupCheck;
-         foreach my $confPart (@path) {
-        if ("$confPart" eq "DEFAULT") {
-          $doDupCheck = 0;
-        } else {
-          $doDupCheck = 1;
-          $confPart = $confPart;
-        }
+      foreach my $confPart (@path) {
+        $doDupCheck = ("$confPart" ne "DEFAULT");
+        # if ("$confPart" eq "DEFAULT") {
+        #   $doDupCheck = 0;
+        # } else {
+        #   $doDupCheck = 1;
+        #   $confPart = lc($confPart);
+        # }
         if (!exists $var->{$confPart}) {
           $var->{$confPart} = {};
           $var->{$confPart}->{INHERIT} = "DEFAULT";
@@ -489,8 +487,9 @@ sub _replaceVariables {
     # actually replace variables
     while ($configref->{$thiskey} =~ /\$\((.*?)\)/) {
       my $var    = $1;
-      my $lcvar  = $var;
-      my $target = getRef($self, $lcvar);
+      # my $lcvar  = lc($var);
+      # my $target = getRef($self, $lcvar);
+      my $target = getRef($self, $var);
       $target     = "" unless defined $target;
 
       $var =~ s/\./\\\./g;

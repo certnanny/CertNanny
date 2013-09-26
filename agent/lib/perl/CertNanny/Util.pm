@@ -88,7 +88,7 @@ sub hidePin() {
   
   for (my $ii = 0; $ii < $#cmd; $ii++) {
     $cmd[$ii + 1] = "*HIDDEN*" if ($cmd[$ii] =~ /(-pw|-target_pw|-storepass|-keypass)/);
-    $cmd[$ii] = s/Login=\S+/Login=*HIDDEN*/;
+    $cmd[$ii] =~ s/Login=\S+/Login=*HIDDEN*/;
   }
   my $commando = join(' ', @cmd);
   
@@ -109,9 +109,9 @@ sub runCommand {
     @cmdarr = @$cmd;
   } else {
     push(@cmdarr, $cmd);
-  }               
+  }
   my $logCmd = $args{HIDEPWD} ? $self->hidePin(@cmdarr) : join(' ' , @cmdarr);
-  
+
   CertNanny::Logging->debug("Execute: $logCmd");
 
   open my $PROGRAM, join(' ' , @cmdarr) . "|" or die "could not execute $logCmd";
