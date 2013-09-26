@@ -1511,15 +1511,19 @@ sub k_syncRootCAs {
 
   # Data structure $availableRootCAs and $installedRootCAs
   #  -<certSHA1> #1
-  #     |- CERTFILE  
   #     |- CERTDATA  
   #     |- CERTINFO  
+  #     |- optional: CERTFILE  
+  #        ...
   #  
   #  -<certSHA1> #2
-  #     |- CERTFILE  
   #     |- CERTDATA  
   #     |- CERTINFO  
-  #       ...
+  #     |- optional: CERTFILE  
+  #        ...
+  #  
+  #  -<certSHA1> #3
+  #   ...
 
   # First fetch available root certificates
   my $rootCertList = $self->k_getRootCerts();
@@ -1533,7 +1537,11 @@ sub k_syncRootCAs {
     foreach my $certRef (@{$rootCertList}) {
       my $certSHA1 = CertNanny::Util->getCertSHA1(%{$certRef})->{CERTSHA1};
       if (exists($availableRootCAs->{$certSHA1})) {
-        CertNanny::Logging->debug("Identical root certificate in <" . $availableRootCAs->{$certSHA1}->{CERTFILE} . "> and <" . $certRef->{CERTFILE} . ">");
+        if (exists($availableRootCAs->{$certSHA1}->{CERTFILE}) and ($certRef->{CERTFILE})) {
+          CertNanny::Logging->debug("Identical root certificate in <" . $availableRootCAs->{$certSHA1}->{CERTFILE} . "> and <" . $certRef->{CERTFILE} . ">");
+        } else {
+          CertNanny::Logging->debug("Identical root certificate <" . $availableRootCAs->{$certSHA1}->{CERTINFO}->{SubjectName} . "> found.");
+        }
       } else {
         $availableRootCAs->{$certSHA1} = $certRef;
       }
