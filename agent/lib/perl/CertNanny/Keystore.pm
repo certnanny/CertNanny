@@ -48,11 +48,11 @@ sub new {
   my $self = {};
   bless $self, $class;
   
-  # Store singleton objects in CertNanny
-  $self->{CONFIG}  = CertNanny::Config->getInstance(%args); return undef unless defined $self->{CONFIG};
-  $self->{UTIL}    = CertNanny::Util->getInstance(CONFIG => $self->{CONFIG});
-  $self->{LOGGING} = CertNanny::Logging->getInstance(CONFIG => $self->{CONFIG});
-
+#  # Store singleton objects in CertNanny
+#  $self->{CONFIG}  = CertNanny::Config->getInstance(%args); return undef unless defined $self->{CONFIG};
+#  $self->{UTIL}    = CertNanny::Util->getInstance(CONFIG => $self->{CONFIG});
+#  $self->{LOGGING} = CertNanny::Logging->getInstance(CONFIG => $self->{CONFIG});
+#
   # sanity check keystore config parameters
   # keystore must be available
   my $type = $args{ENTRY}->{type};
@@ -1117,7 +1117,7 @@ sub k_getNextTrustAnchor {
                   if (!CertNanny::Util->writeFile(DSTFILE    => $RootCertFile,
                                                   SRCCONTENT => $pemCACert,
                                                   FORCE      => 1)) {
-                    CertNanny::Logging->error("Could not write new Root CA into trusted roots dir " . $entry->{trustedrootca}->{authoritative}->{dir});
+                    CertNanny::Logging->error("Could not write new Root CA into trusted roots dir " . $entry->{TrustedRootCA}->{authoritative}->{dir});
                     last;
                   }
                   ##delete new root CA cert from quarantine
@@ -1193,59 +1193,10 @@ sub k_getRootCerts {
 
   my @result = ();
   my $res;
-  # Todo Arkadius: That should do the job as well and more compact. traversing the indices is no longer needed
   my $locRootCA = $config->get("keystore.$entryname.TrustedRootCA.AUTHORITATIVE.Dir", 'FILE');
   foreach (@{CertNanny::Util->fetchFileList($locRootCA)}) {
     push(@result, $res) if ($res = $self->_checkCert($_));
   }
-  
-  #foreach my $index (keys %{$entry->{rootcacert}}) {
-  #  next if ($index eq "INHERIT");
-  #    my @fileList = @{CertNanny::Util->fetchFileList($entry->{rootcacert}->{$index})};
-  #    foreach my $file (@fileList) {
-  #      if (my $res = $self->_checkCert($file)) {
-  #        push(@result, $res);
-  #      }
-  #    } ## end foreach my $file (@fileList)
-  #  } ## end foreach my $index (keys %{$entry->{rootcacert}})
-#
-#ROOTCERT:
-#  foreach my $index (keys %{$entry->{rootcacert}}) {
-#    next if ($index eq "INHERIT");
-#
-#    #....{$index} is a valid cert?
-#    CertNanny::Logging->debug("check for root file: " . $entry->{rootcacert}->{$index});
-#    my $res = 0;
-#    #avoid error message trying to read a directory in openSSL
-#    if (not -d $entry->{rootcacert}->{$index}) {
-#      CertNanny::Logging->debug("root cert is a directory");
-#      $res = $self->_checkCert($entry->{rootcacert}->{$index});
-#    }
-#
-#    if ($res != 0) {
-#      push(@result, $res);
-#    } else {
-#      #check if ...{$index} is folder
-#      CertNanny::Logging->debug("check for roots directory");
-#      if (not opendir(inFolder, $entry->{rootcacert}->{$index})) {
-#        CertNanny::Logging->error("can't open folder: $index");
-#        next ROOTCERT;    #eventuell die?
-#      }
-#      #go through each file in the folder and check if it is avalid cert
-#      my @files = readdir inFolder;
-#      foreach my $file (@files) {
-#        if ($file ne "." and $file ne ".." and $file ne '') {
-#          my $rootFile = File::Spec->catfile($entry->{rootcacert}->{$index}, "$file");
-#          CertNanny::Logging->debug("Trusted root certificate: " . $rootFile);
-#          my $res = $self->_checkCert($rootFile);
-#          if ($res != 0) {
-#            push(@result, $res);
-#          }
-#        }
-#      } ## end foreach my $file (@files)
-#    } ## end else [ if ($res != 0) ]
-#  } ## end ROOTCERT: foreach my $index (keys %{$self...})
-
   CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "get all root certificates from the configuration that are currently valid");
   return \@result;
 } ## end sub k_getRootCerts
@@ -1260,8 +1211,8 @@ sub _checkCert {
   #           $1 certificate file
   #
   # Output: caller gets a hash ref:
-  #           CERTINFO => hash as returned by getCertInfoHash()
-  #           CERTFILE => filename
+  #           CERTINFO   => hash as returned by getCertInfoHash()
+  #           CERTFILE   => filename
   #           CERTFORMAT => cert format (PEM, DER)
   #  
   CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "check whether cert is valid");
@@ -1304,9 +1255,6 @@ sub _checkCert {
   
   CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "check whether cert is valid");
   return $rc;
-#    return {CERTINFO   => $certinfo,
-#            CERTFILE   => $certfile,
-#            CERTFORMAT => $certformat};
 } ## end sub _checkCert
 
 
@@ -1364,7 +1312,6 @@ sub k_buildCertificateChain {
         return 2;
       }
     }
-                                                                                  ### no match...
     return undef;
   };
 
