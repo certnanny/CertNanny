@@ -1186,9 +1186,9 @@ sub getInstalledRoots {
   my $entryname = $options->{ENTRYNAME};
   my $config    = $options->{CONFIG};
   
-  my %locSearch = ('directory' => $config->get("keystore.$entryname.trustedrootca.generated.dir",       'FILE'),
-                   'file'      => $config->get("keystore.$entryname.trustedrootca.generated.file",      'FILE'),
-                   'chainfile' => $config->get("keystore.$entryname.trustedrootca.generated.chainfile", 'FILE'));
+  my %locSearch = ('directory' => $config->get("keystore.$entryname.TrustedRootCA.GENERATED.Dir",       'FILE'),
+                   'file'      => $config->get("keystore.$entryname.TrustedRootCA.GENERATED.File",      'FILE'),
+                   'chainfile' => $config->get("keystore.$entryname.TrustedRootCA.GENERATED.ChainFile", 'FILE'));
 
                 
   my ($certRef, $certData, $certSha1);
@@ -1202,12 +1202,12 @@ sub getInstalledRoots {
         my @certFileList = @{CertNanny::Util->fetchFileList($locSearch{$locName})};
         foreach my $certFile (@certFileList) {
           $certRef = $self->getCert(CERTFILE => $certFile);
-          while ($certData = $certRef->{CERTDATA}) {
+          while ($certRef and ($certData = $certRef->{CERTDATA})) {
             $certSha1 = CertNanny::Util->getCertSHA1(%{$certRef});
             $certFound->{$certSha1->{CERTSHA1}}->{CERTFILE} = $certFile;
             $certFound->{$certSha1->{CERTSHA1}}->{CERTDATA} = $certData;
             $certFound->{$certSha1->{CERTSHA1}}->{CERTINFO} = CertNanny::Util->getCertInfoHash(CERTDATA   => $certData,
-                                                                                           CERTFORMAT => 'PEM');
+                                                                                               CERTFORMAT => 'PEM');
             $certRef  = $self->getCert(CERTDATA => $certRef->{CERTREST});
           }
         }
@@ -1254,9 +1254,9 @@ sub installRoots {
   my $entryname = $options->{ENTRYNAME};
   my $config    = $options->{CONFIG};
   
-  my %locInstall = ('directory' => $config->get("keystore.$entryname.trustedrootca.generated.dir",       'FILE'),
-                    'file'      => $config->get("keystore.$entryname.trustedrootca.generated.file",      'FILE'),
-                    'chainfile' => $config->get("keystore.$entryname.trustedrootca.generated.chainfile", 'FILE'));
+  my %locInstall = ('directory' => $config->get("keystore.$entryname.TrustedRootCA.GENERATED.Dir",       'FILE'),
+                    'file'      => $config->get("keystore.$entryname.TrustedRootCA.GENERATED.File",      'FILE'),
+                    'chainfile' => $config->get("keystore.$entryname.TrustedRootCA.GENERATED.ChainFile", 'FILE'));
 
   my $rc = (defined($args{TARGET}) and !defined($locInstall{lc($args{TARGET})}));
   # Todo pgk: Zugriff in k_getRootCerts aendern auf keystore.openssl.TrustedRootCA.AUTHORITATIVE.Dir
@@ -1355,9 +1355,9 @@ sub installRoots {
 
 
   # # Install Options
-  # my %optInstall = ('directory' => $config->getFlag("keystore.$entryname.cachain.generated.dir",       'LC'),
-  #                   'file'      => $config->getFlag("keystore.$entryname.cachain.generated.file",      'LC'),
-  #                   'chainfile' => $config->getFlag("keystore.$entryname.cachain.generated.chainfile", 'LC'));
+  # my %optInstall = ('directory' => $config->getFlag("keystore.$entryname.cachain.GENERATED.Dir",       'LC'),
+  #                   'file'      => $config->getFlag("keystore.$entryname.cachain.GENERATED.File",      'LC'),
+  #                   'chainfile' => $config->getFlag("keystore.$entryname.cachain.GENERATED.ChainFile", 'LC'));
   # print Dumper(%optInstall);
 
 

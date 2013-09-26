@@ -121,6 +121,13 @@ sub _getRef {
     $target = $target->{$_};
   }
   if (defined $option and $option eq 'ref') {
+    if (!defined $target) {
+      $target = $self->{$where};
+      foreach (@var) {
+        $target->{$_} = {} unless exists $target->{$_};
+        $target       = $target->{$_};
+      }
+    }
     $target->{$tmp} = undef unless exists $target->{$tmp};
     $target = \$target->{$tmp};
     return $target;
