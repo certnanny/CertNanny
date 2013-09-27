@@ -1229,6 +1229,8 @@ sub installRoots {
   #           TARGET      => optional : where should the procedure install
   #                          root certificates (DIRECTORY|FILE|CHAINFILE)
   #                          default: all three
+  #           INSTALLED   => mandatory(not used) : hash with already installed roots
+  #           AVAILABLE   => mandatory(not used) : hash with available roots
   # 
   # Output: 1 : failure  0 : success 
   #

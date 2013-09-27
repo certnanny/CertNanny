@@ -1517,7 +1517,9 @@ sub k_syncRootCAs {
 
       if ($rebuild) {
         CertNanny::Logging->debug("rebuilding " . lc($target) . ".");
-        $self->installRoots(TARGET => $target);
+        $self->installRoots(TARGET    => $target,
+                            INSTALLED => $installedRootCAs,
+                            AVAILABLE => $availableRootCAs);
       }
     }
   }
