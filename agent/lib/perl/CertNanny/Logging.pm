@@ -39,7 +39,7 @@ my $dbgInfo = 1;
 BEGIN {
   open($stdOutFake, ">&", STDOUT);
   open($stdErrFake, ">&", STDERR);
-  $logTarget = 2;  # 0: Off   1: Console   2: File
+  $logTarget;  # 0: Off   1: Console   2: File  #  DO NOT SET HERE! USE logOff, log2File, log2Console INSTEAD
 }
 
 sub getInstance {
@@ -49,12 +49,12 @@ sub getInstance {
   if (!defined($INSTANCE->{CONFIG})) {
     shift;
     my %args = (@_);
+    $logTarget = -1;
     $INSTANCE->{CONFIG} = $args{CONFIG};
     if (defined $INSTANCE->{CONFIG}) {
       # only instantiate if $self->{CONFIG} exists.
       # otherwise initalisation phase is not yet finished
       $INSTANCE->logLevel($args{CONFIG}->get('loglevel') || 3);
-      $INSTANCE->log2File();
     }
   }
   return $INSTANCE;
@@ -65,8 +65,7 @@ sub new {
   if (!defined $INSTANCE) {
     my $proto = shift;
     my $class = ref($proto) || $proto;
-    my %args = (@_,    # argument pair list
-               );
+    my %args = (@_);    # argument pair list
 
     my $self = {};
     bless $self, $class;
@@ -131,12 +130,11 @@ sub log2File {
   my $self = (shift)->getInstance();
 
   if ($logTarget != 2) {
-    if ($self->{CONFIG}->get("logfile", "FILE")) {
+    if (my $file = $self->{CONFIG}->get("logfile", "FILE")) {
       $self->debug('Logging is redirected to ' . $self->{CONFIG}->get('logfile'));
 
       #TODO sub logFile Fehlerbehandlung
       #write alle messages into a file
-      my $file = $self->{CONFIG}->get("logfile", "FILE");
       $| = 1;
       open STDOUT, ">>", $file || die "Could not redirect STDOUT. Stopped";
       open STDERR, ">>", $file || die "Could not redirect STDERR. Stopped";
@@ -197,7 +195,7 @@ sub log {
       $logStr = "$year-$mon-$mday $hour:$min:$sec : [$prio] [$$] $arg->{MSG}\n";
     }
 
-    if (defined $self->{CONFIG}) {   # Bereit
+    if ($logTarget >= 0) {   # Bereit
       while (@logBuffer) {
         print STDERR shift(@logBuffer);
       }
