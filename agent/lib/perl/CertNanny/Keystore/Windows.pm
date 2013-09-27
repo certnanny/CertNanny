@@ -175,7 +175,7 @@ sub getCert {
       my $notbefore = CertNanny::Util->isoDateToEpoch($certinfo->{NotBefore});
       my $notafter  = CertNanny::Util->isoDateToEpoch($certinfo->{NotAfter});
       my $now       = time;
-      CertNanny::Logging->debug("Searching for" . $entry->{location} . " in $certinfo->{SubjectName} and NotAfter $notafter where current time is $now");
+      CertNanny::Logging->debug("Searching for " . $entry->{location} . " in $certinfo->{SubjectName} and NotAfter $notafter where current time is $now");
       CertNanny::Logging->debug("Result of index: " . index($certinfo->{SubjectName}, $entry->{location}));
  
       if (index($certinfo->{SubjectName}, $entry->{location}) != -1 && $notafter > $now) {
@@ -1010,6 +1010,10 @@ sub _deleteOldCerts() {
   return $ret;
 } ## end sub _deleteOldCerts
 
-
+sub _hasEngine {
+  my $self = shift;
+  
+  return 1;
+}
 
 1;
