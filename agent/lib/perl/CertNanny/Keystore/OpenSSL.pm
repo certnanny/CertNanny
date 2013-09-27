@@ -1549,7 +1549,7 @@ sub _writeCAChainFile {
 
 sub _hasEngine {
   my $self = shift;
-
+ 
   return defined $self->{HSM};
 }
 
