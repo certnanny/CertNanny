@@ -14,6 +14,7 @@ use strict;
 use vars qw(@ISA @EXPORT @EXPORT_OK %EXPORT_TAGS $VERSION);
 use Exporter;
 use Carp;
+use Data::Dumper;
 
 use IO::File;
 use File::Spec;
@@ -237,6 +238,11 @@ sub installCert {
   # execute import_cert.exe import test100-cert.pfx
   my $self = shift;
   my %args = (@_);    # argument pair list
+  
+  my $options   = $self->{OPTIONS};
+  my $entry     = $options->{ENTRY};
+  my $entryname = $options->{ENTRYNAME};
+  my $config    = $options->{CONFIG};
 
   my $ret = 1;
   CertNanny::Logging->debug("enter sub installCert in widnows.pm \n");
@@ -269,9 +275,23 @@ sub installCert {
       CertNanny::Logging->error("installCert(): Could not delete the old csr. Since the certificate was already installed, this is *critical*. Delete it manually or the next renewal will fail.");
     }
   }
-
+  
+  my $certinfo = CertNanny::Util->getCertInfoHash(CERTFILE   => $certfile,
+                                                    CERTFORMAT => 'PEM');  
   if (!$self->_deleteOldCerts($certfile)) {
     return 0;
+  }
+   
+  if(defined $entry->{iis} && defined $entry->{iis}->{ipport}){
+  	CertNanny::Logging->debug("found app configuration $entry->{iis}->{appid} try to bind  certificate to port ". $entry->{iis}->{ipport});
+	my @netsh      = ('netsh','http', 'add','sslcert', 'ipport='.$entry->{iis}->{ipport},'certhash='. $certinfo->{CertificateFingerprint} ,'appid='.$entry->{iis}->{appid} ); 
+    my $netsh      = join(" ", @netsh);
+    CertNanny::Logging->debug("netsh cmd: $netsh");
+     
+  	if (CertNanny::Util->runCommand(\@netsh)) {
+    	CertNanny::Logging->error("installCert(): failed to register https certificate.");
+    	#return undef;
+  	}
   }
 
   return $ret;
