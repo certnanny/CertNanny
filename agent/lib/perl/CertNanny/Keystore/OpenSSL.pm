@@ -831,10 +831,10 @@ sub generateKey {
   my $rc = undef;
   my $outfile;
   
-  if ($entry->{type} ne 'OpenSSL') {
+#  if ($entry->{type} ne 'OpenSSL' && $entry->{type} ne 'PKCS12') {
     # Only valid for OpenSSL Key all others should implement by themselfs or they get an error
-    CertNanny::Logging->error("WRONG GENERATE KEY! ");
-  } else {
+#    CertNanny::Logging->error("WRONG GENERATE KEY! ");
+#  } else {
     my $keyfile = $entryname . "-key.pem";
     $outfile = File::Spec->catfile($entry->{statedir}, $keyfile);
 
@@ -890,7 +890,7 @@ sub generateKey {
       delete $ENV{PIN};
       $rc = {KEYFILE => $outfile};
     }
-  }
+ # }
 
   CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "generateKey");
   return $rc;
@@ -948,12 +948,12 @@ sub createPKCS12 {
   my $entryname = $options->{ENTRYNAME};
   my $config    = $options->{CONFIG};
   
-  if ($entry->{type} ne 'OpenSSL') {
+ # if ($entry->{type} ne 'OpenSSL' && $entry->{type} ne 'PKCS12') {
     # Only valid for OpenSSL Key all others should implement by themselfs or they get an error
-    CertNanny::Logging->error("WRONG GENERATE KEY! ");
-    CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "create pkcs12 file");
-    return undef;
-  }
+  #  CertNanny::Logging->error("WRONG GENERATE KEY! ");
+  #  CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "create pkcs12 file");
+  # return undef;
+  #}
   
   my $openssl = $config->get('cmd.openssl', 'FILE');
   if (!defined $openssl) {
@@ -1034,40 +1034,34 @@ sub createPKCS12 {
   my @cachain = ();
   if (defined $args{CACHAIN} and ref $args{CACHAIN} eq "ARRAY") {
     $cachainfile = CertNanny::Util->getTmpFile;
-    my $fh = new IO::File(">$cachainfile");
-    if (!$fh) {
-      CertNanny::Logging->error("createPKCS12(): Could not create temporary CA chain file");
-      CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "create pkcs12 file");
-      return undef;
-    }
 
     # add this temp file
     push(@cachain, '-certfile');
     push(@cachain, qq("$cachainfile"));
 
     foreach my $entry (@{$args{CACHAIN}}) {
-      my $file = $entry->{CERTFILE};
+      #my $file = $entry->{CERTFILE};
       my @RDN  = split(/(?<!\\),\s*/, $entry->{CERTINFO}->{SubjectName});
       my $CN   = $RDN[0];
       $CN =~ s/^CN=//;
-      CertNanny::Logging->debug("Adding CA certificate '$CN' in $file");
+      CertNanny::Logging->debug("Adding CA certificate '$CN' in $cachainfile");
+      my $pemCACert = "-----BEGIN CERTIFICATE-----\n" . $entry->{'CERTINFO'}->{'Certificate'} ."-----END CERTIFICATE-----\n";
 
-      my $content = CertNanny::Util->readFile($file);
-      if (!defined $content) {
-        $fh->close;
-        unlink $cachainfile if (defined $cachainfile);
-        CertNanny::Logging->error("createPKCS12(): Could not read CA chain entry");
-        CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "create pkcs12 file");
-        return undef;
+             
+      if (!CertNanny::Util->writeFile(DSTFILE => $cachainfile,
+								      SRCCONTENT => $pemCACert,
+								      APPEND      => 1)) {
+    	CertNanny::Logging->error("Could not append Root CA into chainfile");        
+      }else{
+      	push(@cachain, '-caname');
+      	push(@cachain, qq("$CN"));
       }
 
-      print $fh $content;
-      push(@cachain, '-caname');
-      push(@cachain, qq("$CN"));
+
     } ## end foreach my $entry (@{$args{...}})
-    $fh->close;
   } ## end if (defined $args{CACHAIN...})
 
+  
   @cmd = (qq("$openssl"), 'pkcs12', '-export', '-out', qq("$args{FILENAME}"), @passout, '-in', qq("$certfile"), '-inkey', qq("$args{KEYFILE}"), @passin, @name, @cachain,);
   if (CertNanny::Util->runCommand(\@cmd) != 0) {
     delete $ENV{PIN};
@@ -1085,7 +1079,7 @@ sub createPKCS12 {
   unlink $cachainfile if (defined $cachainfile);
 
   CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "create pkcs12 file");
-  return $args{FILENAME};
+ # return $args{FILENAME};
   return {FILENAME => $args{FILENAME}};
 } ## end sub createPKCS12
 
