@@ -307,13 +307,13 @@ sub writeFile {
   my $self = (shift)->getInstance();
   my %args = (@_);
 
-  my $rc = 1;
+  my $rc = 0;
   
   if ((!defined $args{SRCFILE} && !defined $args{SRCCONTENT}) || (defined $args{SRCFILE} && defined $args{SRCCONTENT})) {
     $rc = CertNanny::Logging->error("writeFile(): Either SRCFILE or SRCCONTENT must be defined.");
   }
   
-  if ($rc && !defined $args{DSTFILE}) {
+  if (!$rc && !defined $args{DSTFILE}) {
     $rc = CertNanny::Logging->error("writeFile(): Destination File DSTFILE must be defined.");
   }
 
@@ -321,11 +321,11 @@ sub writeFile {
   my $srccontent = $args{SRCCONTENT};
   my $dstfile    = $args{DSTFILE};
 
-  if ($rc && (-e $dstfile) && (!$args{FORCE}) && (!$args{APPEND})) {
+  if (!$rc && (-e $dstfile) && (!$args{FORCE}) && (!$args{APPEND})) {
     $rc = CertNanny::Logging->error("writeFile(): output file already exists");
   }
 
-  if ($rc && defined($srccontent)) {
+  if (!$rc && defined($srccontent)) {
     my $mode = O_WRONLY;
     if (!-e $dstfile) {
       $mode |= O_EXCL | O_CREAT;
@@ -344,7 +344,7 @@ sub writeFile {
     close $fh
   }
   
-  if ($rc && defined($srcfile)) {
+  if (!$rc && defined($srcfile)) {
     if ($args{APPEND}) {
       if (!open OUT, '>>'.$dstfile) {
         $rc = CertNanny::Logging->error("writeFile(): output file open failed");
@@ -354,11 +354,11 @@ sub writeFile {
         $rc = CertNanny::Logging->error("writeFile(): output file open failed");
       }
     }
-    if ($rc) {
+    if (!$rc) {
       if (!open IN, $srcfile) {
         $rc = CertNanny::Logging->error("writeFile(): input file open failed");
       }
-      if ($rc) {
+      if (!$rc) {
         while (<IN>) {
           print OUT;
         }
@@ -369,7 +369,8 @@ sub writeFile {
   }
 
   CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "write file/content to disk");
-  return 1;
+  # Todo RC-Logik umkehren
+  return !$rc;
 } ## end sub writeFile
 
 
@@ -425,7 +426,7 @@ sub callOpenSSL {
   my $params  = shift;
   my %args    = (@_);
 
-  my $rc = 1;
+  my $rc = 0;
   my $info;
   # build commandstring
   my $openssl = $self->{CONFIG}->get('cmd.openssl', 'FILE');
@@ -447,7 +448,7 @@ sub callOpenSSL {
     unlink $outfile;
   }
 
-  if ($rc) {
+  if (!$rc) {
     binmode $fh;
     print $fh $args{CERTDATA} if (defined $args{CERTDATA});
     close $fh;
@@ -457,7 +458,7 @@ sub callOpenSSL {
       unlink $outfile;
     }
 
-    if ($rc) {
+    if (!$rc) {
       # read certificate
       open $fh, '<', $outfile;
       if (!$fh) {
@@ -467,7 +468,7 @@ sub callOpenSSL {
     }
   }
 
-  if ($rc) {
+  if (!$rc) {
     $info = CertNanny::Util->parseCertData(\$fh);
     close $fh;
     unlink $outfile;

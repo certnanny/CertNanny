@@ -1054,8 +1054,6 @@ sub k_getNextTrustAnchor {
         CertNanny::Logging->debug("Subject signer check successful " . $RDN[0]);
       } else {
         $rc = CertNanny::Logging->error("Subject signer check failed new root CA cert WILL NOT BE ACCEPTED" . $RDN[0]);
-        CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "get the next trust anchor");
-        return undef;
       }
 
       if (!$rc) {
@@ -1497,7 +1495,7 @@ sub k_syncRootCAs {
 
     # then compare against DIR, FILE and CHAINFILE in case of an 
     # inconsistence rebuild DIR, FILE or CHAINIFLE
-    foreach my $target ('DIRECTORY', 'FILE', 'CHAINFILE') {
+    foreach my $target ('DIRECTORY', 'FILE', 'CHAINFILE', 'LOCATION') {
       # Fetch installed root certificates into
       my $installedRootCAs = $self->getInstalledRoots(TARGET => $target);
   
