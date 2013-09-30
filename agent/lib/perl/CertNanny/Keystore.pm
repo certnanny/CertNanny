@@ -1322,6 +1322,7 @@ sub k_buildCertificateChain {
   foreach my $entry (@trustedroots) {
     my $fingerprint = $entry->{CERTINFO}->{CertificateFingerprint};
     $rootcertfingerprint{$fingerprint}++;
+    CertNanny::Logging->debug("Authoritife Root CA found:".$entry->{CERTINFO}->{SubjectName}." - ".$entry->{CERTINFO}->{CertificateFingerprint} );
   }
 
   # remove root certs from certificate list
