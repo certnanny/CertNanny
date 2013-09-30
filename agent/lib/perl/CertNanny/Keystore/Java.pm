@@ -456,7 +456,7 @@ sub createRequest {
 
   # decide whether we need to export the key (and do that if it's required)
   my $keyfile;
-  unless ($self->k_hasEngine()) {
+  unless ($self->_hasEngine()) {
 
     # okay no engine, export the key
     my $key = $self->getKey($location, $newalias) or return undef;
@@ -964,5 +964,11 @@ sub _changeAlias {
   }
 
 } ## end sub _changeAlias
+
+sub _hasEngine {
+  my $self = shift;
+  
+  return 0;
+}
 
 1;
