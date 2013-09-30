@@ -741,14 +741,21 @@ sub getInstalledRoots {
   #
   # get all installed root certificates
   #
-  # Input: -
+  # Input:  caller must provide a hash ref:
+  #           TARGET      => optional : where should the procedure search for installed
+  #                          root certificates (DIRECTORY|FILE|CHAINFILE|LOCATION)
+  #                          default: all
   # 
   # Output: caller gets a hash ref:
-  #           ROOTCERTS   => Hash containing currently installed root 
-  #                          certificates
-  #                          be installed (as returned by getInstalledRoots)
-  #                          Hashkey is tha SHA1 of the certificate
-  #                          Hashcontent ist the parsed certificate
+  #           Hashkey is the SHA1 of the certificate
+  #           Hashcontent ist the parsed certificate
+  #             - CERTDATA      mandatory: certificate data
+  #             - CERTINFO      mandatory: parsed certificat info
+  #             - CERTFILE       optional (not present): certificate file
+  #             - CERTALIAS      optional (present): certificate alias name
+  #             - CERTCREATEDATE optional (present): certificate creation date
+  #             - CERTTYPE       optional (present): certificate type
+  #
   #
   # Reads the config Parameters
   #   keystore.<name>.TrustedRootCA.GENERATED.Dir
@@ -778,11 +785,12 @@ sub installRoots {
   #
   # install all available root certificates
   #
-  # Input: caller must provide a hash ref:
-  #           ROOTCERTS   => Hash containing all rootcertificates to 
-  #                          be installed (as returned by getInstalledRoots)
-  #                          Hashkey is tha SHA1 of the certificate
-  #                          Hashcontent ist the parsed certificate
+  # Input:  caller must provide a hash ref:
+  #           TARGET      => optional : where should the procedure install
+  #                          root certificates (DIRECTORY|FILE|CHAINFILE|LOCATION)
+  #                          default: all three
+  #           INSTALLED   => mandatory(used) : hash with already installed roots
+  #           AVAILABLE   => mandatory(used) : hash with available roots
   # 
   # Output: 1 : failure  0 : success 
   #

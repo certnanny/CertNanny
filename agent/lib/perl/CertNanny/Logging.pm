@@ -220,7 +220,7 @@ sub debug {
   $self->log({MSG  => $arg,
               PRIO => 'debug'});
   
-  return 1
+  return 0
 } ## end sub debug
 
 
@@ -231,7 +231,7 @@ sub info {
   $self->log({MSG  => $arg,
               PRIO => 'info'});
   
-  return 1
+  return 0
 } ## end sub info
 
 
@@ -242,7 +242,7 @@ sub notice {
   $self->log({MSG  => $arg,
               PRIO => 'notice'});
   
-  return 1
+  return 0
 } ## end sub notice
 
 
@@ -253,7 +253,7 @@ sub error {
   $self->log({MSG  => $arg,
               PRIO => 'error'});
   
-  return 0
+  return 1
 } ## end sub error
 
 
@@ -264,7 +264,7 @@ sub fatal {
   $self->log({MSG  => $arg,
               PRIO => 'fatal'});
   
-  return 0
+  return 1
 } ## end sub fatal
 
 
