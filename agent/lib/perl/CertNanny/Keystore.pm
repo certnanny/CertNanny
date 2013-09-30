@@ -1191,7 +1191,7 @@ sub k_getRootCerts {
 
   my @result = ();
   my $res;
-  my $locRootCA = $config->get("keystore.$entryname.TrustedRootCA.AUTHORITATIVE.Dir", 'FILE');
+  my $locRootCA = $config->get("keystore.$entryname.TrustedRootCA.AUTHORITATIVE.Directory", 'FILE');
   foreach (@{CertNanny::Util->fetchFileList($locRootCA)}) {
     push(@result, $res) if ($res = $self->_checkCert($_));
   }
