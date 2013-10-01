@@ -68,10 +68,16 @@ sub new {
     return undef;
   }
   
-  if (!$config->get("keystore.$entryname.TrustedRootCA.GENERATED.Dir")) {
-    # TrustedRootCA.GENERATED.Dir must be definied in order for k_syncRootCAs to work. For Java it is identical top location
-    $config->set("keystore.$entryname.TrustedRootCA.GENERATED.Dir", $entry->{location});
+#  if (!$config->get("keystore.$entryname.TrustedRootCA.GENERATED.Dir")) {
+#    # TrustedRootCA.GENERATED.Dir must be definied in order for k_syncRootCAs to work. For Java it is identical top location
+#    $config->set("keystore.$entryname.TrustedRootCA.GENERATED.Dir", $entry->{location});
+#  }
+
+  if (!$config->get("keystore.$entryname.TrustedRootCA.GENERATED.Location")) {
+    # TrustedRootCA.GENERATED.Location must be definied in order for k_syncRootCAs to work. For Java it is identical top location
+    $config->set("keystore.$entryname.TrustedRootCA.GENERATED.Location", $entry->{location});
   }
+
   if (!defined $entry->{store}->{pin}) {
     croak("keystore.$entryname.store.pin not defined");
     return undef;
@@ -680,8 +686,8 @@ sub getInstalledRoots {
   #
   # Input:  caller must provide a hash ref:
   #           TARGET      => optional : where should the procedure search for installed
-  #                          root certificates (DIRECTORY|FILE|CHAINFILE)
-  #                          default: all three
+  #                          root certificates (DIRECTORY|FILE|CHAINFILE|LOCATION)
+  #                          default: all
   # 
   # Output: caller gets a hash ref:
   #           Hashkey is the SHA1 of the certificate
@@ -720,7 +726,7 @@ sub getInstalledRoots {
   my $rc = 0;
   my $certFound = {};
   
-  if (!defined($args{TARGET}) or ($args{TARGET} eq 'FILE')) {
+  if (!defined($args{TARGET}) or ($args{TARGET} eq 'LOCATION')) {
     if (defined(my $locName = $config->get("keystore.$entryname.location", 'FILE'))) {
       my ($certRef, @certList, $certData, $certSha1, $certAlias, $certCreateDate, $certType, $certFingerprint);
       my @cmd = $self->_buildKeytoolCmd($locName, '-list');
@@ -758,16 +764,18 @@ sub getInstalledRoots {
 } ## end sub getInstalledRoots
 
 
-sub _installRoots {
-  # ToDo pgk Testen: sub installRoots Postinstall Hooks
+sub installRoots {
+  # ToDo pgk : Postinstall Hooks
   ###########################################################################
   #
   # install all available root certificates
   #
   # Input:  caller must provide a hash ref:
   #           TARGET      => optional : where should the procedure install
-  #                          root certificates (DIRECTORY|FILE|CHAINFILE)
+  #                          root certificates (DIRECTORY|FILE|CHAINFILE|LOCATION)
   #                          default: all three
+  #           INSTALLED   => mandatory(used) : hash with already installed roots
+  #           AVAILABLE   => mandatory(used) : hash with available roots
   # 
   # Output: 1 : failure  0 : success 
   #
@@ -793,312 +801,91 @@ sub _installRoots {
   my $entryname = $options->{ENTRYNAME};
   my $config    = $options->{CONFIG};
   
-  my %locInstall = ('directory' => $config->get("keystore.$entryname.TrustedRootCA.GENERATED.Dir",       'FILE'),
-                    'file'      => $config->get("keystore.$entryname.TrustedRootCA.GENERATED.File",      'FILE'),
-                    'chainfile' => $config->get("keystore.$entryname.TrustedRootCA.GENERATED.ChainFile", 'FILE'));
-
-  my $rc = (defined($args{TARGET}) and !defined($locInstall{lc($args{TARGET})}));
-  # Todo pgk: Zugriff in k_getRootCerts aendern auf keystore.openssl.TrustedRootCA.AUTHORITATIVE.Dir
-
+  # set rc 0 if TARGET is not defined or TARGET is LOCATION otherwise 1
+  my $rc = (defined($args{TARGET}) and ($args{TARGET} ne 'LOCATION'));
+  
+  # run only if no TARGET is defined or TARGET is LOCATION
   if (!$rc) {
-    my $rootCertList = $self->k_getRootCerts();
-    if (!defined($rootCertList)) {
+    my $installedRootCAs = $args{INSTALLED};
+    my $availableRootCAs = $args{AVAILABLE};
+
+    my @cmd;
+    my $certData;
+
+    if (!defined($availableRootCAs)) {
+      my $rootCertList = $self->k_getRootCerts();
+      if (!defined($rootCertList)) {
+        $rc = CertNanny::Logging->error("No root certificates found in " . $config-get("keystore.$entryname.TrustedRootCA.AUTHORITATIVE.Dir", 'FILE'));
+      }
+  
+      if (!$rc) {
+        my $availableRootCAs = {};
+        # Foreach available root cert get the SHA1
+        foreach my $certRef (@{$rootCertList}) {
+          my $certSHA1 = CertNanny::Util->getCertSHA1(%{$certRef})->{CERTSHA1};
+          if (exists($availableRootCAs->{$certSHA1})) {
+            if (exists($availableRootCAs->{$certSHA1}->{CERTFILE}) and ($certRef->{CERTFILE})) {
+              CertNanny::Logging->debug("Identical root certificate in <" . $availableRootCAs->{$certSHA1}->{CERTFILE} . "> and <" . $certRef->{CERTFILE} . ">");
+            } else {
+              CertNanny::Logging->debug("Identical root certificate <" . $availableRootCAs->{$certSHA1}->{CERTINFO}->{SubjectName} . "> found.");
+            }
+          } else {
+            $availableRootCAs->{$certSHA1} = $certRef;
+          }
+        }
+      }
+    }
+
+    if (!defined($availableRootCAs)) {
       $rc = CertNanny::Logging->error("No root certificates found in " . $config-get("keystore.$entryname.TrustedRootCA.AUTHORITATIVE.dir", 'FILE'));
     } else {
-      # write directory links: Links every certificate to the target directory
-      if (defined($locInstall{directory}) && (!defined($args{TARGET}) or ('DIRECTORY' =~ m/^$args{TARGET}/))) {
-	      # First clean up the Target directory and get rid of all old certs
-        $self->_createLocalCerts(TARGET  => $locInstall{directory},
-                                   CLEANUP => 1);
+      # build a new temp keystore; Start with a copy of the existing one
+      my $locName = $self->_generateKeystore();
+      $rc = 1 if (!$locName);
+      if (!$rc) {
+        # delete every root CA, that does not exist in $availableRootCAs from keystore
+        foreach my $certSHA1 (keys ($installedRootCAs)) {
+          if (!exists($availableRootCAs->{$certSHA1})) {
+            CertNanny::Logging->debug("Deleting root cert " . $installedRootCAs->{$certSHA1}->{CERTINFO}->{SubjectName});
+            @cmd = $self->_buildKeytoolCmd($locName, '-delete', '-alias', $installedRootCAs->{$certSHA1}->{CERTALIAS});
+            if (CertNanny::Util->runCommand(\@cmd, HIDEPWD => 1)) {
+              CertNanny::Logging->error("Error deleting root cert " . $installedRootCAs->{$certSHA1}->{CERTINFO}->{SubjectName});
+            }
+          }
+        }
 
-        # For each cert install in target and execute postinstall Hook
-        foreach my $cert (@$rootCertList) {
-          $self->_createLocalCerts(SOURCE  => $cert->{CERTFILE},
-                                   TARGET  => $locInstall{directory},
-                                   CLEANUP => 0);
-
-          $self->_executeHook($entry->{hook}->{roots}->{install}->{post},
-                              '__TYPE__'        => 'DIRECTORY',
-                              '__CERTFILE__'    => $cert->{CERTFILE},
-                              '__FINGERPRINT__' => $cert->{CERTINFO}->{CertificateFingerprint},
-                              '__TARGET__'      => $locInstall{directory});
-        }  
-      }  
-
-      foreach my $target ('file', 'chainfile') {
-        if (!defined($args{TARGET}) or (uc($target) =~ m/^$args{TARGET}/)) {
-          # write file: Writes all certificates in one PEM file / Chainfile
-          if (defined($locInstall{$target})) {
-  	        # write in an tmp-file first just in case ...
+        # copy every root CA, that does not exist in $installedRootCAs to keystore
+        foreach my $certSHA1 (keys ($availableRootCAs)) {
+          if (!exists($installedRootCAs->{$certSHA1})) {
+            CertNanny::Logging->debug("Importing root cert " . $availableRootCAs->{$certSHA1}->{CERTINFO}->{SubjectName});
             my $tmpFile = CertNanny::Util->getTmpFile();
-            foreach my $cert (@$rootCertList) {
-              CertNanny::Util->writeFile(DSTFILE => $tmpFile,
-                                         SRCFILE => $cert->{CERTFILE}, 
-                                         APPEND  => 1);
-
-              $self->_executeHook($entry->{hook}->{roots}->{install}->{post},
-                                  '__TYPE__'        => uc($target),
-                                  '__CERTFILE__'    => $cert->{CERTFILE},
-                                  '__FINGERPRINT__' => $cert->{CERTINFO}->{CertificateFingerprint},
-                                  '__TARGET__'      => $locInstall{$target});
+            CertNanny::Util->writeFile(DSTFILE => $tmpFile,
+                                       SRCFILE => $availableRootCAs->{$certSHA1}->{CERTDATA});
+            @cmd = $self->_buildKeytoolCmd($locName, '-importcert', '-file', $tmpFile, '-trustcacerts', '-alias', $availableRootCAs->{$certSHA1}->{CERTALIAS});
+            if (CertNanny::Util->runCommand(\@cmd, HIDEPWD => 1)) {
+              CertNanny::Logging->error("Error importing root cert " . $availableRootCAs->{$certSHA1}->{CERTINFO}->{SubjectName});
             }
-
-            if ($target eq 'chainfile') {
-              # in addition to the Root Certs, the chainfile also keeps the chain
-              if (!exists($self->{STATE}->{DATA}->{SCEP}->{CACERTS})) {
-                $self->k_getCaCerts();
-              }
-# Todo Arkadius Frage ok: Wie filtere ich die raus, die in das CheinFile gehoeren NEIN, es kommen neue dazu naemlich die Chain der intermediate CAs
-# Todo installRoots: buildcertChain liefert mit dem aktuellen cert nur undef zurueck :-(
-# intermediate CAs holen mit k_getCACerts falls nicht bereits geholt 
-#   $self->{STATE}->{DATA}->{SCEP}->{CACERTS} = $certs{CACERTS};
-# Reihenfolge ist egal
-# getCert : Endcert holen
-# danach buildcertChain
-# Anker und ggf andere Roots entfernen EE entfernen, und den Rest an chainfile anhaengen; Reihenfolge egal
-              if (my $chainArrRef = $self->k_buildCertificateChain($self->getCert())) {
-                # delete root
-                shift(@$chainArrRef);
-                # delete EE
-                pop(@$chainArrRef);
-                # all others add to chainfile
-                while (my $cert = shift($chainArrRef)) {
-                  CertNanny::Util->writeFile(DSTFILE => $tmpFile,
-                                             SRCFILE => $cert->{CERTFILE}, 
-                                             APPEND  => 1);
-
-                  $self->_executeHook($entry->{hook}->{roots}->{install}->{post},
-                                      '__TYPE__'        => uc($target),
-                                      '__CERTFILE__'    => $cert->{CERTFILE},
-                                      '__FINGERPRINT__' => $cert->{CERTINFO}->{CertificateFingerprint},
-                                      '__TARGET__'      => $locInstall{$target});
-                }
-              }    
-            }    
-
-            # put tmp-file to the right location     
-            if (!File::Copy::copy($tmpFile, $locInstall{$target})) {
-              CertNanny::Logging->error("Could not install new TrusteRootCA File to " . $locInstall{$target} . ".");
-            }
-            eval {unlink($tmpFile)};
-          }  
-        }  
-      }  
+            # Postinstallhook
+            $self->_executeHook($entry->{hook}->{roots}->{install}->{post},
+                                '__TYPE__'        => 'FILE',
+                                '__CERTFILE__'    => $availableRootCAs->{$certSHA1}->{CERTFILE},
+                                '__FINGERPRINT__' => $availableRootCAs->{$certSHA1}->{CERTINFO}->{CertificateFingerprint},
+                                '__TARGET__'      => $locName);
+          }
+        }
+      
+        # copy the temp keystore to $location an delete temp keystore
+        if (!File::Copy::copy($locName, $entry->{location})) {
+          $rc = CertNanny::Logging->error("Could not copy new store <$locName> to current store <$entry->{location}>");
+        } else {
+          eval {unlink($locName)};
+        }
+      }
     }
   }
-
   CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "Install all available root certificates");
   return $rc;
 } ## end sub installRoots
-
-
-sub installRoots {
-  # ToDo pgk Testen: sub installRoots Postinstall Hooks
-  ###########################################################################
-  #
-  # install all available root certificates
-  #
-  # Input:  caller must provide a hash ref:
-  #           TARGET      => optional : where should the procedure install
-  #                          root certificates (DIRECTORY|FILE|CHAINFILE)
-  #                          default: all three
-  # 
-  # Output: 1 : failure  0 : success 
-  #
-  # this function gets a hash of parsed root certificates
-  # installs all roots into the keystore depending on keystore type
-  # (write files, rebuild kestore, etc.)
-  # execute install-root-hook for all certificates that will be new installed
-  #
-  # You may want to inherit this class from CertNanny::Keystore::OpenSSL if
-  # you wish to generate the private key 'outside' of your keystore and 
-  # import this information later.
-  # In this case use the following code:
-  # sub installRoots {
-  #   my $self = shift;
-  #   return $self->SUPER::installRoots(@_) if $self->can("SUPER::installRoots");
-  # }
-
-  # INFO Sascha:
-  #  - im Keystore gibt es keine Unterscheidung zwischen normalen/intermidiate/root 
-  #    Zertifikaten. Deswegen gibt es auch keinen Befehl um sich nur die Root Cert 
-  #    anzeigen zu lassen.
-  #    Root Certs lassen sich deswegen auch einfach nachinstallieren.
-  #  - um ein Cert zu installieren:
-  #       keytool -importcert -file <path to certificate> -trustcacerts -keystore <path to keystore>.jks
-  #    die Option -trustcacerts ist optional und bewirkt, das zusätzlich zu den 
-  #    Certs im angegebenen Keystore noch die Certs aus dem Keystore 
-  #    $JAVA_HOME/jre/lib/security/cacerts für die Überprüfung der Kette verwendet 
-  #    werden.
-  #  - wenn du versuchst ein Cert zu installieren, für das keine vollständige Kette 
-  #    vorliegt (oder du ein Root Cert installierst), dann wirst du gefragt, ob du 
-  #    dem Cert vertrauen willst. Wenn die Kette vorhanden ist, dann stellt keytool 
-  #    keine Rückfragen
-  #
-  # Beispiel:
-  # #!/bin/bash
-  # 
-  # #create jsk keystore
-  # #Parameter:
-  # #-alias: <alias for the private key for the keystore>
-  # #-keystore: <name/path for the keystore>
-  # keytool -genkey -alias mydomain -keyalg RSA -keystore keystore.jks -keysize 2048
-  # 
-  # #view available certificates
-  # keytool -list -keystore keystore.jks
-  # 
-  # #install certificate
-  # #Parameter:
-  # #-file: <certificate you want to install>
-  # #-alias: <alias for the certificate to use in your database>
-  # #-keystore: <name of your keystore>.jks
-  # #-trustcacerts: optional
-  # keytool -importcert -file CA/uat/roottestca10.pem -trustcacerts -keystore keystore.jks
-#keystore.java.location     = $(Config)/EECerts/TestCertNanny.db.com JavaKeystore.jks
-#keystore.java.type         = Java
-#keystore.java.store.pin    = +tiZAttMP#FNmtSyvpMw/A
-#keystore.java.key.pin      = +tiZAttMP#FNmtSyvpMw/A
-#keystore.java.alias        = key
-#keystore.java.keyalg       = RSA
-#keystore.java.sigalg       = SHA1withRSA
-  CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "Install all available root certificates");
-  my $self = shift;
-  my %args = (@_);
-
-  my $options   = $self->{OPTIONS};
-  my $entry     = $options->{ENTRY};
-  my $entryname = $options->{ENTRYNAME};
-  my $config    = $options->{CONFIG};
-  
-  my $rc = 0;
-  
-#  my %locInstall = ('directory' => $config->get("keystore.$entryname.TrustedRootCA.GENERATED.Dir",       'FILE'),
-#                    'file'      => $config->get("keystore.$entryname.TrustedRootCA.GENERATED.File",      'FILE'),
-#                    'chainfile' => $config->get("keystore.$entryname.TrustedRootCA.GENERATED.ChainFile", 'FILE'));
-#
-#  my $rc = (defined($args{TARGET}) and !defined($locInstall{lc($args{TARGET})}));
-#  # Todo pgk: Zugriff in k_getRootCerts aendern auf keystore.openssl.TrustedRootCA.AUTHORITATIVE.Dir
-#
-#  if (!$rc) {
-#    my $rootCertList = $self->k_getRootCerts();
-#    if (!defined($rootCertList)) {
-#      $rc = CertNanny::Logging->error("No root certificates found in " . $config-get("keystore.$entryname.TrustedRootCA.AUTHORITATIVE.dir", 'FILE'));
-#    } else {
-#      # write directory links: Links every certificate to the target directory
-#      if (defined($locInstall{directory}) && (!defined($args{TARGET}) or ('DIRECTORY' =~ m/^$args{TARGET}/))) {
-#	      # First clean up the Target directory and get rid of all old certs
-#        $self->_createLocalCerts(TARGET  => $locInstall{directory},
-#                                   CLEANUP => 1);
-#
-#        # For each cert install in target and execute postinstall Hook
-#        foreach my $cert (@$rootCertList) {
-#          $self->_createLocalCerts(SOURCE  => $cert->{CERTFILE},
-#                                   TARGET  => $locInstall{directory},
-#                                   CLEANUP => 0);
-#
-#          $self->_executeHook($entry->{hook}->{roots}->{install}->{post},
-#                              '__TYPE__'        => 'DIRECTORY',
-#                              '__CERTFILE__'    => $cert->{CERTFILE},
-#                              '__FINGERPRINT__' => $cert->{CERTINFO}->{CertificateFingerprint},
-#                              '__TARGET__'      => $locInstall{directory});
-#        }  
-#      }  
-#
-#      foreach my $target ('file', 'chainfile') {
-#        if (!defined($args{TARGET}) or (uc($target) =~ m/^$args{TARGET}/)) {
-#          # write file: Writes all certificates in one PEM file / Chainfile
-#          if (defined($locInstall{$target})) {
-#  	        # write in an tmp-file first just in case ...
-#            my $tmpFile = CertNanny::Util->getTmpFile();
-#            foreach my $cert (@$rootCertList) {
-#              CertNanny::Util->writeFile(DSTFILE => $tmpFile,
-#                                         SRCFILE => $cert->{CERTFILE}, 
-#                                         APPEND  => 1);
-#
-#              $self->_executeHook($entry->{hook}->{roots}->{install}->{post},
-#                                  '__TYPE__'        => uc($target),
-#                                  '__CERTFILE__'    => $cert->{CERTFILE},
-#                                  '__FINGERPRINT__' => $cert->{CERTINFO}->{CertificateFingerprint},
-#                                  '__TARGET__'      => $locInstall{$target});
-#            }
-#
-#            if ($target eq 'chainfile') {
-#              # in addition to the Root Certs, the chainfile also keeps the chain
-#              if (!exists($self->{STATE}->{DATA}->{SCEP}->{CACERTS})) {
-#                $self->k_getCaCerts();
-#              }
-## Todo Arkadius Frage ok: Wie filtere ich die raus, die in das CheinFile gehoeren NEIN, es kommen neue dazu naemlich die Chain der intermediate CAs
-## Todo installRoots: buildcertChain liefert mit dem aktuellen cert nur undef zurueck :-(
-## intermediate CAs holen mit k_getCACerts falls nicht bereits geholt 
-##   $self->{STATE}->{DATA}->{SCEP}->{CACERTS} = $certs{CACERTS};
-## Reihenfolge ist egal
-## getCert : Endcert holen
-## danach buildcertChain
-## Anker und ggf andere Roots entfernen EE entfernen, und den Rest an chainfile anhaengen; Reihenfolge egal
-#              if (my $chainArrRef = $self->k_buildCertificateChain($self->getCert())) {
-#                # delete root
-#                shift(@$chainArrRef);
-#                # delete EE
-#                pop(@$chainArrRef);
-#                # all others add to chainfile
-#                while (my $cert = shift($chainArrRef)) {
-#                  CertNanny::Util->writeFile(DSTFILE => $tmpFile,
-#                                             SRCFILE => $cert->{CERTFILE}, 
-#                                             APPEND  => 1);
-#
-#                  $self->_executeHook($entry->{hook}->{roots}->{install}->{post},
-#                                      '__TYPE__'        => uc($target),
-#                                      '__CERTFILE__'    => $cert->{CERTFILE},
-#                                      '__FINGERPRINT__' => $cert->{CERTINFO}->{CertificateFingerprint},
-#                                      '__TARGET__'      => $locInstall{$target});
-#                }
-#              }    
-#            }    
-#
-#            # put tmp-file to the right location     
-#            if (!File::Copy::copy($tmpFile, $locInstall{$target})) {
-#              CertNanny::Logging->error("Could not install new TrusteRootCA File to " . $locInstall{$target} . ".");
-#            }
-#            eval {unlink($tmpFile)};
-#          }  
-#        }  
-#      }  
-#    }
-#  }
-
-  CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "Install all available root certificates");
-  return $rc;
-} ## end sub installRoots
-
-
-sub syncRootCAs {
-  ###########################################################################
-  #
-  # synchronize the unstalled root certificates with the avaiable ones
-  #
-  # Input: -
-  # 
-  # Output: 1 : failure  0 : success 
-  #
-  # this function synchronizes installed roots with local trusted root CAs.
-  # The installed root CAs are fetched via getInstalledRoots. The available
-  # trusted root CAs are fetched via k_getRootCerts.
-  # Alle available root CAs are installed in a new temp. keystore. The 
-  # installed root CAs are replaced with the new keytore. So all installed
-  # roots CAs that are no longer available are deleted 
-  # after all the post-install-hook is executed.
-  #
-  # You may want to inherit this class from CertNanny::Keystore::OpenSSL if
-  # you wish to generate the private key 'outside' of your keystore and 
-  # import this information later.
-  # In this case use the following code:
-  # sub syncRootCAs {
-  #   my $self = shift;
-  #   return $self->SUPER::syncRootCAs(@_) if $self->can("SUPER::syncRootCAs");
-  # }
-  my $self = shift;
-  return $self->SUPER::syncRootCAs(@_) if $self->can("SUPER::syncRootCAs");
-}
 
 
 
