@@ -68,9 +68,9 @@ sub new {
     return undef;
   }
   
-#  if (!$config->get("keystore.$entryname.TrustedRootCA.GENERATED.Dir")) {
-#    # TrustedRootCA.GENERATED.Dir must be definied in order for k_syncRootCAs to work. For Java it is identical top location
-#    $config->set("keystore.$entryname.TrustedRootCA.GENERATED.Dir", $entry->{location});
+#  if (!$config->get("keystore.$entryname.TrustedRootCA.GENERATED.Directory")) {
+#    # TrustedRootCA.GENERATED.Directory must be definied in order for k_syncRootCAs to work. For Java it is identical top location
+#    $config->set("keystore.$entryname.TrustedRootCA.GENERATED.Directory", $entry->{location});
 #  }
 
   if (!$config->get("keystore.$entryname.TrustedRootCA.GENERATED.Location")) {
@@ -700,7 +700,7 @@ sub getInstalledRoots {
   #             - CERTTYPE       optional (present): certificate type
   #
   # Reads the config Parameters
-  #   keystore.<name>.TrustedRootCA.GENERATED.Dir
+  #   keystore.<name>.TrustedRootCA.GENERATED.Directory
   #   keystore.<name>.TrustedRootCA.GENERATED.File
   #   keystore.<name>.TrustedRootCA.GENERATED.ChainFile
   # and look for Trusted Root Certificates. All found certificates are
@@ -815,7 +815,7 @@ sub installRoots {
     if (!defined($availableRootCAs)) {
       my $rootCertList = $self->k_getRootCerts();
       if (!defined($rootCertList)) {
-        $rc = CertNanny::Logging->error("No root certificates found in " . $config-get("keystore.$entryname.TrustedRootCA.AUTHORITATIVE.Dir", 'FILE'));
+        $rc = CertNanny::Logging->error("No root certificates found in " . $config-get("keystore.$entryname.TrustedRootCA.AUTHORITATIVE.Directory", 'FILE'));
       }
   
       if (!$rc) {

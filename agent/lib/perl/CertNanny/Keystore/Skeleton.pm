@@ -758,7 +758,7 @@ sub getInstalledRoots {
   #
   #
   # Reads the config Parameters
-  #   keystore.<name>.TrustedRootCA.GENERATED.Dir
+  #   keystore.<name>.TrustedRootCA.GENERATED.Directory
   #   keystore.<name>.TrustedRootCA.GENERATED.File
   #   keystore.<name>.TrustedRootCA.GENERATED.ChainFile
   # and look for Trusted Root Certificates. All found certificates are
