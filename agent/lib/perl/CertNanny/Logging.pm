@@ -18,6 +18,7 @@ use Carp;
 use strict;
 use warnings;
 use English;
+use utf8;
 
 use vars qw(@ISA @EXPORT @EXPORT_OK %EXPORT_TAGS $VERSION);
 
@@ -149,7 +150,7 @@ sub log2File {
 sub log {
   my $self = (shift)->getInstance();
   my $arg  = shift;
-  
+
   confess "Not a hash ref" unless (ref($arg) eq "HASH");
   return undef unless (defined $arg->{MSG});
   my $prio = lc($arg->{PRIO} || "info");
@@ -188,6 +189,9 @@ sub log {
           }
         }
       }
+    }
+    if (!utf8::is_utf8($arg->{MSG}) and ($arg->{MSG} !~ m/\A [[:ascii:]]* \Z/xms)) {
+      $arg->{MSG} = '---Binary Data---';
     }
     if ($subroutine) {
       $logStr = "$year-$mon-$mday $hour:$min:$sec : [$prio] [$$] [$subroutine] $arg->{MSG}\n";
