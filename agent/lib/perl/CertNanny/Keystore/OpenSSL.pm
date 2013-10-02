@@ -50,11 +50,11 @@ sub new {
   # propagate PIN to class options
   $self->{PIN} = $entry->{key}->{pin};
 
-  if (defined $config->{INITIALENROLLEMNT} and $config->{INITIALENROLLEMNT} eq 'yes') {
+  if (defined $entry->{INITIALENROLLEMNT} and $entry->{INITIALENROLLEMNT} eq 'yes') {
     CertNanny::Logging->info("Initial enrollment mode, skip check for key and cert file");
   } else {
   	#If not an initial enrollment set default to no 
-  	$config->{INITIALENROLLEMNT} =  'no'; 
+  	$entry->{INITIALENROLLEMNT} =  'no'; 
   	
     # If it's not an Initial Enrollment, we need at least
     #   - keyfile
@@ -544,8 +544,8 @@ sub createRequest {
 
   my $result = undef;
 
-  if (defined  $config->{INITIALENROLLEMNT} and 
- 	  $config->{INITIALENROLLEMNT} eq 'yes' and 
+  if (defined  $entry->{INITIALENROLLEMNT} and 
+ 	  $entry->{INITIALENROLLEMNT} eq 'yes' and 
  	  ($entry->{initialenroll}->{auth}->{mode} eq 'password' or $entry->{initialenroll}->{auth}->{mode} eq 'anonymous')) {
     $result = {KEYFILE => File::Spec->catfile($entry->{statedir}, $entryname . "-key.pem")};
     CertNanny::Logging->debug("Skip key generation in initialenrollment its already generated for selfsign certificate");
@@ -575,7 +575,7 @@ sub createRequest {
 
     my $DN;
     #for inital enrollment we override the DN to use the configured desiered DN rather then the preset enrollment certificates DN
-    if ($config->{INITIALENROLLEMNT} eq 'yes') {
+    if ($entry->{INITIALENROLLEMNT} eq 'yes') {
       $DN = $entry->{initialenroll}->{subject};
     } else {
       $DN = $self->{CERT}->{CERTINFO}->{SubjectName};
@@ -603,7 +603,7 @@ sub createRequest {
 
     # handle subject alt names from inital configuration information
     my $newsans = '';
-    if ($config->{INITIALENROLLEMNT} eq 'yes') {
+    if ($entry->{INITIALENROLLEMNT} eq 'yes') {
       CertNanny::Logging->debug("Add SANs for initial enrollment");
       if (exists $entry->{initialenroll}->{san}) {
         push(@{$config_options->{req}}, {req_extensions => "v3_ext"});
@@ -643,7 +643,7 @@ sub createRequest {
       push(@{$config_options->{v3_ext}}, {subjectAltName => $san});
     }
 
-    if ($config->{INITIALENROLLEMNT} eq 'yes') {
+    if ($entry->{INITIALENROLLEMNT} eq 'yes') {
       CertNanny::Logging->debug("Enter initial enrollment section");
 
       if (exists $entry->{initialenroll}->{profile} && $entry->{initialenroll}->{profile} ne '') {
@@ -657,7 +657,7 @@ sub createRequest {
         push(@{$config_options->{req_attributes}}, {'challengePassword' => $entry->{initialenroll}->{auth}->{challengepassword}});
       }
 
-    } ## end if ($self->{INITIALENROLLEMNT...})
+    } ## end if ($entry->{INITIALENROLLEMNT...})
 
     my @engine_cmd;
     if ($self->_hasEngine()) {
@@ -743,7 +743,7 @@ sub selfSign {
 
   my $DN;
   #for inital enrollment we override the DN to use the configured desiered DN rather then the preset enrollment certificates DN
-  if ($config->{INITIALENROLLEMNT} eq 'yes') {
+  if ($entry->{INITIALENROLLEMNT} eq 'yes') {
     $DN = $entry->{initialenroll}->{subject};
   } else {
     $DN = Net::Domain::hostfqdn();

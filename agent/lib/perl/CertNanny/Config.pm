@@ -84,7 +84,6 @@ sub new {
   return $INSTANCE;
 } ## end sub new
 
-
 sub DESTROY {
   $INSTANCE = undef;
 }

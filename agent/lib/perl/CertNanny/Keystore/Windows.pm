@@ -284,6 +284,16 @@ sub installCert {
    
   if(defined $entry->{iis} && defined $entry->{iis}->{ipport}){
   	CertNanny::Logging->debug("found app configuration $entry->{iis}->{appid} try to bind  certificate to port ". $entry->{iis}->{ipport});
+	my @netshdel 	= ('netsh','http', 'delete','sslcert', 'ipport='.$entry->{iis}->{ipport});
+	my $netshdel    = join(" ", @netshdel);
+	CertNanny::Logging->debug("netsh cmd: $netshdel");
+     
+  	if (CertNanny::Util->runCommand(\@netshdel)) {
+    	CertNanny::Logging->error("installCert(): failed to unbind https certificate.");
+    	#return undef;
+  	}
+	
+	
 	my @netsh      = ('netsh','http', 'add','sslcert', 'ipport='.$entry->{iis}->{ipport},'certhash='. $certinfo->{CertificateFingerprint} ,'appid='.$entry->{iis}->{appid} ); 
     my $netsh      = join(" ", @netsh);
     CertNanny::Logging->debug("netsh cmd: $netsh");
@@ -494,10 +504,11 @@ sub importP12 {
   # import pkcs12 file
   # 
   # Input: caller must provide a hash ref:
-  #           FILE         => mandatory: 'path/file.p12'
+  #           FILENAME     => mandatory: 'path/file.p12'
   #           PIN          => mandatory: 'file pin'
   #           ENTRYNAME    => optional:  'capi'
   #           CONF         => optional:  Certnanny Configurationhashref
+  #			  ENTRY         => optional:  Certnanny ENTRY hashref
   # 
   # Output: caller gets a hash ref:
   #           FILENAME    => created pkcs12 file to create
@@ -518,19 +529,17 @@ sub importP12 {
   #   my $self = shift;
   #   return $self->SUPER::importP12(@_) if $self->can("SUPER::importP12");
   # }
-  my $self = shift;
+  #my $self = shift;
   my %args = (@_);    # argument pair list
 
-  my $options   = $self->{OPTIONS};
-  my $entry     = $options->{ENTRY};
-  my $entryname = $options->{ENTRYNAME};
-  my $config    = $options->{CONFIG};
+  my $entry     = $args{ENTRY};
+  my $config    =  $args{CONFIG};
 
   my @cmd;
   push(@cmd, 'certutil');
 
-  # CertNanny::Logging->debug("storelocation:" . $conf->{CONFIG}->{certmonitor}->{$args{ENTRYNAME}}->{storelocation});
   CertNanny::Logging->debug("storelocation:" . $entry->{storelocation});
+  
   if ($entry->{storelocation} eq 'user') {
     CertNanny::Logging->debug("Store location for import is user");
     push(@cmd, '-user');
