@@ -117,7 +117,7 @@ sub _iterate_entries {
         }
       } ## end if ($action eq ' renew'...)
     } ## end else [ if ($keystore) ]
-    print "\n\n";
+   ## print "\n\n";
   } ## end foreach my $entry (keys %{$self...})
 
   return 1;
@@ -185,6 +185,8 @@ sub do_check {
 
   if (!$keystore->{INSTANCE}->k_checkValidity($self->{ITEMS}->{$args{ENTRY}}->{autorenew_days})) {
     CertNanny::Logging->info("Certificate is to be scheduled for automatic renewal ($self->{ITEMS}->{$args{ENTRY}}->{autorenew_days}; days prior to expiry)");
+  }else{
+  	CertNanny::Logging->info("Certificate has not be scheduled for automatic renewal ($self->{ITEMS}->{$args{ENTRY}}->{autorenew_days}; days prior to expiry)");  	
   }
 
   if (!$keystore->{INSTANCE}->k_checkValidity($self->{ITEMS}->{$args{ENTRY}}->{warnexpiry_days})) {
@@ -225,13 +227,15 @@ sub do_enroll {
     if (exists $self->{ITEMS}->{$entryname}->{certreq}) {
       $self->{ITEMS}->{$entryname}->{certreq} = undef;
     }
-
+    
+   
     $keystore = CertNanny::Keystore->new(CONFIG    => $self->{CONFIG},
                                          ENTRY     => $self->{ITEMS}->{$entryname},
                                          ENTRYNAME => $entryname);
 
-    $keystore->{INSTANCE}->{INITIALENROLLEMNT} = 'yes';
-
+    #$keystore->{INSTANCE}->{INITIALENROLLEMNT} = 'yes';
+    $keystore->{INSTANCE}->{OPTIONS}->{ENTRY}->{INITIALENROLLEMNT} = 'yes';
+	
     #disable engine specific configuration
     $keystore->{INSTANCE}->{OPTIONS}->{ENTRY}->{enroll}->{engine_section}  = undef;
     $keystore->{INSTANCE}->{OPTIONS}->{ENTRY}->{enroll}->{sscep}->{engine} = undef;
@@ -244,9 +248,9 @@ sub do_enroll {
     #reset the keystore configuration after the inital enrollment back to the .cfg file specified settings including engine
     $self->{ITEMS}->{$entryname} = $conf->{CONFIG}->{certmonitor}->{$entryname};
 
-    $conf->{CONFIG}->{INITIALENROLLEMNT} = 'yes';
+    #$conf->{CONFIG}->{ENTRY}->{INITIALENROLLEMNT} = 'yes';
 
-    my $newkeystore = CertNanny::Keystore->new(CONFIG    => $self->{CONFIG},
+    my $newkeystore = CertNanny::Keystore->new(CONFIG    => $conf,
                                                ENTRY     => $self->{ITEMS}->{$entryname},
                                                ENTRYNAME => $entryname);
 
@@ -279,13 +283,13 @@ sub do_enroll {
       ##Change keystore attributes to instantitae a openSSL keystore with the entrollment certificate
       $entry->{initialenroll}->{targetType} = $entry->{type};
       $entry->{type}                        = 'OpenSSL';
-      $self->{CONFIG}->{INITIALENROLLEMNT}  = 'yes';
+      $self->{CONFIG}->{ENTRY}->{INITIALENROLLEMNT} = 'yes';
 
       my $newkeystore = CertNanny::Keystore->new(CONFIG    => $self->{CONFIG},
                                                  ENTRY     => $self->{ITEMS}->{$entryname},
                                                  ENTRYNAME => $entryname);
       $newkeystore->{INSTANCE}->k_retrieveState() || croak "Could not write state file $newkeystore->{STATE}->{FILE}";
-      $newkeystore->{INSTANCE}->{INITIALENROLLEMNT} = 'yes';
+      $newkeystore->{INSTANCE}->{ENTRY}->{INITIALENROLLEMNT} = 'yes';
 
       if ($self->{ITEMS}->{$entryname}->{initialenroll}->{auth}->{mode} eq 'password') {
         if (!defined $newkeystore->{INSTANCE}->{OPTIONS}->{ENTRY}->{initialenroll}->{auth}->{challengepassword}) {

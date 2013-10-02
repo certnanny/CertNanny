@@ -118,8 +118,8 @@ sub new {
   croak "Could not initialize keystore handler '$type'. Aborted." unless defined $self->{INSTANCE};
 
   # get certificate
-  if (defined $self->{INSTANCE}->{OPTIONS}->{CONFIG}->{INITIALENROLLEMNT}
-      and $self->{INSTANCE}->{OPTIONS}->{CONFIG}->{INITIALENROLLEMNT} eq 'yes') {
+  if (defined $self->{INSTANCE}->{OPTIONS}->{ENTRY}->{INITIALENROLLEMNT}
+      and $self->{INSTANCE}->{OPTIONS}->{ENTRY}->{INITIALENROLLEMNT} eq 'yes') {
 
     CertNanny::Logging->debug("Initialenrollment keystore that has no certificate to read yet.");
   } else {
@@ -1815,8 +1815,8 @@ sub _sendRequest {
                         '__NEWCERT_NOTAFTER__'  => $newcert->{CERTINFO}->{NotAfter},
                         '__NEWCERT_NOTBEFORE__' => $newcert->{CERTINFO}->{NotBefore},);
 
-    if (exists $self->{INITIALENROLLEMNT}
-        and $self->{INITIALENROLLEMNT} eq 'yes') {
+    if (exists $entry->{INITIALENROLLEMNT}
+        and $entry->{INITIALENROLLEMNT} eq 'yes') {
 
       CertNanny::Logging->debug("Install cert in initial entrollment build p12 first to import into the final location. ");
 
@@ -1858,6 +1858,7 @@ sub _sendRequest {
         my %p12args = (FILENAME  => $outp12,
                        PIN       => $self->{PIN},
                        ENTRYNAME => $entryname,
+                       ENTRY => $entry,
                        CONF      => $conf);
 
         # create pkcs12 file
@@ -1866,7 +1867,9 @@ sub _sendRequest {
         # PIN => cert label to be used in pkcs#12 structure
         # ENTRYNAME => certificate location
         # CONF => keystore config to be implemented
-
+		
+		#CertNanny::Logging->debug("CertNanny::Keystore::${target}::importP12 ". Dumper(%p12args) );
+		
         eval "CertNanny::Keystore::${target}::importP12( %p12args )";
         if ($@) {
           croak "Problem calling importP12 $@";

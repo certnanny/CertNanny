@@ -398,16 +398,17 @@ sub importP12 {
   # import pkcs12 file
   # 
   # Input: caller must provide a hash ref:
-  #           FILE         => mandatory: 'path/file.p12'
+  #           FILENAME     => mandatory: 'path/file.p12'
   #           PIN          => mandatory: 'file pin'
   #           ENTRYNAME    => optional:  'capi'
   #           CONF         => optional:  Certnanny Configurationhashref
+  #			  ENTRY         => optional:  Certnanny ENTRY hashref
   # 
   # Output: caller gets a hash ref:
   #           FILENAME    => created pkcs12 file to create
   # 
   # examples:
-  # $self->importP12({FILE => 'foo.p12', PIN => 'secretpin'});
+  # $self->importP12({FILENAME => 'foo.p12', PIN => 'secretpin'});
   # 
   # Import a p12 with private key and certificate into target keystore
   # also adding the certificate chain if required / included.
@@ -422,8 +423,22 @@ sub importP12 {
   #   my $self = shift;
   #   return $self->SUPER::importP12(@_) if $self->can("SUPER::importP12");
   # }
-  my $self = shift;
-  return $self->SUPER::importP12(@_) if $self->can("SUPER::importP12");
+  #my $self = shift;
+  my %args = (@_);    # argument pair list
+
+  my $entry     = $args{ENTRY};
+  my $config    =  $args{CONFIG};
+
+  if (!CertNanny::Util->writeFile(DSTFILE    => $entry->{location},
+                                  SRCFILE => $args{FILENAME} ,
+                                  FORCE      => 0)) {
+    CertNanny::Logging->error("Could not write new p12 Keystore, file already exists ?!$entry->{location} to $args{FILENAME} ");
+    CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "import pkcs12 file");
+    return undef;
+  }
+
+  CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "import pkcs12 file");
+  return 1;
 } ## end sub importP12
 
 
