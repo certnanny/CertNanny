@@ -123,37 +123,43 @@ sub new {
 
     CertNanny::Logging->debug("Initialenrollment keystore that has no certificate to read yet.");
   } else {
-
-    $self->{CERT} = $self->{INSTANCE}->getCert();
-
-    if (defined $self->{CERT}) {
-      $self->{CERT}->{CERTINFO} = CertNanny::Util->getCertInfoHash(%{$self->{CERT}});
-      CertNanny::Logging->debug("Certificate Information:\n\tSubjectName: " . $self->{CERT}->{CERTINFO}->{SubjectName}  . "\n\t" .
-                                                            "Serial: "      . $self->{CERT}->{CERTINFO}->{SerialNumber} . "\n\t" . 
-                                                            "Issuer: "      . $self->{CERT}->{CERTINFO}->{IssuerName});
-
-      my %convopts = %{$self->{CERT}};
-
-      $convopts{OUTFORMAT}        = 'PEM';
-      $self->{CERT}->{RAW}->{PEM} = CertNanny::Util->convertCert(%convopts)->{CERTDATA};
-      # $self->k_convertCert(%convopts)->{CERTDATA};
-      $convopts{OUTFORMAT}        = 'DER';
-      $self->{CERT}->{RAW}->{DER} = CertNanny::Util->convertCert(%convopts)->{CERTDATA};
-      # $self->k_convertCert(%convopts)->{CERTDATA};
-    } else {
-      CertNanny::Logging->error("Could not parse instance certificate");
-      return undef;
-    }
-    $self->{INSTANCE}->k_setCert($self->{CERT});
-
-  } ## end else [ if (defined $self->{INSTANCE...})]
-
-  # get previous renewal status
-  $self->k_retrieveState() or return;
-
-  # check if we can write to the file
-  $self->k_storeState() || croak "Could not write state file $self->{STATE}->{FILE}";
-
+  	
+	if($self->{INSTANCE}->{OPTIONS}->{ENTRY}->{location} eq "rootonly")
+	{
+		CertNanny::Logging->debug("rootonly keystore that has no certificate to read.");
+		
+	}else{
+	    $self->{CERT} = $self->{INSTANCE}->getCert();
+	
+	    if (defined $self->{CERT}) {
+	      $self->{CERT}->{CERTINFO} = CertNanny::Util->getCertInfoHash(%{$self->{CERT}});
+	      CertNanny::Logging->debug("Certificate Information:\n\tSubjectName: " . $self->{CERT}->{CERTINFO}->{SubjectName}  . "\n\t" .
+	                                                            "Serial: "      . $self->{CERT}->{CERTINFO}->{SerialNumber} . "\n\t" . 
+	                                                            "Issuer: "      . $self->{CERT}->{CERTINFO}->{IssuerName});
+	
+	      my %convopts = %{$self->{CERT}};
+	
+	      $convopts{OUTFORMAT}        = 'PEM';
+	      $self->{CERT}->{RAW}->{PEM} = CertNanny::Util->convertCert(%convopts)->{CERTDATA};
+	      # $self->k_convertCert(%convopts)->{CERTDATA};
+	      $convopts{OUTFORMAT}        = 'DER';
+	      $self->{CERT}->{RAW}->{DER} = CertNanny::Util->convertCert(%convopts)->{CERTDATA};
+	      # $self->k_convertCert(%convopts)->{CERTDATA};
+	    } else {
+	      CertNanny::Logging->error("Could not parse instance certificate");
+	      return undef;
+	    }
+	    $self->{INSTANCE}->k_setCert($self->{CERT});
+	
+	  } ## end else [ if (defined $self->{INSTANCE...})]
+	
+	  # get previous renewal status
+	  $self->k_retrieveState() or return;
+	
+	  # check if we can write to the file
+	  $self->k_storeState() || croak "Could not write state file $self->{STATE}->{FILE}";
+  }
+	
   return $self;
 } ## end sub new
 
@@ -1109,7 +1115,7 @@ sub k_getNextTrustAnchor {
                   my $newCAFileName = join("-", @newCAfilePart);
                   $newCAFileName .= ".pem";
 
-                  my $RootCertFile = File::Spec->catfile($entry->{TrustedRootCA}->{AUTHORITATIVE}->{Dir}, $newCAFileName);
+                  my $RootCertFile = File::Spec->catfile($entry->{TrustedRootCA}->{AUTHORITATIVE}->{Directory}, $newCAFileName);
                   CertNanny::Logging->debug("newRootCertFile:" . $RootCertFile ."\n content: ". $pemCACert);
                   
                   if (!CertNanny::Util->writeFile(DSTFILE    => $RootCertFile,

@@ -129,7 +129,14 @@ sub runCommand {
       <$PROGRAM>;
     };
     close($PROGRAM);
-    CertNanny::Logging->debug("$output") if ($output);
+    
+    if (($output =~ m/\A [[:ascii:]]* \Z/xms)) {
+     	CertNanny::Logging->debug("$output") if ($output);
+	}
+	else {
+	    CertNanny::Logging->debug("output is binary no print") if ($output);
+	}
+    
   }
     
   if ($args{WANTOUT}) {
