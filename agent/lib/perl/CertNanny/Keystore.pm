@@ -419,7 +419,7 @@ sub DESTROY {
 #  #                          Hashcontent ist the parsed certificate
 #  #
 #  # Reads the config Parameters
-#  #   keystore.<name>.TrustedRootCA.GENERATED.Dir
+#  #   keystore.<name>.TrustedRootCA.GENERATED.Directory
 #  #   keystore.<name>.TrustedRootCA.GENERATED.File
 #  #   keystore.<name>.TrustedRootCA.GENERATED.ChainFile
 #  # and look for Trusted Root Certificates. All found certificates are
@@ -1480,7 +1480,7 @@ sub k_syncRootCAs {
   # First fetch available root certificates
   my $rootCertList = $self->k_getRootCerts();
   if (!defined($rootCertList)) {
-    $rc = CertNanny::Logging->error("No root certificates found in " . $config-get("keystore.$entryname.TrustedRootCA.AUTHORITATIVE.Dir", 'FILE'));
+    $rc = CertNanny::Logging->error("No root certificates found in " . $config-get("keystore.$entryname.TrustedRootCA.AUTHORITATIVE.Directory", 'FILE'));
   }
   
   if (!$rc) {

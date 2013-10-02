@@ -42,6 +42,8 @@ use File::Basename;
 use File::Glob qw(:globally :case);
 use Digest::SHA qw(sha1_base64);
 
+use Storable 'dclone';
+use Clone 'clone';
 use Data::Dumper;
 
 use CertNanny::Util;
@@ -49,7 +51,7 @@ use CertNanny::Logging;
 
 use strict;
 
-our @EXPORT    = qw(getConfigFilename getRef get set getFlagRef getFlag setFlag);
+our @EXPORT    = qw(getConfigFilename getRef get set getFlagRef getFlag setFlag pushConf popConf);
 our @EXPORT_OK = ();
 use vars qw(@ISA @EXPORT @EXPORT_OK %EXPORT_TAGS $VERSION);
 use Exporter;
@@ -59,6 +61,7 @@ $VERSION = 0.10;
 #@EXPORT      = qw(...);       # Symbols to autoexport (:DEFAULT tag)
 
 my $INSTANCE;
+my @INSTANCESTACK;
 
 
 sub getInstance {
@@ -83,6 +86,7 @@ sub new {
   }
   return $INSTANCE;
 } ## end sub new
+
 
 sub DESTROY {
   $INSTANCE = undef;
@@ -296,6 +300,37 @@ sub setFlag {
 
   return $self->_set($var, $value, 'CFGFLAG');
 } ## end sub setFlag
+
+
+sub pushConf {
+  # pushes the current config beside
+  # Any modifications will be lost when the next popConf is done
+  my $self   = (shift)->getInstance();
+  
+  my $newConf = Storable::dclone($self);
+  push(@INSTANCESTACK, $newConf);
+
+  return 0;
+} ## end sub pushConf
+
+
+sub popConf {
+  # pop the formerly pushed config back
+  # Any modifications that have been done since the last pushConf are lost
+  my $self   = (shift)->getInstance();
+
+  my $rc = undef;  # Error
+  
+  my $oldConf = pop(@INSTANCESTACK);
+  if ($oldConf) {
+    $INSTANCE = $oldConf;
+    $rc = $INSTANCE;  # No error
+  }
+
+  return $rc
+} ## end sub popConf
+
+
 
 
 sub _deepCopy {
