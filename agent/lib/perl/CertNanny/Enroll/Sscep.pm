@@ -322,7 +322,7 @@ sub getNextCA {
     my $certformat = 'PEM';    # always returned by sscep
     my $certinfo = CertNanny::Util->getCertInfoHash(CERTFILE   => $certfile,
                                                     CERTFORMAT => 'PEM');
-    CertNanny::Logging->debug("info $certfile" . Dumper($certinfo));
+
     if (defined $certinfo) {
       push(@nextcacerts, {CERTINFO => $certinfo});
     }

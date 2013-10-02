@@ -411,27 +411,39 @@ sub do_renew {
       && $self->{ITEMS}->{$args{ENTRY}}->{rootcaupdate}->{enable} eq "true") {
     CertNanny::Logging->debug("RootCA update activated running k_getNextTrustAnchor");
     $keystore->{INSTANCE}->k_getNextTrustAnchor();
+    
+    if( $keystore->{INSTANCE}->k_syncRootCAs() != 0 ){
+    	CertNanny::Logging->debug("syncRoots failed.");
+    };
+    
   } else {
     CertNanny::Logging->debug("RootCA update deactivated");
   }
 
-  if (!$keystore->{INSTANCE}->k_checkValidity(0)) {
-    CertNanny::Logging->error("Certificate has expired. No automatic renewal can be performed.");
-    return 1;
-  }
-
-  if (!$keystore->{INSTANCE}->k_checkValidity($self->{ITEMS}->{$args{ENTRY}}->{autorenew_days})) {
-
-    # schedule automatic renewal
-    CertNanny::Util->backoffTime($self->{CONFIG});
-    $keystore->{INSTANCE}->k_renew();
+  if($self->{ITEMS}->{$args{ENTRY}}->{'location'} eq 'rootonly'){
+  	 CertNanny::Logging->debug("rootonly keystore skip certificfate check and renewal");
   }else{
-  	    CertNanny::Logging->debug("Certificate is still valid for more than $self->{ITEMS}->{ $args{ENTRY} }->{warnexpiry_days} days");
-  }
-
-  if (!$keystore->{INSTANCE}->k_checkValidity($self->{ITEMS}->{$args{ENTRY}}->{warnexpiry_days})) {
-    CertNanny::Logging->notice("Certificate is valid for less than $self->{ITEMS}->{ $args{ENTRY} }->{warnexpiry_days} days");
-    $keystore->{INSTANCE}->k_warnExpiry();
+  	
+  
+	  if (!$keystore->{INSTANCE}->k_checkValidity(0)) {
+	    CertNanny::Logging->error("Certificate has expired. No automatic renewal can be performed.");
+	    return 1;
+	  }
+	
+	  if (!$keystore->{INSTANCE}->k_checkValidity($self->{ITEMS}->{$args{ENTRY}}->{autorenew_days})) {
+	
+	    # schedule automatic renewal
+	    CertNanny::Util->backoffTime($self->{CONFIG});
+	    $keystore->{INSTANCE}->k_renew();
+	  }else{
+	  	    CertNanny::Logging->debug("Certificate is still valid for more than $self->{ITEMS}->{ $args{ENTRY} }->{warnexpiry_days} days");
+	  }
+	
+	  if (!$keystore->{INSTANCE}->k_checkValidity($self->{ITEMS}->{$args{ENTRY}}->{warnexpiry_days})) {
+	    CertNanny::Logging->notice("Certificate is valid for less than $self->{ITEMS}->{ $args{ENTRY} }->{warnexpiry_days} days");
+	    $keystore->{INSTANCE}->k_warnExpiry();
+	  }
+	  
   }
 
   return 1;

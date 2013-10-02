@@ -49,8 +49,28 @@ sub new {
 
   # propagate PIN to class options
   $self->{PIN} = $entry->{key}->{pin};
+ 
 
-  if (defined $entry->{INITIALENROLLEMNT} and $entry->{INITIALENROLLEMNT} eq 'yes') {
+  
+  if($entry->{location} eq 'rootonly')
+  {
+  	 CertNanny::Logging->debug("Instantiate root only keystore skip sanity checks");
+  	 if(!defined $entry->{rootcaupdate}->{enable}){
+  	 	CertNanny::Logging->debug("Rootonly keystored only make sense if rootca update is enabled");
+  	 }
+  	 
+  	 if(!defined $entry->{rootcaupdate}->{quarantinedir}){
+  	 	CertNanny::Logging->debug("Rootonly missing quarantinedir");
+  	 }
+  	 
+  	 if(!defined $entry->{TrustedRootCA}->{AUTHORITATIVE}->{Directory}){
+  	 	CertNanny::Logging->debug("Rootonly missing TrustedRootCA AUTHORITATIVE Directory");
+  	 }
+  	
+  	
+  }else{
+  	
+  if (defined $entry->{INITIALENROLLEMNT} and $entry->{INITIALENROLLEMNT} eq 'yes' ) {
     CertNanny::Logging->info("Initial enrollment mode, skip check for key and cert file");
   } else {
   	#If not an initial enrollment set default to no 
@@ -68,8 +88,8 @@ sub new {
       croak("keystore.location $entry->{location} not defined, does not exist or unreadable");
       return undef;
     }
-  } ## end else [ if (defined $config->...)]
-
+  } ## end else [ if (defined $config->...)]	
+  
   # desired target formats valid is PEM or DER
   foreach my $format (qw(FORMAT KEYFORMAT CACERTFORMAT ROOTCACERTFORMAT)) {
     # assign format if explicitly defined in config
@@ -145,7 +165,7 @@ sub new {
 
   # check if we can write to the file
   $self->k_storeState()    || croak "Could not write state file $self->{STATE}->{FILE}";
-
+  }#location root only 
   # return new keystore object
   return $self;
 } ## end sub new
