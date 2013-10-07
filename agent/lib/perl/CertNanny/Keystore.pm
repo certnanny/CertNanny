@@ -952,7 +952,7 @@ sub k_renew {
     # renewal state machine
     if (   $self->_renewalState() eq "initial"
         or $self->_renewalState() eq "keygenerated") {
-      CertNanny::Logging->debug("State: initial");
+      CertNanny::Logging->info("State: initial");
 
       $self->{STATE}->{DATA}->{RENEWAL}->{REQUEST} = $self->createRequest();
 
@@ -962,14 +962,14 @@ sub k_renew {
       }
       $self->_renewalState("sendrequest");
     } elsif ($self->_renewalState() eq "sendrequest") {
-      CertNanny::Logging->debug("State: sendrequest");
+      CertNanny::Logging->info("State: sendrequest");
 
       if (!$self->_sendRequest()) {
         CertNanny::Logging->error("Could not send request");
         return undef;
       }
     } elsif ($self->_renewalState() eq "completed") {
-      CertNanny::Logging->debug("State: completed");
+      CertNanny::Logging->info("State: completed");
 
       # reset state
       $self->_renewalState(undef);
@@ -1251,7 +1251,7 @@ sub _checkCert {
   }
 
   if ($rc) {
-    CertNanny::Logging->info("Trusted root certificate: " . $certinfo->{SubjectName});
+    CertNanny::Logging->debug("Trusted root certificate: " . $certinfo->{SubjectName});
     $rc = {CERTINFO   => $certinfo,
            CERTFILE   => $certfile,
            CERTFORMAT => $certformat};
@@ -1340,7 +1340,7 @@ sub k_buildCertificateChain {
   # output structure, for building the chain start with the end entity cert
   my @chain = ($cert);
 
-  CertNanny::Logging->info("Building certificate chain");
+  CertNanny::Logging->debug("Building certificate chain");
 BUILDCHAIN:
   while (1) {
     ### check if the first cert in the chain is a root certificate...
@@ -1352,7 +1352,7 @@ BUILDCHAIN:
     my $cert;
     my $issuer_found = 0;
     my $subject      = $chain[0]->{CERTINFO}->{SubjectName};
-    CertNanny::Logging->info("Subject: $subject");
+    CertNanny::Logging->debug("Subject: $subject");
 
   FINDISSUER:
     foreach my $entry (@cacerts, @trustedroots) {
@@ -1375,9 +1375,9 @@ BUILDCHAIN:
       $subject = $entry->{CERTINFO}->{SubjectName};
       if ($issuer_found) {
         if ($issuer_found == 1) {
-          CertNanny::Logging->info("  Issuer identified via AuthKeyID match: $subject");
+          CertNanny::Logging->debug("  Issuer identified via AuthKeyID match: $subject");
         } else {
-          CertNanny::Logging->info("  Issuer identified via DN match: $subject");
+          CertNanny::Logging->debug("  Issuer identified via DN match: $subject");
         }
       } else {
         CertNanny::Logging->debug("  Unrelated: $subject");
@@ -1415,11 +1415,11 @@ BUILDCHAIN:
   my $fingerprint = $chain[0]->{CERTINFO}->{CertificateFingerprint};
   if (!exists $rootcertfingerprint{$fingerprint}) {
     CertNanny::Logging->error("Root certificate is not trusted");
-    CertNanny::Logging->info("Untrusted root certificate DN: " . $chain[0]->{CERTINFO}->{SubjectName});
+    CertNanny::Logging->error("Untrusted root certificate DN: " . $chain[0]->{CERTINFO}->{SubjectName});
     CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "build a certificate chain for the specified certificate");
     return undef;
   }
-  CertNanny::Logging->info("Root certificate is marked as trusted in configuration");
+  CertNanny::Logging->debug("Root certificate is marked as trusted in configuration");
   CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "build a certificate chain for the specified certificate");
 
   return \@chain;
@@ -1640,7 +1640,7 @@ sub _sendRequest {
 
   if (!$self->k_getCaCerts()) {
     CertNanny::Logging->error("Could not get CA certs");
-    #return undef;
+    return undef;
   }
   #CertNanny::Logging->debug("Keystore _sendrequest self" .Dumper($self));
 
@@ -1842,7 +1842,12 @@ sub _sendRequest {
                   KEYFILE      => $self->{STATE}->{DATA}->{RENEWAL}->{REQUEST}->{KEYFILE},
                   CERTFORMAT   => 'PEM',
                   CERTFILE     => $self->{STATE}->{DATA}->{RENEWAL}->{REQUEST}->{CERTFILE},
-                  EXPORTPIN    => $conf->{CONFIG}->{certmonitor}->{$entryname}->{key}->{pin});
+                  EXPORTPIN    => $entry->{initialenroll}->{targetPIN},
+                  PIN    => $conf->{CONFIG}->{certmonitor}->{$entryname}->{key}->{pin}
+                  );
+                  
+       #	CertNanny::Logging->debug("CertNanny::Keystore::_sendRequest ". Dumper(%args) );
+	
 
 # Todo Testen createPKCS12: Passt das noch? Die Methode war im Keystore als Dummy implementiert und nur in den Keys ausprogrammiert, wird aber über $self aufgerufen?!?
 # Todo Testen createPKCS12: Was passiert hier? keine Zuweisung des Ergebnisses ....
@@ -1862,7 +1867,7 @@ sub _sendRequest {
 
       eval {
         my %p12args = (FILENAME  => $outp12,
-                       PIN       => $self->{PIN},
+                       PIN       => $entry->{initialenroll}->{targetPIN},
                        ENTRYNAME => $entryname,
                        ENTRY => $entry,
                        CONF      => $conf);

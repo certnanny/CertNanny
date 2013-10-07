@@ -323,7 +323,8 @@ sub popConf {
   
   my $oldConf = pop(@INSTANCESTACK);
   if ($oldConf) {
-    $INSTANCE = $oldConf;
+  	#$self->_deepForceCopy($oldConf, $INSTANCE);
+  	$INSTANCE = $oldConf;
     $rc = $INSTANCE;  # No error
   }
 
@@ -359,6 +360,29 @@ sub _deepCopy {
 
   1;
 } ## end sub _deepCopy
+
+sub _deepForceCopy {
+  # recursively deep-copy a hash tree, NOT overwriting already existing
+  # values in destination tree
+  my $self   = (shift)->getInstance();
+  my $source = shift;
+  my $dest   = shift;
+
+  foreach my $key (keys %{$source}) {
+    if (ref($source->{$key}) eq "HASH") {
+      # create new node if it does not exist yet
+      $dest->{$key} = {} unless exists $dest->{$key};
+      $self->_deepCopy($source->{$key}, $dest->{$key});
+    } else {
+        $dest->{$key} = $source->{$key};
+    }
+  } ## end foreach my $key (keys %{$source...})
+
+  1;
+} ## end sub _deepForceCopy
+
+
+
 
 
 sub _inheritConfig {

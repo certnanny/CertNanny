@@ -17,7 +17,7 @@ use Carp;
 
 # use IO::File;
 # use File::Spec;
-# use File::Copy;
+use File::Copy;
 # use File::Basename;
 use Data::Dumper;
 
@@ -428,11 +428,14 @@ sub importP12 {
 
   my $entry     = $args{ENTRY};
   my $config    =  $args{CONFIG};
-
-  if (!CertNanny::Util->writeFile(DSTFILE    => $entry->{location},
-                                  SRCFILE => $args{FILENAME} ,
-                                  FORCE      => 0)) {
-    CertNanny::Logging->error("Could not write new p12 Keystore, file already exists ?!$entry->{location} to $args{FILENAME} ");
+  #CertNanny::Logging->debug( "import pkcs12 file entry". Dumper($entry));
+ 
+  if(! copy($args{FILENAME},$entry->{initialenroll}->{targetLocation})){
+  	 CertNanny::Logging->error("Could not write new p12 Keystore, file already exists ?!$entry->{location} to $args{FILENAME} ");
+#  if (!CertNanny::Util->writeFile(DSTFILE    => $entry->{initialenroll}->{targetLocation},
+#                                 SRCFILE => $args{FILENAME} ,
+#                                  FORCE      => 0)) {
+#    CertNanny::Logging->error("Could not write new p12 Keystore, file already exists ?!$entry->{location} to $args{FILENAME} ");
     CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "import pkcs12 file");
     return undef;
   }
