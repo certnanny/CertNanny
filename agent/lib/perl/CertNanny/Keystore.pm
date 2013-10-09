@@ -1038,10 +1038,11 @@ sub k_getNextTrustAnchor {
     my $enroller = $self->_getEnroller();
     my %certs    = $enroller->getNextCA($certchainfile);
 
-    if (%certs) {
+    if (exists $certs{SIGNERCERT} and exists $certs{NEXTCACERTS}  ) {
       my $signerCertificate = $certs{SIGNERCERT};
       my @newrootcerts      = @{$certs{NEXTCACERTS}};
-
+      
+      
       # list of trusted root certificates
       my @trustedroots = @{$self->{STATE}->{DATA}->{ROOTCACERTS}};
     
@@ -1835,6 +1836,10 @@ sub _sendRequest {
       my $conf = CertNanny::Config->new($self->{OPTIONS}->{CONFIG}->{CONFIGFILE});
       ##reset location to be passed correctly to the post install hook
       $entry->{location} = $conf->{CONFIG}->{certmonitor}->{$entryname}->{location};
+      
+      if(!$entry->{initialenroll}->{targetPIN}  or $entry->{initialenroll}->{targetPIN} eq ""){
+      	$entry->{initialenroll}->{targetPIN} = $conf->{CONFIG}->{certmonitor}->{$entryname}->{key}->{pin};
+      }
 
       my %args = (FILENAME     => $outp12,
                   FRIENDLYNAME => 'cert1',
@@ -1851,10 +1856,14 @@ sub _sendRequest {
 
 # Todo Testen createPKCS12: Passt das noch? Die Methode war im Keystore als Dummy implementiert und nur in den Keys ausprogrammiert, wird aber über $self aufgerufen?!?
 # Todo Testen createPKCS12: Was passiert hier? keine Zuweisung des Ergebnisses ....
-      $self->createPKCS12(%args);
+      my $exportp12 = $self->createPKCS12(%args);
       CertNanny::Logging->debug("Created importp12 file :" . $importp12);
       my $target = $entry->{initialenroll}->{targetType};
       CertNanny::Logging->debug("Target keystore:" . $target);
+      if(!$exportp12){
+      	CertNanny::Logging->error("Failed to create importP12 abort initial" . $target);
+      	return 0;
+      }
 
       eval {
         eval "require CertNanny::Keystore::$target";
