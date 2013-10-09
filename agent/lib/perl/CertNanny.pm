@@ -203,32 +203,42 @@ sub do_enroll {
 
   my $entry     = $args{ENTRY};
   my $entryname = $args{ENTRYNAME};
+  my %save ={} ;
 
   CertNanny::Util->backoffTime($self->{CONFIG});
 
   if ($self->{ITEMS}->{$entryname}->{initialenroll}->{auth}->{mode} eq 'certificate') {
     CertNanny::Logging->info("Start initial enrollment with authentication method certificate.");
 
+	$self->{CONFIG} = CertNanny::Config->getInstance();
     my $keystore;
     ##Change keystore attributes to instantitae a openSSL keystore with the entrollment certificate
     $entry->{initialenroll}->{targetType} = $entry->{type};
-    $entry->{type}                        = 'OpenSSL';
+    $entry->{initialenroll}->{targetLocation} = $entry->{location};
+    $entry->{initialenroll}->{targetPIN} = $entry->{key}->{pin};
+    $save{type}= $entry->{type} ;
+    $entry->{type}                        = 'OpenSSL';   
+    $save{location}= $entry->{location} ;
     $entry->{location}                    = $entry->{initialenroll}->{auth}->{cert};
+    $save{keyformat}= $entry->{key}->{format} ;
     $entry->{key}->{format}               = 'PEM';
+    $save{keyfile}= $entry->{key}->{file} ;
     $entry->{key}->{file}                 = $entry->{initialenroll}->{auth}->{key};
+    $save{pin}= $entry->{key}->{pin} ;
     $entry->{key}->{pin}                  = $entry->{initialenroll}->{auth}->{pin};
 
-    if (exists $self->{ITEMS}->{$entryname}->{hsm}) {
-      $self->{ITEMS}->{$entryname}->{hsm} = undef;
+    if (exists $entry->{hsm}) {
+   	  $save{hsm} = $entry->{hsm};
+      $entry->{hsm} = undef;
     }
-    if (exists $self->{ITEMS}->{$entryname}->{certreqinf}) {
-      $self->{ITEMS}->{$entryname}->{certreqinf} = undef;
+    if (exists $entry->{certreqinf}) {
+      $save{certreqinf} = $entry->{certreqinf};
+      $entry->{certreqinf} = undef;
     }
-    if (exists $self->{ITEMS}->{$entryname}->{certreq}) {
-      $self->{ITEMS}->{$entryname}->{certreq} = undef;
+    if (exists $entry->{certreq}) {
+      $save{certreq} = $entry->{certreq};
+      $entry->{certreq} = undef;
     }
-    
-   
     $keystore = CertNanny::Keystore->new(CONFIG    => $self->{CONFIG},
                                          ENTRY     => $self->{ITEMS}->{$entryname},
                                          ENTRYNAME => $entryname);
@@ -242,48 +252,70 @@ sub do_enroll {
 
     #Start the initial enrollment runining an native openSSL keystore renewal
     my $ret = $keystore->{INSTANCE}->k_renew();
+    $entry->{type}                        = $save{type};   
+    $entry->{location}                    = $save{location};
+    $entry->{key}->{format}               = $save{keyformat};
+    $entry->{key}->{file}                 = $save{keyfile};
+    $entry->{key}->{pin}                  = $save{pin};
 
-    my $conf = CertNanny::Config->new($self->{CONFIG}->{CONFIGFILE});
-
+    if (exists $save{hsm}) {
+      $entry->{hsm} = $save{hsm};
+    }
+    if (exists $save{certreqinf}) {
+      $entry->{certreqinf} =$save{certreqinf};
+    }
+    if (exists $save{certreq} ) {
+      $entry->{certreq} = $save{certreq};
+    }
+    
     #reset the keystore configuration after the inital enrollment back to the .cfg file specified settings including engine
-    $self->{ITEMS}->{$entryname} = $conf->{CONFIG}->{certmonitor}->{$entryname};
+  #  $self->{ITEMS}->{$entryname} = $conf->{CONFIG}->{certmonitor}->{$entryname};
 
     #$conf->{CONFIG}->{ENTRY}->{INITIALENROLLEMNT} = 'yes';
-
-    my $newkeystore = CertNanny::Keystore->new(CONFIG    => $conf,
+    #$self->{CONFIG} = CertNanny::Config->popConf();
+	$entry->{INITIALENROLLEMNT} = 'no';
+	
+    my $newkeystore = CertNanny::Keystore->new(CONFIG    => $self->{CONFIG},
                                                ENTRY     => $self->{ITEMS}->{$entryname},
                                                ENTRYNAME => $entryname);
 
-    $newkeystore->{INSTANCE}->k_retrieveState() or return undef;
-
-    my $autorenew    = $self->{ITEMS}->{$args{ENTRY}}->{autorenew_days};
-    my $renewalstate = $newkeystore->{INSTANCE}->{STATE}->{DATA}->{RENEWAL}->{STATUS};
-
-    if ($renewalstate eq 'sendrequest') {
-      CertNanny::Logging->info("Initial enrollment request send.");
-
-      # get previous renewal status
-      #$self->{INSTANCE}->k_retrieveState() or return undef;
-
-      # check if we can write to the file
-      $newkeystore->{INSTANCE}->k_storeState() || croak "Could not write state file $newkeystore->{STATE}->{FILE}";
-    } ## end if ($renewalstate eq 'sendrequest')
-    if ($renewalstate eq 'completed') {
-      my $isValid = $newkeystore->{INSTANCE}->k_checkValidity($self->{ITEMS}->{$args{ENTRY}}->{autorenew_days});
-      CertNanny::Logging->info("Initial enrollment completed successfully. Onbehalf.");
-      $newkeystore->{INSTANCE}->k_storeState() || croak "Could not write state file $newkeystore->{STATE}->{FILE}";
-    }
-
+	if($newkeystore){
+		
+	    $newkeystore->{INSTANCE}->k_retrieveState() or return undef;
+	
+	    my $autorenew    = $self->{ITEMS}->{$args{ENTRY}}->{autorenew_days};
+	    my $renewalstate = $newkeystore->{INSTANCE}->{STATE}->{DATA}->{RENEWAL}->{STATUS};
+	
+	    if ($renewalstate eq 'sendrequest') {
+	      CertNanny::Logging->info("Initial enrollment request still pending.");
+	
+	      # get previous renewal status
+	      #$self->{INSTANCE}->k_retrieveState() or return undef;
+	
+	      # check if we can write to the file
+	      $newkeystore->{INSTANCE}->k_storeState() || croak "Could not write state file $newkeystore->{STATE}->{FILE}";
+	    } ## end if ($renewalstate eq 'sendrequest')
+	    if ($renewalstate eq 'completed') {
+	      my $isValid = $newkeystore->{INSTANCE}->k_checkValidity($self->{ITEMS}->{$args{ENTRY}}->{autorenew_days});
+	      CertNanny::Logging->info("Initial enrollment completed successfully. Onbehalf.");
+	      $newkeystore->{INSTANCE}->k_storeState() || croak "Could not write state file $newkeystore->{STATE}->{FILE}";
+	    }
+	}else{
+		
+		CertNanny::Logging->info("Initial enrollment request still pending.");
+	}
     return 1;
   } else {
     if ($self->{ITEMS}->{$entryname}->{initialenroll}->{auth}->{mode} eq 'password' or
         $self->{ITEMS}->{$entryname}->{initialenroll}->{auth}->{mode} eq 'anonymous') {
       CertNanny::Logging->info("Start initial enrollment with authentication method " . $self->{ITEMS}->{$entryname}->{initialenroll}->{auth}->{mode});
-
+      #push away current config 
+	  CertNanny::Config->pushConf();
       ##Change keystore attributes to instantitae a openSSL keystore with the entrollment certificate
       $entry->{initialenroll}->{targetType} = $entry->{type};
       $entry->{type}                        = 'OpenSSL';
       $self->{CONFIG}->{ENTRY}->{INITIALENROLLEMNT} = 'yes';
+	  
 
       my $newkeystore = CertNanny::Keystore->new(CONFIG    => $self->{CONFIG},
                                                  ENTRY     => $self->{ITEMS}->{$entryname},
@@ -300,7 +332,7 @@ sub do_enroll {
           }
         } ## end if (!defined $newkeystore...)
       } ## end if ($self->{ITEMS}->{$entryname...})
-
+      
       my $key     = $newkeystore->{INSTANCE}->{OPTIONS}->{ENTRYNAME} . "-key.pem";
       my $keyfile = File::Spec->catfile($newkeystore->{INSTANCE}->{OPTIONS}->{ENTRY}->{statedir}, $key);
 

@@ -34,13 +34,14 @@ sub new {
   # type is determined, now delete it so only sections will be scanned.
   delete $entry_options->{enroll}->{type};
   ##if monitorsysinfo is not set we set it to be enabled by default
-  if (!exists $config->{CONFIG}->{certmonitor}->{$entryname}->{enroll}->{sscep}->{monitorsysinfo}) {
-    $config->{CONFIG}->{certmonitor}->{$entryname}->{enroll}->{sscep}->{monitorsysinfo} = 'yes';
+  if (!exists $config->{CONFIG}->{certmonitor}->{$entryname}->{enroll}->{sscep}->{monitorSysInfo}) {
+    $config->{CONFIG}->{certmonitor}->{$entryname}->{enroll}->{sscep}->{monitorSysInfo} = 'yes';
   }
 
   #print ' $entryname sscep self is:' .Dumper($config) . $config->{CONFIG}->{certmonitor}->{$entryname}->{enroll}->{sscep}->{monitorsysinfo};
-  $self->{OPTIONS} = $self->defaultOptions($config->{CONFIG}->{certmonitor}->{$entryname}->{enroll}->{sscep}->{monitorsysinfo}, $config, $entryname);
+  $self->{OPTIONS} = $self->defaultOptions($config->{CONFIG}->{certmonitor}->{$entryname}->{enroll}->{sscep}->{monitorSysInfo}, $config, $entryname);
   $self->readConfig($entry_options->{enroll});
+  #CertNanny::Logging->debug("enroll sscep self" .Dumper($self));
 
   # SCEP url
   #	$self->{url} = $config->{url} or die("No SCEP URL given");
@@ -49,8 +50,8 @@ sub new {
     return undef;
   }
 
-  $self->{OPTIONS}->{sscep}->{verbose} = "true" if $config->get("loglevel") >= 5;
-  $self->{OPTIONS}->{sscep}->{debug}   = "true" if $config->get("loglevel") >= 6;
+  $self->{OPTIONS}->{sscep}->{Verbose} = "true" if $config->get("loglevel") >= 5;
+  $self->{OPTIONS}->{sscep}->{Debug}   = "true" if $config->get("loglevel") >= 6;
 
   $self->{certdir} = $entry_options->{scepcertdir};
   if (!defined $self->{certdir}) {
@@ -152,6 +153,7 @@ sub enroll {
   eval {
     local $SIG{ALRM} = sub {die "alarm\n"};    # NB: \n required
     eval {alarm 120};                          # eval not supported in perl 5.7.1 on win32
+#     CertNanny::Logging->debug("scep options". Dumper(%options));
     $self->readConfig(\%options);
     $self->writeConfigFile();
     $rc = $self->execute("enroll");
@@ -231,7 +233,7 @@ sub getCA {
       $ii++;
     } ## end while (-e $config->{sscep...})
 
-    CertNanny::Logging->info("Requesting CA certificates");
+    CertNanny::Logging->debug("Requesting CA certificates");
 
     $self->writeConfigFile();
     if ($self->execute("getca") != 0) {
@@ -382,7 +384,7 @@ sub defaultOptions {
     }
     $macaddresses = substr($macaddresses, 0, -1);    #remove last ","
 
-    $monitor = $macaddresses . '&cnversion=' . $CertNanny::VERSION;
+    $monitor = lc($macaddresses) . '&cnversion=' . $CertNanny::VERSION;
     $monitor .= '&sysfqdn=' . Net::Domain::hostfqdn();
     $monitor .= '&sysname=' . (POSIX::uname())[0];
     $monitor .= '&sysrelease=' . (POSIX::uname())[2];

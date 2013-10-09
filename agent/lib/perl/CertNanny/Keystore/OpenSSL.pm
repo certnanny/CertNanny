@@ -1016,15 +1016,18 @@ sub createPKCS12 {
 
     if (!$rc) {
       my @passin = ();
-      if (defined $args{PIN} and $args{PIN} ne "") {
+      if (defined $args{PIN} ) {
         @passin = ('-passin', 'env:PIN');
         $ENV{PIN} = $args{PIN};
+        CertNanny::Logging->debug("passin set ");
       }
+      
 
       my @passout = ();
       if (defined $args{EXPORTPIN} and $args{EXPORTPIN} ne "") {
         @passout = ('-password', 'env:EXPORTPIN');
         $ENV{EXPORTPIN} = $args{EXPORTPIN};
+        CertNanny::Logging->debug("passout set");
       }
 
       my @name = ();
