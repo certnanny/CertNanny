@@ -62,6 +62,7 @@ $VERSION = 0.10;
 
 my $INSTANCE;
 my @INSTANCESTACK;
+my $INSTANCESTACKIDX;
 
 
 sub getInstance {
@@ -78,6 +79,7 @@ sub new {
     my $self = {};
     bless $self, $class;
     $INSTANCE = $self;
+    $INSTANCESTACKIDX = -1;
 
     $self->{CONFIGFILE} = $args{CONFIG} || 'certnanny.cfg';
     $self->{CONFIGPATH} = (fileparse($self->{CONFIGFILE}))[1];
@@ -302,34 +304,68 @@ sub setFlag {
 } ## end sub setFlag
 
 
-sub pushConf {
-  # pushes the current config beside
-  # Any modifications will be lost when the next popConf is done
-  my $self   = (shift)->getInstance();
-  
-  my $newConf = Storable::dclone($self);
-  push(@INSTANCESTACK, $newConf);
+#sub pushConf {
+#  # pushes the current config beside
+#  # Any modifications will be lost when the next popConf is done
+#  my $self   = (shift)->getInstance();
+#  
+#  my $newConf = Storable::dclone($self);
+#  # push(@INSTANCESTACK, $newConf);
+#  # Don't ask me why: pop kills $INSTANCE. Therefor I do it by foot
+#  $INSTANCESTACKIDX++;
+#  $INSTANCESTACK[$INSTANCESTACKIDX] = $newConf;
+#
+#  return 0;
+#} ## end sub pushConf
 
-  return 0;
-} ## end sub pushConf
 
-
-sub popConf {
-  # pop the formerly pushed config back
-  # Any modifications that have been done since the last pushConf are lost
-  my $self   = (shift)->getInstance();
-
-  my $rc = undef;  # Error
-  
-  my $oldConf = pop(@INSTANCESTACK);
-  if ($oldConf) {
-    $INSTANCE = $oldConf;
-    $rc = $INSTANCE;  # No error
-  }
-
-  return $rc
-} ## end sub popConf
-
+#sub popConf {
+#
+#  sub _deepPop {
+#    # recursively deep-copy a hash tree, overwriting already existing
+#    # values in destination tree
+#    my $source = shift;
+#    my $dest   = shift;
+#
+#    # delete all existing keys in dest that are not hashes
+#    foreach my $key (keys %{$dest}) {
+#      if (ref($dest->{$key}) ne "HASH") {
+#        delete($dest->{$key});
+#      }
+#    }
+#  
+#    foreach my $key (keys %{$source}) {
+#      if (ref($source->{$key}) eq "HASH") {
+#        # create new node if it does not exist yet
+#        $dest->{$key} = {} unless exists $dest->{$key};
+#        _deepPop($source->{$key}, $dest->{$key});
+#      } else {
+#        # use default/parent value
+#        $dest->{$key} = $source->{$key};
+#      }
+#    } ## end foreach my $key (keys %{$source...})
+#    return 1;
+#  } ## end sub _deepPop
+#
+#  # pop the formerly pushed config back
+#  # Any modifications that have been done since the last pushConf are lost
+#  my $self = (shift)->getInstance();
+#
+#  my $rc = undef;  # Error
+#  
+#  # my $oldConf = pop(@INSTANCESTACK);
+#  # Don't ask me why: pop kills $INSTANCE. Therefor I do it by foot
+#  if ($INSTANCESTACKIDX >= 0) {
+#    my $oldConf = $INSTANCESTACK[$INSTANCESTACKIDX];
+#    if ($oldConf) {
+#      _deepPop($oldConf, $INSTANCE);
+#      $rc = $INSTANCE;  # No error
+#    }
+#    $INSTANCESTACKIDX--;
+#  }
+#
+#  return $rc
+#} ## end sub popConf
 
 
 

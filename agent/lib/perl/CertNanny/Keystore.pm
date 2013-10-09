@@ -48,11 +48,11 @@ sub new {
   my $self = {};
   bless $self, $class;
   
-#  # Store singleton objects in CertNanny
-#  $self->{CONFIG}  = CertNanny::Config->getInstance(%args); return undef unless defined $self->{CONFIG};
-#  $self->{UTIL}    = CertNanny::Util->getInstance(CONFIG => $self->{CONFIG});
-#  $self->{LOGGING} = CertNanny::Logging->getInstance(CONFIG => $self->{CONFIG});
-#
+  #  # Store singleton objects in CertNanny
+  #  $self->{CONFIG}  = CertNanny::Config->getInstance(%args); return undef unless defined $self->{CONFIG};
+  #  $self->{UTIL}    = CertNanny::Util->getInstance(CONFIG => $self->{CONFIG});
+  #  $self->{LOGGING} = CertNanny::Logging->getInstance(CONFIG => $self->{CONFIG}); 
+  #
   # sanity check keystore config parameters
   # keystore must be available
   my $type = $args{ENTRY}->{type};
@@ -61,17 +61,15 @@ sub new {
     return undef;
   }
   
-  #CertNanny::Logging->debug("Keystore args dump:". Dumper( $args{ENTRY} ));
+  # CertNanny::Logging->debug("Keystore args dump:". Dumper( $args{ENTRY} ));
  
   # statedir and scepcertdir must exist and be writeable
   foreach my $item (qw(statedir scepcertdir)) {
     if (!exists $args{ENTRY}->{$item}) {croak "No $item specified for keystore " . $args{ENTRY}->{location};}
-
     if (!-d $args{ENTRY}->{$item})     {croak "$item directory $args{ENTRY}->{$item} does not exist";}
-
-    if (   !-x $args{ENTRY}->{$item}
-        or !-r $args{ENTRY}->{$item}
-        or !-w $args{ENTRY}->{$item})  {croak "Insufficient permissions for $item $args{ENTRY}->{$item}";}
+    if (!-x $args{ENTRY}->{$item} or
+        !-r $args{ENTRY}->{$item} or
+        !-w $args{ENTRY}->{$item})  {croak "Insufficient permissions for $item $args{ENTRY}->{$item}";}
   } ## end foreach my $item (qw(statedir scepcertdir))
 
   # if there is no statefile defined, create one
@@ -120,25 +118,21 @@ sub new {
   # get certificate
   if (defined $self->{INSTANCE}->{OPTIONS}->{ENTRY}->{INITIALENROLLEMNT}
       and $self->{INSTANCE}->{OPTIONS}->{ENTRY}->{INITIALENROLLEMNT} eq 'yes') {
-
     CertNanny::Logging->debug("Initialenrollment keystore that has no certificate to read yet.");
   } else {
-  	
-	if($self->{INSTANCE}->{OPTIONS}->{ENTRY}->{location} eq "rootonly")
-	{
-		CertNanny::Logging->debug("rootonly keystore that has no certificate to read.");
-		
-	}else{
+  	if ($self->{INSTANCE}->{OPTIONS}->{ENTRY}->{location} eq "rootonly") {
+	     CertNanny::Logging->debug("rootonly keystore that has no certificate to read.");
+	  } else {
 	    $self->{CERT} = $self->{INSTANCE}->getCert();
 	
-	    if (defined $self->{CERT}) {
+  	  if (defined $self->{CERT}) {
 	      $self->{CERT}->{CERTINFO} = CertNanny::Util->getCertInfoHash(%{$self->{CERT}});
 	      CertNanny::Logging->debug("Certificate Information:\n\tSubjectName: " . $self->{CERT}->{CERTINFO}->{SubjectName}  . "\n\t" .
 	                                                            "Serial: "      . $self->{CERT}->{CERTINFO}->{SerialNumber} . "\n\t" . 
 	                                                            "Issuer: "      . $self->{CERT}->{CERTINFO}->{IssuerName});
 	
-	      my %convopts = %{$self->{CERT}};
-	
+  	    my %convopts = %{$self->{CERT}};
+	       
 	      $convopts{OUTFORMAT}        = 'PEM';
 	      $self->{CERT}->{RAW}->{PEM} = CertNanny::Util->convertCert(%convopts)->{CERTDATA};
 	      # $self->k_convertCert(%convopts)->{CERTDATA};
@@ -150,8 +144,7 @@ sub new {
 	      return undef;
 	    }
 	    $self->{INSTANCE}->k_setCert($self->{CERT});
-	
-	  } ## end else [ if (defined $self->{INSTANCE...})]
+  	} ## end else [ if (defined $self->{INSTANCE...})]
 	
 	  # get previous renewal status
 	  $self->k_retrieveState() or return;
@@ -1503,6 +1496,8 @@ sub k_syncRootCAs {
     # inconsistence rebuild DIR, FILE or CHAINIFLE
     foreach my $target ('DIRECTORY', 'FILE', 'CHAINFILE', 'LOCATION') {
       # Fetch installed root certificates into
+# Todo Dumper Löschen      
+print Dumper($target);
       my $installedRootCAs = $self->getInstalledRoots(TARGET => $target);
   
       my $rebuild = 0;
