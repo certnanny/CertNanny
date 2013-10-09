@@ -746,13 +746,20 @@ sub getInstalledRoots {
   #
   # get all installed root certificates
   #
-  # Input: -
+  # Input:  caller must provide a hash ref:
+  #           TARGET      => optional : where should the procedure search for installed
+  #                          root certificates (DIRECTORY|FILE|CHAINFILE|LOCATION)
+  #                          default: all
   # 
   # Output: caller gets a hash ref:
-  #           ROOTCERTS   => Hash containing array of currently installed root 
-  #                          certificates
-  #                          Hashkey is tha SHA1 of the certificate
-  #                          Hashcontent ist the parsed certificate
+  #           Hashkey is the SHA1 of the certificate
+  #           Hashcontent ist the parsed certificate
+  #             - CERTDATA      mandatory: certificate data
+  #             - CERTINFO      mandatory: parsed certificat info
+  #             - CERTFILE       optional (not present): certificate file
+  #             - CERTALIAS      optional (present): certificate alias name
+  #             - CERTCREATEDATE optional (present): certificate creation date
+  #             - CERTTYPE       optional (present): certificate type
   #
   # Reads the config Parameters
   #   keystore.<name>.TrustedRootCA.GENERATED.Directory
@@ -769,8 +776,53 @@ sub getInstalledRoots {
   #   my $self = shift;
   #   return $self->SUPER::getInstalledRoots(@_) if $self->can("SUPER::getInstalledRoots");
   # }
+  CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "get all installed root certificates");
   my $self = shift;
-  return $self->SUPER::getInstalledRoots(@_) if $self->can("SUPER::getInstalledRoots");
+  my %args = (@_);
+
+  my $options   = $self->{OPTIONS};
+  my $entry     = $options->{ENTRY};
+  my $entryname = $options->{ENTRYNAME};
+  my $config    = $options->{CONFIG};
+  
+  my $rc = 0;
+  my $certFound = {};
+  
+  if (!defined($args{TARGET}) or ($args{TARGET} eq 'LOCATION')) {
+    if (defined(my $locName = $config->get("keystore.$entryname.location", 'FILE'))) {
+      my ($certRef, @certList, $certData, $certSha1, $certAlias, $certCreateDate, $certType, $certFingerprint);
+      my @cmd = $self->_buildGskCmd($locName, '-list');
+      @certList = CertNanny::Util->runCommand(\@cmd, WANTOUT => 1, HIDEPWD => 1);
+      foreach (@certList) {
+        if ($_ =~ m/^([^,]*), ([0-3][0-9]\.[0-1][0-9]\.20[0-9][0-9]), (PrivateKeyEntry|trustedCertEntry),.*$/) { # gets Privat Key as well
+        # if ($_ =~ m/^([^,]*), ([0-3][0-9]\.[0-1][0-9]\.20[0-9][0-9]), (trustedCertEntry),.*$/) {
+          ($certAlias, $certCreateDate, $certType) = ($1, $2, $3);
+        }
+        if ($_ =~ m/^[^:]*\): ([0-9A-F:]*).*$/) {
+          $certFingerprint = $1;
+          @cmd = $self->_buildKeytoolCmd($locName, '-list', '-rfc', '-alias', $certAlias);
+
+          $certData = CertNanny::Util->runCommand(\@cmd, WANTOUT => 1, HIDEPWD => 1);
+          $certRef  = $self->getCert(CERTDATA => $certData);
+          while ($certRef and ($certData = $certRef->{CERTDATA})) {
+            $certSha1 = CertNanny::Util->getCertSHA1(%{$certRef});
+            
+            $certFound->{$certSha1->{CERTSHA1}}->{CERTALIAS}       = $certAlias;
+            $certFound->{$certSha1->{CERTSHA1}}->{CERTCREATEDATE}  = $certCreateDate;
+            $certFound->{$certSha1->{CERTSHA1}}->{CERTTYPE}        = $certType;
+            $certFound->{$certSha1->{CERTSHA1}}->{CERTFINGERPRINT} = $certFingerprint;
+            $certFound->{$certSha1->{CERTSHA1}}->{CERTDATA}        = $certData;
+            $certFound->{$certSha1->{CERTSHA1}}->{CERTFORMAT}      = $certRef->{CERTFORMAT};
+            $certFound->{$certSha1->{CERTSHA1}}->{CERTINFO}        = CertNanny::Util->getCertInfoHash(CERTDATA => $certData);
+            
+            $certRef  = $self->getCert(CERTDATA => $certRef->{CERTREST});
+          }
+        }
+      }
+    }
+  }
+  CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "get all installed root certificates");
+  return $certFound;
 } ## end sub getInstalledRoots
 
 
@@ -812,6 +864,8 @@ sub installRoots {
   # Beispiel:
   # #!/bin/bash
   # 
+  # gsk7cmd_64 -cert -import -db certnanny.reworktest.db.com_certnannyOpenSSL.p12new -pw yPdNQfoR55RTajom7VU44g -target key.kdb -target_pw 1234567890 -label cert1
+  #
   # #create gsk7 keystore
   # gsk7capicmd_64 -keydb -create -db name_your_db -pw password1
   # 
@@ -831,40 +885,124 @@ sub installRoots {
   # #Error 146: GSKKM_ERR_INVALID_CERT_CHAIN
   # #Part of the certificate chain is missing
 
+  CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "Install all available root certificates");
   my $self = shift;
-  return $self->SUPER::installRoots(@_) if $self->can("SUPER::installRoots");
+  my %args = (@_);
+
+  my $options   = $self->{OPTIONS};
+  my $entry     = $options->{ENTRY};
+  my $entryname = $options->{ENTRYNAME};
+  my $config    = $options->{CONFIG};
+  
+  # set rc 0 if TARGET is not defined or TARGET is LOCATION otherwise 1
+  my $rc = (defined($args{TARGET}) and ($args{TARGET} ne 'LOCATION'));
+  
+  # run only if no TARGET is defined or TARGET is LOCATION
+  if (!$rc) {
+    my $installedRootCAs = $args{INSTALLED};
+    my $availableRootCAs = $args{AVAILABLE};
+
+    my @cmd;
+    my $certData;
+
+    if (!defined($availableRootCAs)) {
+      my $rootCertList = $self->k_getRootCerts();
+      if (!defined($rootCertList)) {
+        $rc = CertNanny::Logging->error("No root certificates found in " . $config-get("keystore.$entryname.TrustedRootCA.AUTHORITATIVE.Directory", 'FILE'));
+      }
+  
+      if (!$rc) {
+        my $availableRootCAs = {};
+        # Foreach available root cert get the SHA1
+        foreach my $certRef (@{$rootCertList}) {
+          my $certSHA1 = CertNanny::Util->getCertSHA1(%{$certRef})->{CERTSHA1};
+          if (exists($availableRootCAs->{$certSHA1})) {
+            if (exists($availableRootCAs->{$certSHA1}->{CERTFILE}) and ($certRef->{CERTFILE})) {
+              CertNanny::Logging->debug("Identical root certificate in <" . $availableRootCAs->{$certSHA1}->{CERTFILE} . "> and <" . $certRef->{CERTFILE} . ">");
+            } else {
+              CertNanny::Logging->debug("Identical root certificate <" . $availableRootCAs->{$certSHA1}->{CERTINFO}->{SubjectName} . "> found.");
+            }
+          } else {
+            $availableRootCAs->{$certSHA1} = $certRef;
+          }
+        }
+      }
+    }
+
+    if (!defined($availableRootCAs)) {
+      $rc = CertNanny::Logging->error("No root certificates found in " . $config-get("keystore.$entryname.TrustedRootCA.AUTHORITATIVE.dir", 'FILE'));
+    } else {
+      # build a new temp keystore; Start with a copy of the existing one
+      my $locName = $self->_generateKeystore();
+      $rc = 1 if (!$locName);
+      if (!$rc) {
+        # delete every root CA, that does not exist in $availableRootCAs from keystore
+        foreach my $certSHA1 (keys ($installedRootCAs)) {
+          if (!exists($availableRootCAs->{$certSHA1})) {
+            CertNanny::Logging->debug("Deleting root cert " . $installedRootCAs->{$certSHA1}->{CERTINFO}->{SubjectName});
+            @cmd = $self->_buildKeytoolCmd($locName, '-delete', '-alias', $installedRootCAs->{$certSHA1}->{CERTALIAS});
+            if (CertNanny::Util->runCommand(\@cmd, HIDEPWD => 1)) {
+              CertNanny::Logging->error("Error deleting root cert " . $installedRootCAs->{$certSHA1}->{CERTINFO}->{SubjectName});
+            }
+          }
+        }
+
+        # copy every root CA, that does not exist in $installedRootCAs to keystore
+        foreach my $certSHA1 (keys ($availableRootCAs)) {
+          if (!exists($installedRootCAs->{$certSHA1})) {
+            CertNanny::Logging->debug("Importing root cert " . $availableRootCAs->{$certSHA1}->{CERTINFO}->{SubjectName});
+            my $tmpFile = CertNanny::Util->getTmpFile();
+            CertNanny::Util->writeFile(DSTFILE => $tmpFile,
+                                       SRCFILE => $availableRootCAs->{$certSHA1}->{CERTDATA});
+            @cmd = $self->_buildKeytoolCmd($locName, '-importcert', '-file', $tmpFile, '-trustcacerts', '-alias', $availableRootCAs->{$certSHA1}->{CERTALIAS});
+            if (CertNanny::Util->runCommand(\@cmd, HIDEPWD => 1)) {
+              CertNanny::Logging->error("Error importing root cert " . $availableRootCAs->{$certSHA1}->{CERTINFO}->{SubjectName});
+            }
+            # Postinstallhook
+            $self->_executeHook($entry->{hook}->{roots}->{install}->{post},
+                                '__TYPE__'        => 'FILE',
+                                '__CERTFILE__'    => $availableRootCAs->{$certSHA1}->{CERTFILE},
+                                '__FINGERPRINT__' => $availableRootCAs->{$certSHA1}->{CERTINFO}->{CertificateFingerprint},
+                                '__TARGET__'      => $locName);
+          }
+        }
+      
+        # copy the temp keystore to $location an delete temp keystore
+        if (!File::Copy::copy($locName, $entry->{location})) {
+          $rc = CertNanny::Logging->error("Could not copy new store <$locName> to current store <$entry->{location}>");
+        } else {
+          eval {unlink($locName)};
+        }
+      }
+    }
+  }
+  CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "Install all available root certificates");
+  return $rc;
 } ## end sub installRoots
 
 
-sub syncRootCAs {
-  ###########################################################################
-  #
-  # synchronize the unstalled root certificates with the avaiable ones
-  #
-  # Input: -
-  # 
-  # Output: 1 : failure  0 : success 
-  #
-  # this function synchronizes installed roots with local trusted root CAs.
-  # The installed root CAs are fetched via getInstalledRoots. The available
-  # trusted root CAs are fetched via k_getRootCerts.
-  # Alle available root CAs are installed in a new temp. keystore. The 
-  # installed root CAs are replaced with the new keytore. So all installed
-  # roots CAs that are no longer available are deleted 
-  # after all the post-install-hook is executed.
-  #
-  # You may want to inherit this class from CertNanny::Keystore::OpenSSL if
-  # you wish to generate the private key 'outside' of your keystore and 
-  # import this information later.
-  # In this case use the following code:
-  # sub syncRootCAs {
-  #   my $self = shift;
-  #   return $self->SUPER::syncRootCAs(@_) if $self->can("SUPER::syncRootCAs");
-  # }
-  my $self = shift;
-  return $self->SUPER::syncRootCAs(@_) if $self->can("SUPER::syncRootCAs");
-}
+sub _buildGskCmd {
+  # build a GSK command (as an array) containing all common options, the
+  # location (if provided as an argument) and further arguments (if provided)
+  # the common options are:
+  my $self     = shift;
+  my $location = shift;
 
+  my $options = $self->{OPTIONS};
+  my $entry   = $options->{ENTRY};
+
+  my @cmd = (qq("$options->{gsktool}"));
+  # Commands-keydb - create | -cert -add |  -cert -import | -cert -list
+  push(@cmd, -db        => qq("$entry->{db}"))        if ($entry->{db});
+  push(@cmd, -pw        => qq("$entry->{pw}"))        if ($entry->{pw});
+  push(@cmd, -target    => qq("$entry->{target}"))    if ($entry->{target});
+  push(@cmd, -target_pw => qq("$entry->{target_pw}")) if ($entry->{target_pw});
+  push(@cmd, -label     => qq("$entry->{label}"))     if ($entry->{label});
+  push(@cmd, -file      => qq("$entry->{file}"))      if ($entry->{file});
+  push(@cmd, -format    => qq("$entry->{format}"))    if ($entry->{format});
+  push(@cmd, @_);
+  @cmd;
+} ## end sub _buildKeytoolCmd
 
 
 sub _getIBMJavaEnvironment {
@@ -1022,14 +1160,5 @@ sub _getCertLabel {
   return $label;
 } ## end sub _getCertLabel
 
-#sub hidepin {
-# arg: array
-# Output: array with pins replaced
-#  my @args = @_;
-#  for (my $ii = 0; $ii < $#args; $ii++) {
-#    $args[$ii + 1] = "*HIDDEN*" if ($args[$ii] =~ /(-pw|-target_pw|-storepass|-keypass)/);
-#  }
-#  @args;
-#}
 
 1;

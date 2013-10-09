@@ -1217,7 +1217,7 @@ sub installRoots {
   #           TARGET      => optional : where should the procedure install
   #                          root certificates (DIRECTORY|FILE|CHAINFILE|LOCATION)
   #                          default: all three
-  #           INSTALLED   => mandatory(used) : hash with already installed roots
+  #           INSTALLED   => mandatory(not used) : hash with already installed roots
   #           AVAILABLE   => mandatory(used) : hash with available roots
   # 
   # Output: 1 : failure  0 : success 
@@ -1243,16 +1243,27 @@ sub installRoots {
   my $entry     = $options->{ENTRY};
   my $entryname = $options->{ENTRYNAME};
   my $config    = $options->{CONFIG};
+
+  my $installedRootCAs = $args{INSTALLED};
+  my $availableRootCAs = $args{AVAILABLE};
   
   my %locInstall = ('directory' => $config->get("keystore.$entryname.TrustedRootCA.GENERATED.Directory", 'FILE'),
                     'file'      => $config->get("keystore.$entryname.TrustedRootCA.GENERATED.File",      'FILE'),
                     'chainfile' => $config->get("keystore.$entryname.TrustedRootCA.GENERATED.ChainFile", 'FILE'));
 
-  my $rc = (defined($args{TARGET}) and !defined($locInstall{lc($args{TARGET})}));
-  # Todo pgk: Zugriff in k_getRootCerts aendern auf keystore.openssl.TrustedRootCA.AUTHORITATIVE.Directory
+  my $rc = 0;
+  my $doSearch = (!defined($args{TARGET}) or defined($locInstall{lc($args{TARGET})}));
 
-  if (!$rc) {
-    my $rootCertList = $self->k_getRootCerts();
+  if ($doSearch) {
+    my $rootCertList = ();
+    # the available Root Certs should be given in $args{AVAILABLE}. If not (i.E Standalone Tests) we create it again
+    if (defined($availableRootCAs)) {
+      foreach (keys($availableRootCAs)) {
+        push(@$rootCertList, $availableRootCAs->{$_});
+      }
+    } else {
+      $rootCertList = $self->k_getRootCerts();
+    }
     if (!defined($rootCertList)) {
       $rc = CertNanny::Logging->error("No root certificates found in " . $config-get("keystore.$entryname.TrustedRootCA.AUTHORITATIVE.Directory", 'FILE'));
     } else {

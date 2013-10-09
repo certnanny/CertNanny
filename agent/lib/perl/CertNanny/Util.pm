@@ -134,7 +134,7 @@ sub runCommand {
      	CertNanny::Logging->debug("$output") if ($output);
 	}
 	else {
-	    CertNanny::Logging->debug("output is binary no print") if ($output);
+	    CertNanny::Logging->debug("---Binary Data---") if ($output);
 	}
     
   }
