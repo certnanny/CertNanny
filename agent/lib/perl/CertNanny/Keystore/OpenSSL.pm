@@ -243,7 +243,7 @@ sub getCert {
         chomp($certRest = $2);
         $certFormat = 'PEM';
       } else {
-        # $cerFormat = CertNanny::Util->getCertType($certData);
+        # $cerFormat = CertNanny::Util->getCertFormat($certData);
         $certFormat = 'DER';
       }
       $rc = {CERTDATA   => $certData,
@@ -494,7 +494,6 @@ sub getKey {
   #           KEYTYPE   => format (e. g. 'PKCS8' or 'OpenSSL'
   #           KEYFORMAT => 'PEM' or 'DER'
   #           KEYPASS   => key pass phrase (only if protected by pass phrase)
-  #           KEYFILE   => file containing the key data
   #         or undef on error
   CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "get private key for main certificate from keystore");
   my $self     = shift;
@@ -519,6 +518,7 @@ sub getKey {
              KEYTYPE   => $self->{KEYTYPE},
              KEYFORMAT => $keyformat,
              KEYPASS   => $pin};
+      $self->{myKey} = $rc;
     }
   }
 
@@ -997,8 +997,9 @@ sub createPKCS12 {
 
   CertNanny::Logging->debug("Certformat: $args{CERTFORMAT}");
 
-  if (!$rc && (!defined $args{CERTFORMAT} or 
-               $args{CERTFORMAT} !~ /^(PEM|DER)$/)) {$rc = CertNanny::Logging->error("createpks12(): Illegal certificate format specified")}
+  if (!$rc && (!defined $args{CERTFORMAT} or $args{CERTFORMAT} !~ /^(PEM|DER)$/)) {
+    $rc = CertNanny::Logging->error("createpks12(): Illegal certificate format specified")
+  }
 
   if (!$rc) {
     my @cmd;
@@ -1011,7 +1012,9 @@ sub createPKCS12 {
 
       # Todo pgk: Testen runCommand
       @cmd = (qq("$openssl"), 'x509', '-in', qq("$args{CERTFILE}"), '-inform', qq("$args{CERTFORMAT}"), '-out', qq("$certfile"), '-outform', 'PEM',);
-      if (CertNanny::Util->runCommand(\@cmd) != 0) {$rc = CertNanny::Logging->error("Certificate format conversion failed")}
+      if (CertNanny::Util->runCommand(\@cmd) != 0) {
+        $rc = CertNanny::Logging->error("Certificate format conversion failed")
+      }
     } ## end if ($args{CERTFORMAT} ...)
 
     if (!$rc) {
@@ -1133,7 +1136,7 @@ sub importP12 {
 } ## end sub importP12
 
 
-sub getInstalledRoots {
+sub getInstalledCAs {
   ###########################################################################
   #
   # get all installed root certificates
@@ -1164,9 +1167,9 @@ sub getInstalledRoots {
   # you wish to generate the private key 'outside' of your keystore and 
   # import this information later.
   # In this case use the following code:
-  # sub getInstalledRoots {
+  # sub getInstalledCAs {
   #   my $self = shift;
-  #   return $self->SUPER::getInstalledRoots(@_) if $self->can("SUPER::getInstalledRoots");
+  #   return $self->SUPER::getInstalledCAs(@_) if $self->can("SUPER::getInstalledCAs");
   # }
   CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "get all installed root certificates");
   my $self = shift;
@@ -1177,13 +1180,15 @@ sub getInstalledRoots {
   my $entryname = $options->{ENTRYNAME};
   my $config    = $options->{CONFIG};
   
+  my $rc = undef;
+  
   my %locSearch = ('directory' => $config->get("keystore.$entryname.TrustedRootCA.GENERATED.Directory", 'FILE'),
                    'file'      => $config->get("keystore.$entryname.TrustedRootCA.GENERATED.File",      'FILE'),
                    'chainfile' => $config->get("keystore.$entryname.TrustedRootCA.GENERATED.ChainFile", 'FILE'));
 
                 
   my ($certRef, $certData, $certSha1);
-  my $certFound = {};
+  $self->{installedRootCAs} = {};
 
   foreach my $locName (keys %locSearch) {  
     # Look for root certificates in keystore.openssl.TrustedRootCA.GENERATED.Directory / File / ChainFile
@@ -1194,20 +1199,29 @@ sub getInstalledRoots {
         foreach my $certFile (@certFileList) {
           $certRef = $self->getCert(CERTFILE => $certFile);
           while ($certRef and ($certData = $certRef->{CERTDATA})) {
-            $certSha1 = CertNanny::Util->getCertSHA1(%{$certRef});
-            $certFound->{$certSha1->{CERTSHA1}}->{CERTFILE} = $certFile;
-            $certFound->{$certSha1->{CERTSHA1}}->{CERTDATA} = $certData;
-            $certFound->{$certSha1->{CERTSHA1}}->{CERTINFO} = CertNanny::Util->getCertInfoHash(CERTDATA   => $certData,
-                                                                                               CERTFORMAT => 'PEM');
+            my $certInfo = CertNanny::Util->getCertInfoHash(CERTDATA   => $certData,
+                                                            CERTFORMAT => 'PEM');
+            if (defined($certInfo)) {
+              if (my $certTyp = $self->k_getCertType(CERTINFO => $certInfo)) {
+                $certSha1 = CertNanny::Util->getCertSHA1(%{$certRef});
+                $self->{$certTyp}->{$certSha1->{CERTSHA1}}->{CERTFILE} = $certFile;
+                $self->{$certTyp}->{$certSha1->{CERTSHA1}}->{CERTDATA} = $certData;
+                $self->{$certTyp}->{$certSha1->{CERTSHA1}}->{CERTINFO} = $certInfo;
+                if ($certTyp eq 'installedRootCAs') {
+                  $rc->{$certSha1->{CERTSHA1}} = $self->{$certTyp}->{$certSha1->{CERTSHA1}}
+                }
+              }
+            }
             $certRef  = $self->getCert(CERTDATA => $certRef->{CERTREST});
           }
         }
       }
     }
   }
+
   CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "get all installed root certificates");
-  return $certFound;
-} ## end sub getInstalledRoots
+  return $rc;
+} ## end sub getInstalledCAs
 
 
 sub installRoots {
@@ -1355,15 +1369,6 @@ sub installRoots {
   CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "Install all available root certificates");
   return $rc;
 } ## end sub installRoots
-
-
-
-  # # Install Options
-  # my %optInstall = ('directory' => $config->getFlag("keystore.$entryname.cachain.GENERATED.Directory", 'LC'),
-  #                   'file'      => $config->getFlag("keystore.$entryname.cachain.GENERATED.File",      'LC'),
-  #                   'chainfile' => $config->getFlag("keystore.$entryname.cachain.GENERATED.ChainFile", 'LC'));
-  # print Dumper(%optInstall);
-
 
 
 sub _createLocalCerts {
