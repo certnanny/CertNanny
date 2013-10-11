@@ -35,7 +35,7 @@ $VERSION = 0.10;
 
 @EXPORT = qw(runCommand timeStamp isoDateToEpoch epochToIsoDate 
              expandDate printableIsoDate readFile writeFile getCertSHA1
-             getCertType getCertInfoHash getCSRInfoHash parseCertData 
+             getCertFormat getCertInfoHash getCSRInfoHash parseCertData 
              getTmpFile staticEngine encodeBMPString writeOpenSSLConfig 
              getDefaultOpenSSLConfig backoffTime getMacAddresses 
              fetchFileList callOpenSSL);    # Symbols to autoexport (:DEFAULT tag)
@@ -381,7 +381,7 @@ sub writeFile {
 } ## end sub writeFile
 
 
-sub getCertType {
+sub getCertFormat {
   ###########################################################################
   # Analyses certificate and decides whether it's DER or PEM format
   #
@@ -392,7 +392,7 @@ sub getCertType {
   my $certdata = shift;
   
   return ($certdata =~ m{ -----.*CERTIFICATE.*----- }xms) ? 'PEM' : 'DER';
-} ## end sub getCertType
+} ## end sub getCertFormat
 
 
 sub callOpenSSL {
