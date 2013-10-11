@@ -1010,7 +1010,13 @@ sub k_getNextTrustAnchor {
   my $certchainfile = CertNanny::Util->getTmpFile();
 
   CertNanny::Logging->debug("CertNanny::Keystore::k_getNextTrustAnchor ");
-  CertNanny::Logging->error("Could not get CA certs") if (!$self->k_getCaCerts());
+  if (!$self->k_getCaCerts()){
+  	
+  	CertNanny::Logging->error("Could not get CA certs - abort get next trust Anchor ");
+  	
+  	return 1;   	
+  }
+  
   #CertNanny::Logging->debug("getEnroller config: " . Dumper($self));
 
   $scepracert->{CERTINFO} = CertNanny::Util->getCertInfoHash(CERTFILE   => $self->{STATE}->{DATA}->{SCEP}->{RACERT},
@@ -1161,7 +1167,18 @@ sub k_warnExpiry {
   # call k_warnExpiry hook for notification event
   my $self         = shift;
   my $notification = shift;
-  return $self->_executeHook($self->{INSTANCE}->{OPTIONS}->{ENTRY}->{hook}->{warnexpiry},
+  return $self->_executeHook($self->{OPTIONS}->{ENTRY}->{hook}->{warnexpiry},
+                             '__NOTAFTER__'  => $self->{CERT}->{CERTINFO}->{NotAfter},
+                             '__NOTBEFORE__' => $self->{CERT}->{CERTINFO}->{NotBefore},
+                             '__STATE__'     => $self->{STATE}->{DATA}->{RENEWAL}->{STATUS},);
+} ## end sub k_warnExpiry
+
+sub k_executionHook {
+  # call k_execution hook for CN monitoring event
+  my $self         = shift;
+  my $notification = shift;
+  
+  return $self->_executeHook($self->{OPTIONS}->{ENTRY}->{hook}->{execution},
                              '__NOTAFTER__'  => $self->{CERT}->{CERTINFO}->{NotAfter},
                              '__NOTBEFORE__' => $self->{CERT}->{CERTINFO}->{NotBefore},
                              '__STATE__'     => $self->{STATE}->{DATA}->{RENEWAL}->{STATUS},);
@@ -1588,7 +1605,7 @@ sub _executeHook {
   # 
   # Output: 1 : success  0 : failure  # : returncode of the hook command 
   #
-  CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "synchronize the unstalled root certificates with the avaiable ones");
+  CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "start _executeHook");
   my $self = shift;
   my $hook = shift;
   my %args = ('__ENTRY__'       => $self->{INSTANCE}->{OPTIONS}->{ENTRYNAME}           || $self->{OPTIONS}->{ENTRYNAME},
@@ -1599,7 +1616,7 @@ sub _executeHook {
 
   # hook not defined -> success
   if (!defined $hook) {
-    CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "synchronize the unstalled root certificates with the avaiable ones");
+    CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "hook not defined or miss configured: $hook , Continue ");
     return 1;
   }
 
@@ -1608,7 +1625,7 @@ sub _executeHook {
   if ($hook =~ /::/) {
     # execute Perl method
     CertNanny::Logging->info("Perl method hook not yet supported");
-    CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "synchronize the unstalled root certificates with the avaiable ones");
+    CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "error evaluating Perl function hook");
     return undef;
   } else {
     # assume it's an executable
@@ -1627,7 +1644,7 @@ sub _executeHook {
     }
 
     CertNanny::Logging->info("Exec: $hook");
-    CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "synchronize the unstalled root certificates with the avaiable ones");
+    CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "hook execution of $hook ");
     return CertNanny::Util->runCommand($hook);
   } ## end else [ if ($hook =~ /::/) ]
 } ## end sub _executeHook

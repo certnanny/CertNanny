@@ -794,7 +794,10 @@ sub _getNewPKCS12Data {
   my $pkcs12file = $self->createPKCS12(FILENAME     => CertNanny::Util->getTmpFile(),
                                        FRIENDLYNAME => $label,
                                        EXPORTPIN    => $self->_getPin(),
-                                       CACHAIN      => \@cachain)->{FILENAME};
+                                       CACHAIN      => \@cachain,
+                                       CERTFILE     => $certfile, 
+ 									   KEYFILE      => $keyfile, 
+  									   PIN          => $self->_getPin() )->{FILENAME} ;
 
   if (!defined $pkcs12file) {
     CertNanny::Logging->error("Could not create prototype PKCS#12 from received certificate");
