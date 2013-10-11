@@ -190,9 +190,9 @@ sub log {
         }
       }
     }
-    if (!utf8::is_utf8($arg->{MSG}) and ($arg->{MSG} !~ m/\A [[:ascii:]]* \Z/xms)) {
-      $arg->{MSG} = '---Binary Data---';
-    }
+ #   if (!utf8::is_utf8($arg->{MSG}) and ($arg->{MSG} !~ m/\A [[:ascii:]]* \Z/xms)) {
+ #    $arg->{MSG} = '---Binary Data---';
+ #  }
     if ($subroutine) {
       $logStr = "$year-$mon-$mday $hour:$min:$sec : [$prio] [$$] [$subroutine] $arg->{MSG}\n";
     } else {
