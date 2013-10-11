@@ -485,11 +485,11 @@ sub getKey {
   # 
   # Output: caller gets a hash ref (as expected by k_convertKey()):
   #           KEYDATA   => string containg the private key OR
-  #           KEYFILE   => file containing the key data
   #           KEYFORMAT => 'PEM' or 'DER'
   #           KEYTYPE   => format (e. g. 'PKCS8' or 'OpenSSL'
   #           KEYPASS   => key pass phrase (only if protected by pass phrase)
   #         or undef on error
+  CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "get private key for main certificate from keystore");
   my $self = shift;
 
   my $options   = $self->{OPTIONS};
@@ -566,6 +566,7 @@ sub getKey {
     return undef;
   }
 
+  CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "get private key for main certificate from keystore");
   return {KEYDATA   => $keydata,
           KEYTYPE   => 'PKCS8',
           KEYFORMAT => 'DER'};  # no keypass, unencrypted
@@ -741,7 +742,7 @@ sub importP12 {
 } ## end sub importP12
 
 
-sub getInstalledRoots {
+sub getInstalledCAs {
   ###########################################################################
   #
   # get all installed root certificates
@@ -772,9 +773,9 @@ sub getInstalledRoots {
   # you wish to generate the private key 'outside' of your keystore and 
   # import this information later.
   # In this case use the following code:
-  # sub getInstalledRoots {
+  # sub getInstalledCAs {
   #   my $self = shift;
-  #   return $self->SUPER::getInstalledRoots(@_) if $self->can("SUPER::getInstalledRoots");
+  #   return $self->SUPER::getInstalledCAs(@_) if $self->can("SUPER::getInstalledCAs");
   # }
   CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "get all installed root certificates");
   my $self = shift;
@@ -805,16 +806,19 @@ sub getInstalledRoots {
           $certData = CertNanny::Util->runCommand(\@cmd, WANTOUT => 1, HIDEPWD => 1);
           $certRef  = $self->getCert(CERTDATA => $certData);
           while ($certRef and ($certData = $certRef->{CERTDATA})) {
-            $certSha1 = CertNanny::Util->getCertSHA1(%{$certRef});
-            
-            $certFound->{$certSha1->{CERTSHA1}}->{CERTALIAS}       = $certAlias;
-            $certFound->{$certSha1->{CERTSHA1}}->{CERTCREATEDATE}  = $certCreateDate;
-            $certFound->{$certSha1->{CERTSHA1}}->{CERTTYPE}        = $certType;
-            $certFound->{$certSha1->{CERTSHA1}}->{CERTFINGERPRINT} = $certFingerprint;
-            $certFound->{$certSha1->{CERTSHA1}}->{CERTDATA}        = $certData;
-            $certFound->{$certSha1->{CERTSHA1}}->{CERTFORMAT}      = $certRef->{CERTFORMAT};
-            $certFound->{$certSha1->{CERTSHA1}}->{CERTINFO}        = CertNanny::Util->getCertInfoHash(CERTDATA => $certData);
-            
+            my $certInfo = CertNanny::Util->getCertInfoHash(CERTDATA => $certData);
+            if (defined($certInfo)) {
+              if (my $certTyp = $self->k_getCertType(CERTINFO => $certInfo)) { 
+                $certSha1 = CertNanny::Util->getCertSHA1(%{$certRef});
+                $self->{$certTyp}->{$certSha1->{CERTSHA1}}->{CERTALIAS}       = $certAlias;
+                $self->{$certTyp}->{$certSha1->{CERTSHA1}}->{CERTCREATEDATE}  = $certCreateDate;
+                $self->{$certTyp}->{$certSha1->{CERTSHA1}}->{CERTTYPE}        = $certType;
+                $self->{$certTyp}->{$certSha1->{CERTSHA1}}->{CERTFINGERPRINT} = $certFingerprint;
+                $self->{$certTyp}->{$certSha1->{CERTSHA1}}->{CERTDATA}        = $certData;
+                $self->{$certTyp}->{$certSha1->{CERTSHA1}}->{CERTFORMAT}      = $certRef->{CERTFORMAT};
+                $self->{$certTyp}->{$certSha1->{CERTSHA1}}->{CERTINFO}        = $certInfo;
+              }
+            }
             $certRef  = $self->getCert(CERTDATA => $certRef->{CERTREST});
           }
         }
@@ -823,7 +827,7 @@ sub getInstalledRoots {
   }
   CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "get all installed root certificates");
   return $certFound;
-} ## end sub getInstalledRoots
+} ## end sub getInstalledCAs
 
 
 sub installRoots {
@@ -833,7 +837,7 @@ sub installRoots {
   #
   # Input: caller must provide a hash ref:
   #           ROOTCERTS   => Hash containing array of all rootcertificates to 
-  #                          be installed (as returned by getInstalledRoots)
+  #                          be installed (as returned by getInstalledCAs)
   #                          Hashkey is tha SHA1 of the certificate
   #                          Hashcontent ist the parsed certificate
   # 

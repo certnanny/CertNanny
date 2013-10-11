@@ -180,7 +180,7 @@ sub DESTROY {
 #      - generateKey
 #      - createpkcs12
 #      - importP12
-#      - getInstalledRoots
+#      - getInstalledCAs
 #      - installeRoots
 #      - syncRootCAs
 
@@ -232,7 +232,6 @@ sub DESTROY {
 #  # 
 #  # Output: caller gets a hash ref (as expected by k_convertKey()):
 #  #           KEYDATA   => string containg the private key OR
-#  #           KEYFILE   => file containing the key data
 #  #           KEYFORMAT => 'PEM' or 'DER'
 #  #           KEYTYPE   => format (e. g. 'PKCS8' or 'OpenSSL'
 #  #           KEYPASS   => key pass phrase (only if protected by pass phrase)
@@ -397,8 +396,8 @@ sub DESTROY {
 #} ## end sub importP12
 
 
-# ToDo pgk: sub getInstalledRoots
-#sub getInstalledRoots {
+# ToDo pgk: sub getInstalledCAs
+#sub getInstalledCAs {
 #  ###########################################################################
 #  #
 #  # get all installed root certificates
@@ -422,14 +421,14 @@ sub DESTROY {
 #  # you wish to generate the private key 'outside' of your keystore and 
 #  # import this information later.
 #  # In this case use the following code:
-#  # sub getInstalledRoots {
+#  # sub getInstalledCAs {
 #  #   my $self = shift;
-#  #   return $self->SUPER::getInstalledRoots(@_) if $self->can("SUPER::getInstalledRoots");
+#  #   return $self->SUPER::getInstalledCAs(@_) if $self->can("SUPER::getInstalledCAs");
 #  # }
 #  my $self = shift;
 #
 #  return undef;
-#} ## end sub getInstalledRoots
+#} ## end sub getInstalledCAs
 
 
 # ToDo pgk: sub installRoots
@@ -440,7 +439,7 @@ sub DESTROY {
 #  #
 #  # Input: caller must provide a hash ref:
 #  #           ROOTCERTS   => Hash containing all rootcertificates to 
-#  #                          be installed (as returned by getInstalledRoots)
+#  #                          be installed (as returned by getInstalledCAs)
 #  #                          Hashkey is tha SHA1 of the certificate
 #  #                          Hashcontent ist the parsed certificate
 #  # 
@@ -476,7 +475,7 @@ sub DESTROY {
 #  # Output: 1 : failure  0 : success 
 #  #
 #  # this function synchronizes installed roots with local trusted root CAs.
-#  # The installed root CAs are fetched via getInstalledRoots. The available
+#  # The installed root CAs are fetched via getInstalledCAs. The available
 #  # trusted root CAs are fetched via k_getRootCerts.
 #  # Alle available root CAs are installed in a new temp. keystore. The 
 #  # installed root CAs are replaced with the new keytore. So all installed
@@ -1200,6 +1199,60 @@ sub k_getRootCerts {
 } ## end sub k_getRootCerts
 
 
+sub k_getAvailableRootCAs {
+  ###########################################################################
+  #
+  # get all available root certificates
+  #
+  # Input: -
+  # 
+  # Output: caller gets a hash ref:
+  #           Hashkey is the SHA1 of the certificate
+  #           Hashcontent ist the parsed certificate
+  #           CERTINFO => hash as returned by getCertInfoHash()
+  #           CERTFILE => filename
+  #           CERTFORMAT => cert format (PEM, DER)
+  # 
+  CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "get all available root certificates");
+  my $self = shift;
+  my %args = (@_);
+
+  my $options   = $self->{OPTIONS};
+  my $entry     = $options->{ENTRY};
+  my $entryname = $options->{ENTRYNAME};
+  my $config    = $options->{CONFIG};
+  
+  my $rc = undef;
+
+  if (defined($self->{INSTANCE}->{availableRootCAs})) {
+    $rc = $self->{INSTANCE}->{availableRootCAs};
+  } else {
+    my $certRef;
+    my $locRootCA = $config->get("keystore.$entryname.TrustedRootCA.AUTHORITATIVE.Directory", 'FILE');
+    foreach (@{CertNanny::Util->fetchFileList($locRootCA)}) {
+      if ($certRef = $self->_checkCert($_)) {
+        my $certTyp = $self->k_getCertType(%{$certRef});
+        if ($certTyp  eq 'installedRootCAs') {
+          my $certSHA1 = CertNanny::Util->getCertSHA1(%{$certRef})->{CERTSHA1};
+          if (exists($rc->{$certSHA1})) {
+            if (exists($rc->{$certSHA1}->{CERTFILE}) and ($certRef->{CERTFILE})) {
+              CertNanny::Logging->debug("Identical root certificate in <" . $rc->{$certSHA1}->{CERTFILE} . "> and <" . $certRef->{CERTFILE} . ">");
+            } else {
+              CertNanny::Logging->debug("Identical root certificate <" . $rc->{$certSHA1}->{CERTINFO}->{SubjectName} . "> found.");
+            }
+          } else {
+            $rc->{$certSHA1} = $certRef;
+          }
+        }
+      }
+    }
+    $self->{INSTANCE}->{availableRootCAs} = $rc;
+  }
+  CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "get all available root certificates");
+  return $rc;
+} ## end sub getAvailableRootCAs
+
+
 sub _checkCert {
   ###########################################################################
   #
@@ -1430,7 +1483,7 @@ sub k_syncRootCAs {
   # Output: 1 : failure  0 : success 
   #
   # this function synchronizes installed roots with local trusted root CAs.
-  # The installed root CAs are fetched via getInstalledRoots. The available
+  # The installed root CAs are fetched via getInstalledCAs. The available
   # trusted root CAs are fetched via k_getRootCerts.
   # Alle available root CAs are installed in a new temp. keystore. The 
   # installed root CAs are replaced with the new keytore. So all installed
@@ -1472,34 +1525,19 @@ sub k_syncRootCAs {
   #   ...
 
   # First fetch available root certificates
-  my $rootCertList = $self->k_getRootCerts();
-  if (!defined($rootCertList)) {
+  my $availableRootCAs = $self->k_getAvailableRootCAs();
+  if (!defined($availableRootCAs)) {
     $rc = CertNanny::Logging->error("No root certificates found in " . $config-get("keystore.$entryname.TrustedRootCA.AUTHORITATIVE.Directory", 'FILE'));
   }
   
   if (!$rc) {
-    my $availableRootCAs = {};
-    # Foreach available root cert get the SHA1
-    foreach my $certRef (@{$rootCertList}) {
-      my $certSHA1 = CertNanny::Util->getCertSHA1(%{$certRef})->{CERTSHA1};
-      if (exists($availableRootCAs->{$certSHA1})) {
-        if (exists($availableRootCAs->{$certSHA1}->{CERTFILE}) and ($certRef->{CERTFILE})) {
-          CertNanny::Logging->debug("Identical root certificate in <" . $availableRootCAs->{$certSHA1}->{CERTFILE} . "> and <" . $certRef->{CERTFILE} . ">");
-        } else {
-          CertNanny::Logging->debug("Identical root certificate <" . $availableRootCAs->{$certSHA1}->{CERTINFO}->{SubjectName} . "> found.");
-        }
-      } else {
-        $availableRootCAs->{$certSHA1} = $certRef;
-      }
-    }
-
     # then compare against DIR, FILE and CHAINFILE in case of an 
     # inconsistence rebuild DIR, FILE or CHAINIFLE
     foreach my $target ('DIRECTORY', 'FILE', 'CHAINFILE', 'LOCATION') {
       # Fetch installed root certificates into
-# Todo Dumper Löschen      
-print Dumper($target);
-      my $installedRootCAs = $self->getInstalledRoots(TARGET => $target);
+      # Todo Dumper Löschen      
+      # print Dumper($target);
+      my $installedRootCAs = $self->getInstalledCAs(TARGET => $target);
   
       my $rebuild = 0;
       # comparison $installedRootCAs to $availableRootCAs
@@ -1621,6 +1659,50 @@ sub k_getCaCerts {
 } ## end sub k_getCaCerts
 
 
+sub k_getCertType {
+  ###########################################################################
+  #
+  # determine the certificate type
+  #
+  # Input:  caller must provide a hash ref to an Cert Info minimum containing:
+  # Input: caller must provide a hash ref:
+  #           CERTINFO => mandatory: certificate information containing al least:
+  #                       BasicConstraints => CA:TRUE|CA:FALSE
+  #                       IssuerName       => Certificate Issuer
+  #                       SubjectName      => Certificate Subject Name
+  # 
+  # Output: String with cert type or undef
+  #
+  # this function determines the certificate type
+  #
+  CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "Determine the Cert Type (installedRootCAs|installedIntermediateCAs|installedEE)");
+  my $self = shift;
+  my %args = (@_);
+
+  my $rc = undef;
+
+  # 1 installedRootCAs         : IssuerName == SubjectName and BasicConstraints ==  CA:TRUE
+  # 2 installedIntermediateCAs : IssuerName != SubjectName and BasicConstraints ==  CA:TRUE
+  # 3 installedEE              : IssuerName != SubjectName and BasicConstraints ==  CA:FALSE
+  if ($args{CERTINFO}{IssuerName} eq $args{CERTINFO}{SubjectName}) {
+    if ($args{CERTINFO}{BasicConstraints} eq 'CA:TRUE') {
+      $rc = 'installedRootCAs';
+    }
+  } else {
+    if ($args{CERTINFO}{BasicConstraints} eq 'CA:TRUE') {
+      $rc = 'installedIntermediateCAs';
+    } else {
+      if ($args{CERTINFO}{BasicConstraints} eq 'CA:FALSE') {
+        $rc = 'installedEE';
+      }
+    }
+  }
+ 
+  CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "Determine the Cert Type (installedRootCAs|installedIntermediateCAs|installedEE)");
+  return $rc;
+} ## end sub k_getCertType
+
+
 sub _sendRequest {
   CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "Sending request");
   my $self = shift;
@@ -1644,7 +1726,7 @@ sub _sendRequest {
   my $requestkeyfile   = $self->{STATE}->{DATA}->{RENEWAL}->{REQUEST}->{KEYFILE};
   my $pin              = $self->{PIN} || $entry->{key}->{pin};
   my $scepsignaturekey = $entry->{scepsignaturekey};
-  my $scepracert = $self->{STATE}->{DATA}->{SCEP}->{RACERT};
+  my $scepracert       = $self->{STATE}->{DATA}->{SCEP}->{RACERT};
   my $scepchecksubjectname ; 
   if(defined $entry->{scepchecksubjectname}){
   	$scepchecksubjectname = $entry->{scepchecksubjectname}; 
@@ -1672,7 +1754,6 @@ sub _sendRequest {
   my $newkey;
 
   unless ($self->_hasEngine()) {
-
     # get unencrypted new key in PEM format
     $newkey = $self->k_convertKey(KEYFILE   => $requestkeyfile,
                                   KEYPASS   => $pin,
@@ -1709,23 +1790,6 @@ sub _sendRequest {
     # get existing private key from keystore
     
     my $oldkey = $self->getKey();
-#    my $oldkeyfile = CertNanny::Util->getTmpFile();
-#    
-#    if (!CertNanny::Util->writeFile(DSTFILE    => $oldkeyfile,
-#                                    SRCCONTENT => $oldkey->{KEYDATA},
-#                                    FORCE      => 1)) {
-#      CertNanny::Logging->error("Could not write copy of oldkey to temp file");
-#      CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "Sending request");
-#      return undef;
-#    }
-#    
-#	 CertNanny::Logging->debug("Oldkey tmp file:" .$oldkeyfile );
-# 
-#    if (!defined $oldkeyfile) {
-#      CertNanny::Logging->error("Could not get old key from certificate instance");
-#      CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "Sending request");
-#      return undef;
-#    }
 
     unless ($self->_hasEngine()) {
 
@@ -1751,8 +1815,7 @@ sub _sendRequest {
 
       if (!CertNanny::Util->writeFile(DSTFILE    => $oldkeyfile,
                                       SRCCONTENT => $oldkey_pem_unencrypted->{KEYDATA},
-                                      FORCE      => 1,)
-        ) {
+                                      FORCE      => 1)) {
         CertNanny::Logging->error("Could not write temporary key file (old key)");
         CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "Sending request");
         return undef;
@@ -1766,8 +1829,7 @@ sub _sendRequest {
     $oldcertfile = CertNanny::Util->getTmpFile();
     if (!CertNanny::Util->writeFile(DSTFILE    => $oldcertfile,
                                     SRCCONTENT => $self->{CERT}->{RAW}->{PEM},
-                                    FORCE      => 1,)
-      ) {
+                                    FORCE      => 1)) {
       CertNanny::Logging->error("Could not write temporary cert file (old certificate)");
       CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "Sending request");
       return undef;
@@ -1793,7 +1855,6 @@ sub _sendRequest {
   }
 
   if (-r $newcertfile) {
-
     # successful installation of the new certificate.
     # parse new certificate.
     # NOTE: in previous versions the hooks reported the old certificate's
@@ -1832,7 +1893,7 @@ sub _sendRequest {
       ##reset location to be passed correctly to the post install hook
       $entry->{location} = $conf->{CONFIG}->{certmonitor}->{$entryname}->{location};
       
-      if(!$entry->{initialenroll}->{targetPIN}  or $entry->{initialenroll}->{targetPIN} eq ""){
+      if (!$entry->{initialenroll}->{targetPIN}  or $entry->{initialenroll}->{targetPIN} eq "") {
       	$entry->{initialenroll}->{targetPIN} = $conf->{CONFIG}->{certmonitor}->{$entryname}->{key}->{pin};
       }
 
@@ -1855,7 +1916,7 @@ sub _sendRequest {
       CertNanny::Logging->debug("Created importp12 file :" . $importp12);
       my $target = $entry->{initialenroll}->{targetType};
       CertNanny::Logging->debug("Target keystore:" . $target);
-      if(!$exportp12){
+      if (!$exportp12) {
       	CertNanny::Logging->error("Failed to create importP12 abort initial" . $target);
       	return 0;
       }
@@ -1920,7 +1981,6 @@ sub _sendRequest {
     }
 
     if (defined $rc and $rc) {
-
       $self->_renewalState("completed");
 
       $self->_executeHook($entry->{hook}->{renewal}->{install}->{post},
@@ -1936,7 +1996,6 @@ sub _sendRequest {
     CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "Sending request");
     return undef;
   } ## end if (-r $newcertfile)
-
   CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "Sending request");
   return 1;
 } ## end sub _sendRequest

@@ -126,7 +126,7 @@ sub getCert {
   my $rc = undef;
 
   if (!defined $args{CERTFILE} && !defined $args{CERTDATA}) {
-    $args{CERTFILE} = $entry->{location}
+    $args{CERTFILE} = $config->get("keystore.$entryname.location", 'FILE')
   }
   
   if (defined $args{CERTFILE} && defined $args{CERTDATA}) {
@@ -138,12 +138,14 @@ sub getCert {
     if (defined $args{CERTFILE}) {
       my @cmd;
       if ($args{CERTTYPE} eq 'CA') {
-        @cmd = $self->_buildOpenSSLPKCS12Cmd('-nokeys', '-cacerts');
+        @cmd = $self->_buildOpenSSLPKCS12Cmd('-nokeys'  => '-nokeys', 
+                                             '-cacerts' => '-cacerts');
       } else {
-        @cmd = $self->_buildOpenSSLPKCS12Cmd('-nokeys', '-clcerts');
+        @cmd = $self->_buildOpenSSLPKCS12Cmd('-nokeys'  => '-nokeys', 
+                                             '-clcerts' => '-clcerts');
       }
-      my $certData = CertNanny::Util->runCommand(\@cmd, WANTOUT => 1);
-      if (!defined $certData) {
+      $certData = CertNanny::Util->runCommand(\@cmd, WANTOUT => 1);
+      if (!defined($certData)) {
         $rc = CertNanny::Logging->error("getCert(): Could not read instance certificate file $args{CERTFILE}");
       }
     } else {
@@ -159,7 +161,7 @@ sub getCert {
         if ($certHead =~ m{ ^ \s* friendlyName: \s+ (.*?) $ }xms) {$certLabel = $1}
         $certFormat = 'PEM';
       } else {
-        # $cerFormat = CertNanny::Util->getCertType($certData);
+        # $cerFormat = CertNanny::Util->getCertFormat($certData);
         $certFormat = 'DER';
       }
       $rc = {CERTDATA   => $certData,
@@ -226,17 +228,16 @@ sub getKey {
   # 
   # Output: caller gets a hash ref (as expected by k_convertKey()):
   #           KEYDATA   => string containg the private key OR
-  #           KEYFILE   => file containing the key data
   #           KEYFORMAT => 'PEM' or 'DER'
   #           KEYTYPE   => format (e. g. 'PKCS8' or 'OpenSSL'
   #           KEYPASS   => key pass phrase (only if protected by pass phrase)
   #         or undef on error
-  CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "Install all available root certificates");
+  CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "get private key for main certificate from keystore");
   my $self = shift;
 
   my $rc = undef;
 
-  my @cmd = $self->_buildOpenSSLPKCS12Cmd('-nocerts');
+  my @cmd = $self->_buildOpenSSLPKCS12Cmd('-nocerts' => '-nocerts');
   my $data = CertNanny::Util->runCommand(\@cmd, WANTOUT => 1);
   
   if ($data =~ s{ \A .* (?=-----BEGIN) }{}xms) {
@@ -244,9 +245,10 @@ sub getKey {
            KEYTYPE   => 'PKCS8',
            KEYFORMAT => 'DER',
            KEYPASS   => ''};
+    $self->{myKey} = $rc;
   }
 
-  CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "Install all available root certificates");
+  CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "get private key for main certificate from keystore");
   return $rc;
 } ## end sub getKey
 
@@ -432,7 +434,7 @@ sub importP12 {
 } ## end sub importP12
 
 
-sub getInstalledRoots {
+sub getInstalledCAs {
   ###########################################################################
   #
   # get all installed root certificates
@@ -463,9 +465,9 @@ sub getInstalledRoots {
   # you wish to generate the private key 'outside' of your keystore and 
   # import this information later.
   # In this case use the following code:
-  # sub getInstalledRoots {
+  # sub getInstalledCAs {
   #   my $self = shift;
-  #   return $self->SUPER::getInstalledRoots(@_) if $self->can("SUPER::getInstalledRoots");
+  #   return $self->SUPER::getInstalledCAs(@_) if $self->can("SUPER::getInstalledCAs");
   # }
   CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "get all installed root certificates");
   my $self = shift;
@@ -476,29 +478,37 @@ sub getInstalledRoots {
   my $entryname = $options->{ENTRYNAME};
   my $config    = $options->{CONFIG};
   
+  my $rc = undef;
+  
   my $certFound = {};
   
   # get FILE, DIRECTORY and CHAINFILE if spezified
-  $certFound = $self->SUPER::getInstalledRoots(\%args) if $self->can("SUPER::getInstalledRoots");
+  $self->{installedRootCAs} = $self->SUPER::getInstalledCAs(\%args) if $self->can("SUPER::getInstalledCAs");
 
   # get root certs from LOCATION
   my ($certRef, $certData, $certSha1);
-  $certRef = $self->getCert(CERTFILE => $self->_getPKCS12File());
+  $certRef = $self->getCert(CERTFILE => $config->get("keystore.$entryname.location", 'FILE'),
+                            CERTTYPE => 'CA');
   while ($certRef and ($certData = $certRef->{CERTDATA})) {
-    # if (issuer == subject) # Root cert {
-    #  Todo
-    $certSha1 = CertNanny::Util->getCertSHA1(%{$certRef});
-    $certFound->{$certSha1->{CERTSHA1}}->{CERTFILE} = $self->_getPKCS12File();
-    $certFound->{$certSha1->{CERTSHA1}}->{CERTDATA} = $certData;
-    $certFound->{$certSha1->{CERTSHA1}}->{CERTINFO} = CertNanny::Util->getCertInfoHash(CERTDATA   => $certData,
-                                                                                       CERTFORMAT => 'PEM');
+    my $certInfo = CertNanny::Util->getCertInfoHash(CERTDATA   => $certData,
+                                                    CERTFORMAT => 'PEM');
+    if (defined($certInfo)) {
+      if (my $certTyp = $self->k_getCertType(CERTINFO => $certInfo)) {
+        $certSha1 = CertNanny::Util->getCertSHA1(%{$certRef});
+        $self->{$certTyp}->{$certSha1->{CERTSHA1}}->{CERTFILE} = $config->get("keystore.$entryname.location", 'FILE');
+        $self->{$certTyp}->{$certSha1->{CERTSHA1}}->{CERTDATA} = $certData;
+        $self->{$certTyp}->{$certSha1->{CERTSHA1}}->{CERTINFO} = $certInfo;
+        if ($certTyp eq 'installedRootCAs') {
+          $rc->{$certSha1->{CERTSHA1}} = $self->{$certTyp}->{$certSha1->{CERTSHA1}}
+        }
+      }
     }
     $certRef  = $self->getCert(CERTDATA => $certRef->{CERTREST});
   }
 
   CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "get all installed root certificates");
-  return $certFound;
-} ## end sub getInstalledRoots
+  return $rc;
+} ## end sub getInstalledCAs
 
 
 sub installRoots {
@@ -528,41 +538,6 @@ sub installRoots {
   #   my $self = shift;
   #   return $self->SUPER::installRoots(@_) if $self->can("SUPER::installRoots");
   # }
-
-  # INFO Sascha:
-  #   - nachträgliches Hinzufügen eines Root Certs in einen pkcs12 Keystore ist 
-  #     nicht möglich (nur durch entpacken und neu zusammensetzen)
-  #
-  # Anbei das Script zum Hinzufügen von Zertifikaten zu pkcs12 Containern.
-  # 
-  # Das Script erwartet folgende Parameter:
-  # $1 Pfad zur pkcs12 Datei
-  # $2 Pfad zum Zertifikat, das hinzugefügt werden soll
-  # $3 Pfad für den neuen pkcs12 Container
-  #
-  # Beispiel:
-  #
-  # #!/bin/bash
-  # 
-  # #$1 path to pkcs12 container
-  # #$2 path to keyfile to add
-  # #$3 path to new pkcs12 container
-  # 
-  # #Extract private key
-  # openssl pkcs12 -in $1 -nocerts -nodes | openssl rsa > id_rsa
-  # 
-  # #Extract certificates
-  # openssl pkcs12 -in $1 -out keyStore.pem -nodes -nokeys
-  # 
-  # #convert 
-  # openssl x509 -in $2 -out keyStore2.pem
-  # 
-  # cat keyStore2.pem >> keyStore.pem
-  # openssl pkcs12 -export -out $3 -inkey ./id_rsa -in keyStore.pem
-  # 
-  # rm id_rsa
-  # rm keyStore.pem
-  # rm keyStore2.pem
   CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "Install all available root certificates");
   my $self = shift;
   my %args = (@_);
@@ -577,140 +552,115 @@ sub installRoots {
   # DIRECTORY, FILE and CHAINFILE is identical to the OpenSSL Key, so we use the installRoots of OpenSSL
   $rc = $self->SUPER::installRoots(@_) if $self->can("SUPER::installRoots");
 
+  # only LOCATION is handled in a different way
   if (!$rc && (!defined($args{TARGET}) || ($args{TARGET} eq 'LOCATION'))) {
-    # only LOCATION is handled in a different way
-    my $installedRootCAs = $args{INSTALLED};
-    my $availableRootCAs = $args{AVAILABLE};
-    
     # First get the available Root Certs
-    my $rootCertList = ();
-    # the available Root Certs should be given in $availableRootCAs. If not (i.E Standalone Tests) we create it again
-    if (defined($availableRootCAs)) {
-      foreach (keys($availableRootCAs)) {
-        push(@$rootCertList, $availableRootCAs->{$_});
-      }
-    } else {
-      $rootCertList = $self->k_getRootCerts();
-    }
-    
-    if (!defined($rootCertList)) {
+    my $installedRootCAs = $self->k_getAvailableRootCAs();
+
+    if (!defined($installedRootCAs)) {
       $rc = CertNanny::Logging->error("No root certificates found in " . $config-get("keystore.$entryname.TrustedRootCA.AUTHORITATIVE.Directory", 'FILE'));
     } else {
       # If this is ok, let's get the privat key
-      my $privKey = $self->getKey();
-      my $cert;
-      my $certChain;
-      if (!defined($privKey)) {
+      my $myKey = $self->getKey();
+      my $EECert;
+      if (!defined($myKey)) {
         $rc = CertNanny::Logging->error("No private key found in " . $config-get("keystore.$entryname.location", 'FILE'));
       } else {
         # now let's get the certificate
-        $cert = $self->getCert(CERTTYPE => 'EE');
-        if (!defined($cert)) {
+        $EECert = $self->getCert(CERTTYPE => 'EE');
+        if (!defined($EECert)) {
           $rc = CertNanny::Logging->error("No EE cert found in " . $config-get("keystore.$entryname.location", 'FILE'));
         } else {
-          my ($certRef, $certData, $certSha1);
-          my $certFound = {};
-          # finaly let's get the certificate chain
-          $certRef = $self->getCert(CERTTYPE => 'CA');
-          while ($certRef and ($certData = $certRef->{CERTDATA})) {
-            $certSha1 = CertNanny::Util->getCertSHA1(%{$certRef});
-            $certFound->{$certSha1->{CERTSHA1}}->{CERTFILE} = $config-get("keystore.$entryname.location", 'FILE');
-            $certFound->{$certSha1->{CERTSHA1}}->{CERTDATA} = $certData;
-            $certFound->{$certSha1->{CERTSHA1}}->{CERTINFO} = CertNanny::Util->getCertInfoHash(CERTDATA   => $certData,
-                                                                                               CERTFORMAT => 'PEM');
-            $certRef  = $self->getCert(CERTDATA => $certRef->{CERTREST});
-          }
-        }
-      }
-    }
-    
-    # we collected the privat key, our certificate, the certificate chain and the root certificate list
-    # now we build the new PKCS12 file
-    if (!$rc) {
-      my $tmpFile = CertNanny::Util->getTmpFile();
-    }
+          $EECert->{CERTINFO} = CertNanny::Util->getCertInfoHash(CERTDATA   => $EECert->{CERTDATA},
+                                                                 CERTFORMAT => 'PEM');
+          # Collect all Certs to be in the PKCS12 file in a list        
+          my %certHash;
 
-
-
-
-
-    if (!defined($availableRootCAs)) {
-      # First fetch available root certificates
-      my $rootCertList = $self->k_getRootCerts();
-      if (!defined($rootCertList)) {
-        $rc = CertNanny::Logging->error("No root certificates found in " . $config-get("keystore.$entryname.TrustedRootCA.AUTHORITATIVE.Directory", 'FILE'));
-      }
-  
-      if (!$rc) {
-        my $availableRootCAs = {};
-        # Foreach available root cert get the SHA1
-        foreach my $certRef (@{$rootCertList}) {
-          my $certSHA1 = CertNanny::Util->getCertSHA1(%{$certRef})->{CERTSHA1};
-          if (exists($availableRootCAs->{$certSHA1})) {
-            if (exists($availableRootCAs->{$certSHA1}->{CERTFILE}) and ($certRef->{CERTFILE})) {
-              CertNanny::Logging->debug("Identical root certificate in <" . $availableRootCAs->{$certSHA1}->{CERTFILE} . "> and <" . $certRef->{CERTFILE} . ">");
-            } else {
-              CertNanny::Logging->debug("Identical root certificate <" . $availableRootCAs->{$certSHA1}->{CERTINFO}->{SubjectName} . "> found.");
+          # EE Cert is always in the PKCS12 File
+          $certHash{CertNanny::Util->getCertSHA1(%{$EECert})->{CERTSHA1}} = $EECert;
+          
+          # Chain Certs is only in the PKCS12 File if excludeCAChain is NOT set
+          if (!$config->getFlag("keystore.$entryname.key.excludeCAChain")) {
+            $self->k_getCaCerts();
+            my $certChain = $self->k_buildCertificateChain($EECert);
+            foreach (@{$certChain}) {
+              $certHash{CertNanny::Util->getCertSHA1(%{$_})->{CERTSHA1}} = $_;
             }
-          } else {
-            $availableRootCAs->{$certSHA1} = $certRef;
           }
+
+          # Trusted Root Certs are only in the PKCS12 File if excludeCAChain is NOT set and excludeRoot is NOT set
+          if (!$config->getFlag("keystore.$entryname.key.excludeCAChain") && !$config->getFlag("keystore.$entryname.key.excludeRoot")) {
+            foreach (keys($installedRootCAs)) {
+              $certHash{$_} = $installedRootCAs->{$_};
+            }
+          }  
+
+          # Build the command option and concat all certs to be added in an single file
+          my $CAListFile = CertNanny::Util->getTmpFile;
+    
+          # First argument ist the CAListfile Name
+          my @CAList     = ();
+          push(@CAList, '-certfile', qq("$CAListFile"));
+          
+          # then collect the certs
+          foreach my $item (keys (%certHash)) {
+            (my $CN = (split(/(?<!\\),\s*/, $certHash{$item}->{CERTINFO}->{SubjectName}))[0]) =~ s/^CN=//;
+            #$CN =~ s/^CN=//;
+            CertNanny::Logging->debug("Adding CA certificate '$CN' in $CAListFile");
+            my $pemCACert = "-----BEGIN CERTIFICATE-----\n" . $certHash{$item}->{'CERTINFO'}->{'Certificate'} ."-----END CERTIFICATE-----\n";
+              
+            # concat the certs in the CAListFile
+            if (!CertNanny::Util->writeFile(SRCCONTENT => $pemCACert,
+                                            DSTFILE    => $CAListFile,
+                                            APPEND     => 1)) {
+              $rc = CertNanny::Logging->error("Could not append Root CA into chainfile");        
+            } else {
+              # and collect the certName in the Argumentlist
+              push(@CAList, '-caname', qq("$CN"));
+            }
+          } ## end foreach my $entry (@{$args{...}})
+
+          if (!$rc) {
+            my $tmpKey = CertNanny::Util->getTmpFile();
+            $rc = !CertNanny::Util->writeFile(SRCCONTENT => $myKey->{KEYDATA},
+                                              DSTFILE    => $tmpKey,
+                                              FORCE      => 1);
+                                              
+            my $tmpCert = CertNanny::Util->getTmpFile();
+            $rc = $rc || !CertNanny::Util->writeFile(SRCCONTENT => $EECert->{CERTDATA},
+                                                     DSTFILE    => $tmpCert,
+                                                     FORCE      => 1);
+                                              
+            my $tmpP12 = CertNanny::Util->getTmpFile();
+            if (!$rc) {
+              my @cmd = $self->_buildOpenSSLPKCS12Cmd('-export' => '-export', 
+                                                      '-in'     => $tmpCert,     
+                                                      '-out'    => $tmpP12,
+                                                      '-inkey'  => $tmpKey,
+                                                      '-name'   => $config->get("keystore.$entryname.label") || 'cert1',
+                                                      'ARGS'    => \@CAList);
+              $rc = CertNanny::Util->runCommand(\@cmd);
+
+              if (!$rc) {
+                $rc = !CertNanny::Util->writeFile(SRCFILE => $tmpP12,
+                                                  DSTFILE => $config->get("keystore.$entryname.location") . ".new",
+                                                  FORCE   => 1);
+              }
+            }
+            # cleanup 
+            eval {unlink($tmpKey)};
+            eval {unlink($tmpCert)};
+            eval {unlink($tmpP12)};
+          }
+          # cleanup 
+          eval {unlink($CAListFile)};
         }
       }
     }
-
-
-
-    my @cmd;
-    my $tmpFile1 = CertNanny::Util->getTmpFile();
-    my $tmpFile2 = CertNanny::Util->getTmpFile();
-    my $tmpFile3 = CertNanny::Util->getTmpFile();
-    my $openssl  = $config->get('cmd.openssl', 'FILE');
-  
-    # openssl pkcs12 -in $1 -nocerts -nodes | ... 
-    @cmd = $self->_buildOpenSSLPKCS12Cmd('-nocerts', -out => qq("$tmpFile1"));
-    $rc = CertNanny::Util->runCommand(\@cmd);
-    # ... | openssl rsa > id_rsa
-    @cmd = (qq("$openssl"), 'rsa', -in => qq("$tmpFile1"), -out => qq("$tmpFile2"));
-    $rc = CertNanny::Util->runCommand(\@cmd);
- 
-    # openssl pkcs12 -in $1 -out keyStore.pem -nodes -nokeys
-    @cmd = $self->_buildOpenSSLPKCS12Cmd('-nokeys', -out => qq("$tmpFile1"));
- 
-    foreach my $certSHA1 (keys ($availableRootCAs)) {
-      CertNanny::Logging->debug("Importing root cert " . $availableRootCAs->{$certSHA1}->{CERTINFO}->{SubjectName});
-      my $tmpFile4 = CertNanny::Util->getTmpFile();
-      CertNanny::Util->writeFile(DSTFILE => $tmpFile4,
-                                 SRCFILE => $availableRootCAs->{$certSHA1}->{CERTDATA});
-
-      # openssl x509 -in $2 -out keyStore2.pem
-      @cmd = (qq("$openssl"), 'x509', -in => qq("$tmpFile4"), -out => qq("$tmpFile3"));
-      $rc = CertNanny::Util->runCommand(\@cmd);
-
-      # cat keyStore2.pem >> keyStore.pem
-      CertNanny::Util->writeFile(DSTFILE => $tmpFile1,
-                                 SRCFILE => $tmpFile3, 
-                                 APPEND  => 1);
-    
-      if ($rc) {
-        CertNanny::Logging->error("Error importing root cert " . $availableRootCAs->{$certSHA1}->{CERTINFO}->{SubjectName});
-      }
-      # Postinstallhook
-      $self->_executeHook($entry->{hook}->{roots}->{install}->{post},
-                          '__TYPE__'        => 'FILE',
-                          '__CERTFILE__'    => $availableRootCAs->{$certSHA1}->{CERTFILE},
-                          '__FINGERPRINT__' => $availableRootCAs->{$certSHA1}->{CERTINFO}->{CertificateFingerprint},
-                          '__TARGET__'      => 'LOCATION');
-    }
-    
-    # openssl pkcs12 -export -out $3 -inkey ./id_rsa -in keyStore.pem
-    @cmd = $self->_buildOpenSSLPKCS12Cmd('-export', -inkey => qq("$tmpFile2"), -in => qq("$tmpFile1"), -out => qq("$tmpFile3"));
-    $rc = CertNanny::Util->runCommand(\@cmd);
   }
 
   CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "Install all available root certificates");
   return $rc;
-  # createPKCS12
 } ## end sub installRoots
 
 
@@ -724,7 +674,7 @@ sub syncRootCAs {
   # Output: 1 : failure  0 : success 
   #
   # this function synchronizes installed roots with local trusted root CAs.
-  # The installed root CAs are fetched via getInstalledRoots. The available
+  # The installed root CAs are fetched via getInstalledCAs. The available
   # trusted root CAs are fetched via k_getRootCerts.
   # Alle available root CAs are installed in a new temp. keystore. The 
   # installed root CAs are replaced with the new keytore. So all installed
@@ -752,6 +702,13 @@ sub _buildOpenSSLPKCS12Cmd {
   #   -nokeys -clcerts : to display the client certificate only
   #   -nokeys -cacerts : to display the CA chain certificates only
   my $self     = shift;
+  
+  my %args = (-in       => undef,
+              -password => undef,
+              -passout  => undef,
+              -passin   => undef,
+              @_);
+  
 
   my $options   = $self->{OPTIONS};
   my $entry     = $options->{ENTRY};
@@ -760,18 +717,28 @@ sub _buildOpenSSLPKCS12Cmd {
 
   my $rc = 0;
   
-  my $openssl = $config->get('cmd.openssl', 'FILE');
-  my $filename = $self->_getPKCS12File();
-  my $pin      = $self->_getPin();
-  $ENV{PIN}    = $pin;
+  my $openssl    = $config->get('cmd.openssl', 'FILE');
+  $args{-in}       ||= $config->get("keystore.$entryname.location", 'FILE');
+  $ENV{PASSWORD} = $args{-password} || $self->_getPin();
+  $ENV{PASSOUT}  = $args{-passout}  || $self->_getPin();
+  $ENV{PASSIN}   = $args{-passin}   || $self->_getPin();
+  $args{-password} = "env:PASSWORD";
+  $args{-passout}  = "env:PASSOUT";
+  $args{-passin}   = "env:PASSIN";
   
   my @cmd = (qq("$openssl"), 'pkcs12') if ($openssl);
-  push(@cmd, -in       => qq("$filename")) if ($filename);
-  push(@cmd, -password => qq("env:PIN"))   if ($pin);
-  push(@cmd, -passout  => qq("env:PIN"))   if ($pin);
+  foreach (keys (%args)) {
+    if (defined($args{$_})) {
+      if ($_ eq 'ARGS') {
+        push(@cmd, @{$args{ARGS}});
+      } else {
+        push(@cmd, $_);
+        push(@cmd, $args{$_}) if ($args{$_} ne $_);
+      }
+    }
+  }
   # if everything should  work unencrypted uncomment:
   # push(@cmd, -nodes);
-  push(@cmd, @_);
 
   @cmd;
 } ## end sub _buildOpenSSLPKCS12Cmd
@@ -844,20 +811,6 @@ sub _getNewPKCS12Data {
 
   return $data;
 } ## end sub get_new_pkcs12_data
-
-
-sub _getPKCS12File {
-  # returns filename with all PKCS#12 data
-  my $self = shift;
-
-  my $options   = $self->{OPTIONS};
-  my $entry     = $options->{ENTRY};
-  my $entryname = $options->{ENTRYNAME};
-  my $config    = $options->{CONFIG};
-
-  return $config->get("keystore.$entryname.location", 'FILE');
-  # $self->{OPTIONS}->{ENTRY}->{location};
-}
 
 
 sub _getPin {

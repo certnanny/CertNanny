@@ -319,7 +319,6 @@ sub getKey() {
   # 
   # Output: caller gets a hash ref (as expected by k_convertKey()):
   #           KEYDATA   => string containg the private key OR
-  #           KEYFILE   => file containing the key data
   #           KEYFORMAT => 'PEM' or 'DER'
   #           KEYTYPE   => format (e. g. 'PKCS8' or 'OpenSSL'
   #           KEYPASS   => key pass phrase (only if protected by pass phrase)
