@@ -204,6 +204,7 @@ sub do_enroll {
   my $entry     = $args{ENTRY};
   my $entryname = $args{ENTRYNAME};
   my %save ={} ;
+  
 
   CertNanny::Util->backoffTime($self->{CONFIG});
 
@@ -438,6 +439,8 @@ sub do_renew {
   my %args = (@_);
 
   my $keystore = $args{KEYSTORE};
+  
+  $keystore->{INSTANCE}->k_executionHook();
 
   if (defined $self->{ITEMS}->{$args{ENTRY}}->{rootcaupdate}->{enable}
       && $self->{ITEMS}->{$args{ENTRY}}->{rootcaupdate}->{enable} eq "true") {
