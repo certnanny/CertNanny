@@ -1402,6 +1402,10 @@ sub k_buildCertificateChain {
   # the config file!
 
   # output structure, for building the chain start with the end entity cert
+  if (!defined($cert->{CERTINFO})) {
+    my $certInfo = CertNanny::Util->getCertInfoHash(%$cert);
+    $cert->{CERTINFO} = $certInfo;
+  }
   my @chain = ($cert);
 
   CertNanny::Logging->debug("Building certificate chain");

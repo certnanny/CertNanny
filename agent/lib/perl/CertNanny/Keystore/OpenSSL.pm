@@ -1234,8 +1234,6 @@ sub installRoots {
   #           TARGET      => optional : where should the procedure install
   #                          root certificates (DIRECTORY|FILE|CHAINFILE|LOCATION)
   #                          default: all three
-  #           INSTALLED   => mandatory(not used) : hash with already installed roots
-  #           AVAILABLE   => mandatory(used) : hash with available roots
   # 
   # Output: 1 : failure  0 : success 
   #
@@ -1261,9 +1259,6 @@ sub installRoots {
   my $entryname = $options->{ENTRYNAME};
   my $config    = $options->{CONFIG};
 
-  my $installedRootCAs = $args{INSTALLED};
-  my $availableRootCAs = $args{AVAILABLE};
-  
   my %locInstall = ('directory' => $config->get("keystore.$entryname.TrustedRootCA.GENERATED.Directory", 'FILE'),
                     'file'      => $config->get("keystore.$entryname.TrustedRootCA.GENERATED.File",      'FILE'),
                     'chainfile' => $config->get("keystore.$entryname.TrustedRootCA.GENERATED.ChainFile", 'FILE'));
@@ -1272,96 +1267,87 @@ sub installRoots {
   my $doSearch = (!defined($args{TARGET}) or defined($locInstall{lc($args{TARGET})}));
 
   if ($doSearch) {
-    my $rootCertList = ();
-    # the available Root Certs should be given in $args{AVAILABLE}. If not (i.E Standalone Tests) we create it again
-    if (defined($availableRootCAs)) {
-      foreach (keys($availableRootCAs)) {
-        push(@$rootCertList, $availableRootCAs->{$_});
-      }
-    } else {
-      $rootCertList = $self->k_getRootCerts();
-    }
-    if (!defined($rootCertList)) {
+    my $rootCertHash = $self->k_getAvailableRootCAs();
+    if (!defined($rootCertHash)) {
       $rc = CertNanny::Logging->error("No root certificates found in " . $config-get("keystore.$entryname.TrustedRootCA.AUTHORITATIVE.Directory", 'FILE'));
     } else {
-      # write directory links: Links every certificate to the target directory
-      if (defined($locInstall{directory}) && (!defined($args{TARGET}) or ('DIRECTORY' =~ m/^$args{TARGET}/))) {
+      # write for TARGET DIRECTORY links: Links every certificate to the target directory
+      if (defined($locInstall{'directory'}) && (!defined($args{TARGET}) or ('DIRECTORY' =~ m/^$args{TARGET}/))) {
 	      # First clean up the Target directory and get rid of all old certs
         $self->_createLocalCerts(TARGET  => $locInstall{directory},
                                  CLEANUP => 1);
 
         # For each cert install in target and execute postinstall Hook
-        foreach my $cert (@$rootCertList) {
-          $self->_createLocalCerts(SOURCE  => $cert->{CERTFILE},
-                                   TARGET  => $locInstall{directory},
-                                   CLEANUP => 0);
+        foreach my $certSHA1 (keys(%$rootCertHash)) {
+          $self->_createLocalCerts(SOURCE   => $rootCertHash->{$certSHA1}->{CERTFILE},
+                                   TARGET   => $locInstall{directory},
+                                   CLEANUP  => 0);
 
           $self->_executeHook($entry->{hook}->{roots}->{install}->{post},
                               '__TYPE__'        => 'DIRECTORY',
-                              '__CERTFILE__'    => $cert->{CERTFILE},
-                              '__FINGERPRINT__' => $cert->{CERTINFO}->{CertificateFingerprint},
+                              '__CERTFILE__'    => $rootCertHash->{$certSHA1}->{CERTFILE},
+                              '__FINGERPRINT__' => $rootCertHash->{$certSHA1}->{CERTINFO}->{CertificateFingerprint},
                               '__TARGET__'      => $locInstall{directory});
         }  
       }  
 
-      foreach my $target ('file', 'chainfile') {
-        if (!defined($args{TARGET}) or (uc($target) =~ m/^$args{TARGET}/)) {
-          # write file: Writes all certificates in one PEM file / Chainfile
-          if (defined($locInstall{$target})) {
-  	        # write in an tmp-file first just in case ...
-            my $tmpFile = CertNanny::Util->getTmpFile();
-            foreach my $cert (@$rootCertList) {
-              CertNanny::Util->writeFile(DSTFILE => $tmpFile,
-                                         SRCFILE => $cert->{CERTFILE}, 
-                                         APPEND  => 1);
+      # write for TARGETs FILE and CHAINFILE a file
+      if (!defined($args{TARGET}) or ('FILE' =~ m/^$args{TARGET}/) or ('CHAINFILE' =~ m/^$args{TARGET}/)) {
+        # write file: Writes all certificates in one PEM file / Chainfile
+        if (defined($locInstall{'file'}) || defined($locInstall{'chainfile'})) {
+          # write in an tmp-file first just in case ...
+          my $tmpFile = CertNanny::Util->getTmpFile();
+          foreach  my $certSHA1 (keys(%$rootCertHash)) {
+            CertNanny::Util->writeFile(DSTFILE => $tmpFile,
+                                       SRCFILE => $rootCertHash->{$certSHA1}->{CERTFILE}, 
+                                       APPEND  => 1);
 
-              $self->_executeHook($entry->{hook}->{roots}->{install}->{post},
-                                  '__TYPE__'        => uc($target),
-                                  '__CERTFILE__'    => $cert->{CERTFILE},
-                                  '__FINGERPRINT__' => $cert->{CERTINFO}->{CertificateFingerprint},
-                                  '__TARGET__'      => $locInstall{$target});
-            }
+            $self->_executeHook($entry->{hook}->{roots}->{install}->{post},
+                                '__TYPE__'        => 'FILE',
+                                '__CERTFILE__'    => $rootCertHash->{$certSHA1}->{CERTFILE},
+                                '__FINGERPRINT__' => $rootCertHash->{$certSHA1}->{CERTINFO}->{CertificateFingerprint},
+                                '__TARGET__'      => $locInstall{'file'});
+          }
 
-            if ($target eq 'chainfile') {
-              # in addition to the Root Certs, the chainfile also keeps the chain
-              if (!exists($self->{STATE}->{DATA}->{SCEP}->{CACERTS})) {
-                $self->k_getCaCerts();
-              }
-# Todo Arkadius Frage ok: Wie filtere ich die raus, die in das CheinFile gehoeren NEIN, es kommen neue dazu naemlich die Chain der intermediate CAs
-# Todo installRoots: buildcertChain liefert mit dem aktuellen cert nur undef zurueck :-(
-# intermediate CAs holen mit k_getCACerts falls nicht bereits geholt 
-#   $self->{STATE}->{DATA}->{SCEP}->{CACERTS} = $certs{CACERTS};
-# Reihenfolge ist egal
-# getCert : Endcert holen
-# danach buildcertChain
-# Anker und ggf andere Roots entfernen EE entfernen, und den Rest an chainfile anhaengen; Reihenfolge egal
-              if (my $chainArrRef = $self->k_buildCertificateChain($self->getCert())) {
-                # delete root
-                shift(@$chainArrRef);
-                # delete EE
-                pop(@$chainArrRef);
-                # all others add to chainfile
-                while (my $cert = shift($chainArrRef)) {
-                  CertNanny::Util->writeFile(DSTFILE => $tmpFile,
-                                             SRCFILE => $cert->{CERTFILE}, 
-                                             APPEND  => 1);
-
-                  $self->_executeHook($entry->{hook}->{roots}->{install}->{post},
-                                      '__TYPE__'        => uc($target),
-                                      '__CERTFILE__'    => $cert->{CERTFILE},
-                                      '__FINGERPRINT__' => $cert->{CERTINFO}->{CertificateFingerprint},
-                                      '__TARGET__'      => $locInstall{$target});
-                }
-              }    
-            }    
-
+          if (defined($locInstall{'file'}) && (!defined($args{TARGET}) or ('FILE' =~ m/^$args{TARGET}/))) {
             # put tmp-file to the right location     
-            if (!File::Copy::copy($tmpFile, $locInstall{$target})) {
-              CertNanny::Logging->error("Could not install new TrusteRootCA File to " . $locInstall{$target} . ".");
+            if (!File::Copy::copy($tmpFile, $locInstall{'file'})) {
+              CertNanny::Logging->error("Could not install new TrusteRootCA File to " . $locInstall{'file'} . ".");
             }
-            eval {unlink($tmpFile)};
-          }  
-        }  
+          }
+
+          if (defined($locInstall{'chainfile'}) && (!defined($args{TARGET}) or ('CHAINFILE' =~ m/^$args{TARGET}/))) {
+            # in addition to the Root Certs, the chainfile also keeps the chain
+            #if (!exists($self->{STATE}->{DATA}->{SCEP}->{CACERTS})) {
+            #  $self->k_getCaCerts();
+            #}
+            $self->k_getCaCerts();
+
+            if (my $chainArrRef = $self->k_buildCertificateChain($self->getCert())) {
+              # delete root
+              shift(@$chainArrRef);
+              # delete EE
+              pop(@$chainArrRef);
+              # all others add to chainfile
+              while (my $cert = shift($chainArrRef)) {
+                CertNanny::Util->writeFile(DSTFILE => $tmpFile,
+                                           SRCFILE => $cert->{CERTFILE}, 
+                                           APPEND  => 1);
+
+                $self->_executeHook($entry->{hook}->{roots}->{install}->{post},
+                                    '__TYPE__'        => 'CHAINFILE',
+                                    '__CERTFILE__'    => $cert->{CERTFILE},
+                                    '__FINGERPRINT__' => $cert->{CERTINFO}->{CertificateFingerprint},
+                                    '__TARGET__'      => $locInstall{'chainfile'});
+              }
+            }    
+            # put tmp-file to the right location     
+            if (!File::Copy::copy($tmpFile, $locInstall{'chainfile'})) {
+              CertNanny::Logging->error("Could not install new TrusteRootCA File to " . $locInstall{'file'} . ".");
+            }
+          }    
+          eval {unlink($tmpFile)};
+        }
       }  
     }
   }
@@ -1391,11 +1377,11 @@ sub _createLocalCerts {
   # target directory (if CLEANUP is not disbled)
   CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "create certificate symlinks or copies in the target directory");
   my $self         = shift;
-  my %args = (CLEANUP => 1,
-              COPY => 0,
+  my %args = (CLEANUP   => 1,
+              COPY      => 0,
               @_);
   
-  my $certSourceGlob = $args{CERTDIR};
+  my $certSourceGlob = $args{SOURCE};
   my $certTargetDir  = $args{TARGET};
   my $copy           = $args{COPY};
   my $cleanup        = $args{CLEANUP};
