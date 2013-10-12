@@ -242,9 +242,9 @@ sub getKey {
   
   if ($data =~ s{ \A .* (?=-----BEGIN) }{}xms) {
     $rc = {KEYDATA   => $data,
-           KEYTYPE   => 'PKCS8',
-           KEYFORMAT => 'DER',
-           KEYPASS   => ''};
+           KEYTYPE   => 'OPENSSL',
+           KEYFORMAT => 'PEM',
+           KEYPASS   => $self->_getPin()};
     $self->{myKey} = $rc;
   }
 
@@ -521,7 +521,6 @@ sub installRoots {
   #                          root certificates (DIRECTORY|FILE|CHAINFILE|LOCATION)
   #                          default: all three
   #           INSTALLED   => mandatory(used) : hash with already installed roots
-  #           AVAILABLE   => mandatory(used) : hash with available roots
   # 
   # Output: 1 : failure  0 : success 
   #
@@ -642,6 +641,7 @@ sub installRoots {
               $rc = CertNanny::Util->runCommand(\@cmd);
 
               if (!$rc) {
+                # Everything ok. Let's replace the old PKCS12
                 $rc = !CertNanny::Util->writeFile(SRCFILE => $tmpP12,
                                                   DSTFILE => $config->get("keystore.$entryname.location") . ".new",
                                                   FORCE   => 1);
