@@ -169,6 +169,7 @@ sub DESTROY {
   }
 } ## end sub DESTROY
 
+sub dummy () {
 #  Abstract methods to be implemented by the instances
 #    NOT needed in Keystore Class. Only for documentation
 #    No overwriting or fallback if missing in the Key Class
@@ -494,6 +495,7 @@ sub DESTROY {
 #
 #  return undef
 #}
+}
 
 
 sub k_storeState {
@@ -1405,6 +1407,10 @@ sub k_buildCertificateChain {
   # the config file!
 
   # output structure, for building the chain start with the end entity cert
+  if (!defined($cert->{CERTINFO})) {
+    my $certInfo = CertNanny::Util->getCertInfoHash(%$cert);
+    $cert->{CERTINFO} = $certInfo;
+  }
   my @chain = ($cert);
 
   CertNanny::Logging->debug("Building certificate chain");
@@ -1561,20 +1567,18 @@ sub k_syncRootCAs {
     foreach my $target ('DIRECTORY', 'FILE', 'CHAINFILE', 'LOCATION') {
       if (defined($locSearch{lc($target)})) {
         # Fetch installed root certificates into
-        # Todo Dumper Löschen      
-        # print Dumper($target);
         my $installedRootCAs = $self->getInstalledCAs(TARGET => $target);
   
         my $rebuild = 0;
         # comparison $installedRootCAs to $availableRootCAs
-        foreach my $certSHA1 (keys ($installedRootCAs)) {
+        foreach my $certSHA1 (keys (%{$installedRootCAs})) {
           $rebuild ||= !exists($availableRootCAs->{$certSHA1});
           last if $rebuild;
         }  
 
         if (!$rebuild) {
           # comparison $availableRootCAs to $installedRootCAs
-	        foreach my $certSHA1 (keys ($availableRootCAs)) {
+	        foreach my $certSHA1 (keys (%{$availableRootCAs})) {
 	          $rebuild ||= !exists($installedRootCAs->{$certSHA1});
 	          last if $rebuild;
 	        }
