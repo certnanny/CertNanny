@@ -895,7 +895,7 @@ sub getTmpFile {
   my $tmpfile = mktemp($template);
 
   push(@{$self->{TMPFILE}}, $tmpfile);
-  #CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "get a tmp file");
+  # CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "get a tmp file");
   return $tmpfile;
 } ## end sub getTmpFile
 

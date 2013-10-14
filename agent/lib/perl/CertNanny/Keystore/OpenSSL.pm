@@ -1180,7 +1180,8 @@ sub getInstalledCAs {
   my $entryname = $options->{ENTRYNAME};
   my $config    = $options->{CONFIG};
   
-  my $rc = undef;
+  #if no root ca location defined return only an empty hash
+  my $rc = {};
   
   my %locSearch = ('directory' => $config->get("keystore.$entryname.TrustedRootCA.GENERATED.Directory", 'FILE'),
                    'file'      => $config->get("keystore.$entryname.TrustedRootCA.GENERATED.File",      'FILE'),
@@ -1264,10 +1265,10 @@ sub installRoots {
                     'chainfile' => $config->get("keystore.$entryname.TrustedRootCA.GENERATED.ChainFile", 'FILE'));
 
   my $rc = 0;
-  my $doSearch = (!defined($args{TARGET}) or defined($locInstall{lc($args{TARGET})}));
-  
-  my ($hookType, $hookCertfile, $hookFingerprint, $hookTarget) = ('', '', '', '');
 
+  my $execHook = (ref($self) eq 'CertNanny::Keystore::OpenSSL');
+  
+  my $doSearch = (!defined($args{TARGET}) or defined($locInstall{lc($args{TARGET})}));
   if ($doSearch) {
     my $rootCertHash = $self->k_getAvailableRootCAs();
     if (!defined($rootCertHash)) {
@@ -1280,47 +1281,55 @@ sub installRoots {
                                  CLEANUP => 1);
 
         # For each cert install in target and execute postinstall Hook
-        foreach my $certSHA1 (keys(%$rootCertHash)) {
-          $self->_createLocalCerts(SOURCE   => $rootCertHash->{$certSHA1}->{CERTFILE},
-                                   TARGET   => $locInstall{directory},
-                                   CLEANUP  => 0);
-          $hookType        .= 'DIRECTORY,'                                                           if $hookType        !~ m/DIRECTORY/;
-          $hookCertfile    .= $rootCertHash->{$certSHA1}->{CERTFILE} . ','                           if $hookCertfile    !~ m/$rootCertHash->{$certSHA1}->{CERTFILE}/;
-          $hookFingerprint .= $rootCertHash->{$certSHA1}->{CERTINFO}->{CertificateFingerprint} . ',' if $hookFingerprint !~ m/$rootCertHash->{$certSHA1}->{CERTINFO}->{CertificateFingerprint}/;
-          $hookTarget      .= $locInstall{directory} . ','                                           if $hookTarget      !~ m/$locInstall{directory})/;;
+        foreach my $item (keys %{$rootCertHash}) {
+          $self->_createLocalCerts(SOURCE  => $rootCertHash->{$item}->{CERTFILE},
+                                   TARGET  => $locInstall{directory},
+                                   CLEANUP => 0);
+
+          $self->{Hook}->{Type}   .= 'DIRECTORY' . ','                                                  if ($self->{Hook}->{Type}   !~ m/DIRECTORY/);
+          $self->{Hook}->{File}   .= $rootCertHash->{$item}->{CERTFILE} . ','                           if ($self->{Hook}->{File}   !~ m/$rootCertHash->{$item}->{CERTFILE}/);
+          $self->{Hook}->{FP}     .= $rootCertHash->{$item}->{CERTINFO}->{CertificateFingerprint} . ',' if ($self->{Hook}->{FP}     !~ m/$rootCertHash->{$item}->{CERTINFO}->{CertificateFingerprint}/);
+          $self->{Hook}->{Target} .= $locInstall{directory} . ','                                       if ($self->{Hook}->{Target} !~ m/$locInstall{directory}/);
         }  
       }  
 
-      # write for TARGETs FILE and CHAINFILE a file
       if (!defined($args{TARGET}) or ('FILE' =~ m/^$args{TARGET}/) or ('CHAINFILE' =~ m/^$args{TARGET}/)) {
         # write file: Writes all certificates in one PEM file / Chainfile
-        if (defined($locInstall{'file'}) || defined($locInstall{'chainfile'})) {
-          # write in an tmp-file first just in case ...
+        if (defined($locInstall{'file'}) or defined($locInstall{'chainfile'})) {
+        # write in an tmp-file first just in case ...
           my $tmpFile = CertNanny::Util->getTmpFile();
-          foreach  my $certSHA1 (keys(%$rootCertHash)) {
-            CertNanny::Util->writeFile(DSTFILE => $tmpFile,
-                                       SRCFILE => $rootCertHash->{$certSHA1}->{CERTFILE}, 
+          foreach my $item (keys %{$rootCertHash}) {
+            CertNanny::Util->writeFile(SRCFILE => $rootCertHash->{$item}->{CERTFILE}, 
+                                       DSTFILE => $tmpFile,
                                        APPEND  => 1);
-            $hookType        .= 'FILE,'                                                                if $hookType        !~ m/FILE/;
-            $hookCertfile    .= $rootCertHash->{$certSHA1}->{CERTFILE} . ','                           if $hookCertfile    !~ m/$rootCertHash->{$certSHA1}->{CERTFILE}/;
-            $hookFingerprint .= $rootCertHash->{$certSHA1}->{CERTINFO}->{CertificateFingerprint} . ',' if $hookFingerprint !~ m/$rootCertHash->{$certSHA1}->{CERTINFO}->{CertificateFingerprint}/;
-            $hookTarget      .= $locInstall{file} . ','                                                if $hookTarget      !~ m/$locInstall{file})/;
+
+            if (defined($locInstall{'file'}) and (!defined($args{TARGET}) or ('FILE' =~ m/^$args{TARGET}/))) {
+              $self->{Hook}->{Type}   .= 'FILE' . ','                                                       if ($self->{Hook}->{Type}   !~ m/FILE/);
+              $self->{Hook}->{File}   .= $rootCertHash->{$item}->{CERTFILE} . ','                           if ($self->{Hook}->{File}   !~ m/$rootCertHash->{$item}->{CERTFILE}/);
+              $self->{Hook}->{FP}     .= $rootCertHash->{$item}->{CERTINFO}->{CertificateFingerprint} . ',' if ($self->{Hook}->{FP}     !~ m/$rootCertHash->{$item}->{CERTINFO}->{CertificateFingerprint}/);
+              $self->{Hook}->{Target} .= $locInstall{file} . ','                                            if ($self->{Hook}->{Target} !~ m/$locInstall{file}/);
+            }
+
+            if (defined($locInstall{'chainfile'}) and (!defined($args{TARGET}) or ('CHAINFILE' =~ m/^$args{TARGET}/))) {
+              $self->{Hook}->{Type}   .= 'CHAINFILE' . ','                                                  if ($self->{Hook}->{Type}   !~ m/CHAINFILE/);
+              $self->{Hook}->{File}   .= $rootCertHash->{$item}->{CERTFILE} . ','                           if ($self->{Hook}->{File}   !~ m/$rootCertHash->{$item}->{CERTFILE}/);
+              $self->{Hook}->{FP}     .= $rootCertHash->{$item}->{CERTINFO}->{CertificateFingerprint} . ',' if ($self->{Hook}->{FP}     !~ m/$rootCertHash->{$item}->{CERTINFO}->{CertificateFingerprint}/);
+              $self->{Hook}->{Target} .= $locInstall{chainfile} . ','                                       if ($self->{Hook}->{Target} !~ m/$locInstall{chainfile}/);
+            }
           }
 
-          if (defined($locInstall{'file'}) && (!defined($args{TARGET}) or ('FILE' =~ m/^$args{TARGET}/))) {
+          # Target file part is finished. now write Target
+          if (defined($locInstall{'file'}) and (!defined($args{TARGET}) or ('FILE' =~ m/^$args{TARGET}/))) {
             # put tmp-file to the right location     
             if (!File::Copy::copy($tmpFile, $locInstall{'file'})) {
               CertNanny::Logging->error("Could not install new TrusteRootCA File to " . $locInstall{'file'} . ".");
             }
           }
 
-          if (defined($locInstall{'chainfile'}) && (!defined($args{TARGET}) or ('CHAINFILE' =~ m/^$args{TARGET}/))) {
+          # continue with target chainfile
+          if (defined($locInstall{'chainfile'}) and (!defined($args{TARGET}) or ('CHAINFILE' =~ m/^$args{TARGET}/))) {
             # in addition to the Root Certs, the chainfile also keeps the chain
-            #if (!exists($self->{STATE}->{DATA}->{SCEP}->{CACERTS})) {
-            #  $self->k_getCaCerts();
-            #}
             $self->k_getCaCerts();
-
             if (my $chainArrRef = $self->k_buildCertificateChain($self->getCert())) {
               # delete root
               shift(@$chainArrRef);
@@ -1331,32 +1340,30 @@ sub installRoots {
                 CertNanny::Util->writeFile(DSTFILE => $tmpFile,
                                            SRCFILE => $cert->{CERTFILE}, 
                                            APPEND  => 1);
-                $hookType        .= 'CHAINFILE,'                                      if $hookType        !~ m/CHAINFILE/;
-                $hookCertfile    .= $cert->{CERTFILE} . ','                           if $hookCertfile    !~ m/$cert->{CERTFILE}/;
-                $hookFingerprint .= $cert->{CERTINFO}->{CertificateFingerprint} . ',' if $hookFingerprint !~ m/$cert->{CERTINFO}->{CertificateFingerprint}/;
-                $hookTarget      .= $locInstall{chainfile} . ','                      if $hookTarget      !~ m/$locInstall{chainfile})/;
-                $self->_executeHook($entry->{hook}->{roots}->{install}->{post},
-                                    '__TYPE__'        => 'CHAINFILE',
-                                    '__CERTFILE__'    => $cert->{CERTFILE},
-                                    '__FINGERPRINT__' => $cert->{CERTINFO}->{CertificateFingerprint},
-                                    '__TARGET__'      => $locInstall{'chainfile'});
+
+                $self->{Hook}->{Type}   .= 'CHAINFILE' . ','                                 if ($self->{Hook}->{Type}   !~ m/CHAINFILE/);
+                $self->{Hook}->{File}   .= $cert->{CERTFILE} . ','                           if ($self->{Hook}->{File}   !~ m/$cert->{CERTFILE}/);
+                $self->{Hook}->{FP}     .= $cert->{CERTINFO}->{CertificateFingerprint} . ',' if ($self->{Hook}->{FP}     !~ m/$cert->{CERTINFO}->{CertificateFingerprint}/);
+                $self->{Hook}->{Target} .= $locInstall{chainfile} . ','                      if ($self->{Hook}->{Target} !~ m/$locInstall{chainfile}/);
+              }    
+              # Target chainfile part is finished. now write Target
+              # put tmp-file to the right location     
+              if (!File::Copy::copy($tmpFile, $locInstall{'file'})) {
+                CertNanny::Logging->error("Could not install new TrusteRootCA ChainFile to " . $locInstall{'file'} . ".");
               }
             }    
-            # put tmp-file to the right location     
-            if (!File::Copy::copy($tmpFile, $locInstall{'chainfile'})) {
-              CertNanny::Logging->error("Could not install new TrusteRootCA File to " . $locInstall{'file'} . ".");
-            }
-          }    
-          eval {unlink($tmpFile)};
-          if ($hookType) {
-            $self->_executeHook($entry->{hook}->{roots}->{install}->{post},
-                                '__TYPE__'        => $hookType,
-                                '__CERTFILE__'    => $hookCertfile,
-                                '__FINGERPRINT__' => $hookFingerprint,
-                                '__TARGET__'      => $hookTarget);
           }
-        }
-      }  
+          eval {unlink($tmpFile)};
+        }  
+      }
+      if ($execHook and defined($self->{Hook})) {
+        $self->_executeHook($entry->{hook}->{roots}->{install}->{post},
+                            '__TYPE__'        => $self->{Hook}->{Type},
+                            '__CERTFILE__'    => $self->{Hook}->{File},
+                            '__FINGERPRINT__' => $self->{Hook}->{FP},
+                            '__TARGET__'      => $self->{Hook}->{Target});
+        delete($self->{Hook});
+      }
     }
   }
 
