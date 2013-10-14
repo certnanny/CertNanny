@@ -421,6 +421,7 @@ sub importP12 {
  
   my $origin = File::Spec->canonpath($args{FILENAME}); 
   my $dest = File::Spec->canonpath($entry->{initialenroll}->{targetLocation});
+  CertNanny::Logging->debug("origin: $origin dest: $dest ");
   
   if(! copy($origin,$dest)){
   	 CertNanny::Logging->error("Could not write new p12 Keystore, file already exists ?!$entry->{location} to $args{FILENAME} ");

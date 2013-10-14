@@ -734,9 +734,9 @@ sub k_saveInstallFile {
   ###########################################################################
   # write new files
 
-WRITENEWFILES:
+WRITEFILES:
   foreach my $entry (@args) {
-
+   
     # file to replace
     my $filename = $entry->{FILENAME};
 
@@ -745,9 +745,9 @@ WRITENEWFILES:
 
     # write content data to suitable temporary file
     my $tries = 10;
-    while ($ii < $tries
+    while ( ($ii < $tries )
            && (!CertNanny::Util->writeFile(DSTFILE    => $tmpfile,
-                                           SRCCONTENT => $entry->{CONTENT}))
+                                          SRCCONTENT => $entry->{CONTENT}))
       ) {
       # writeFile() will not overwrite existing files, an error
       # indicates that e. g. the file already existed, so:
@@ -824,6 +824,7 @@ WRITENEWFILES:
 
       # clean up temporary files
       foreach my $entry (@args) {
+        CertNanny::Logging->error("k_saveInstallFile(): remove tempfile Entry $entry->{TMPFILENAME} ");
         unlink $entry->{TMPFILENAME};
       }
       return;
@@ -844,6 +845,8 @@ WRITENEWFILES:
           rename $undo->{DST}, $undo->{SRC};
         }
 
+    CertNanny::Logging->debug("unlink tempfiles if defined ->TMPFILENAME: ". Dumper($entry));
+    
         # clean up temporary files
         foreach my $entry (@args) {
           unlink $entry->{TMPFILENAME};
@@ -1920,10 +1923,16 @@ sub _sendRequest {
       if (!$entry->{initialenroll}->{targetPIN}  or $entry->{initialenroll}->{targetPIN} eq "") {
       	$entry->{initialenroll}->{targetPIN} = $conf->{CONFIG}->{certmonitor}->{$entryname}->{key}->{pin};
       }
+      
+      my @cachain;
+
+      push(@cachain, @{$self->{STATE}->{DATA}->{ROOTCACERTS}});
+      push(@cachain, @{$self->{STATE}->{DATA}->{CERTCHAIN}});
+      
 
       my %args = (FILENAME     => $outp12,
                   FRIENDLYNAME => 'cert1',
-                  CACHAIN      => $self->{STATE}->{DATA}->{CERTCHAIN},
+                  CACHAIN      => \@cachain,
                   KEYFILE      => $self->{STATE}->{DATA}->{RENEWAL}->{REQUEST}->{KEYFILE},
                   CERTFORMAT   => 'PEM',
                   CERTFILE     => $self->{STATE}->{DATA}->{RENEWAL}->{REQUEST}->{CERTFILE},
