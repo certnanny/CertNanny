@@ -122,7 +122,7 @@ sub runCommand {
       <$PROGRAM>;
     };
     close($PROGRAM);
-    CertNanny::Logging->debug("@outputArr") if (@outputArr);
+    #CertNanny::Logging->debug("@outputArr") if (@outputArr);
   } else {
     $output = do {
       local $/;
@@ -131,10 +131,10 @@ sub runCommand {
     close($PROGRAM);
     
     if (($output =~ m/\A [[:ascii:]]* \Z/xms)) {
-     	CertNanny::Logging->debug("$output") if ($output);
+     	#CertNanny::Logging->debug("$output") if ($output);
 	}
 	else {
-	    CertNanny::Logging->debug("---Binary Data---") if ($output);
+	    #CertNanny::Logging->debug("---Binary Data---") if ($output);
 	}
     
   }
@@ -535,22 +535,27 @@ sub getCertSHA1 {
   my %args = (CERTFORMAT => 'PEM',
               OUTFORMAT  => 'DER',
               @_);                   # argument pair list
+              
+  my $rc = undef;
              
-  my ($cert, $base64, $sha);
+  my ($certType, $cert, $base64, $sha);
   
-  $cert = $self->_sanityCheckIn('getCertSHA1', %args);
-  return undef if !$cert;
-
-  $cert   = CertNanny::Util->convertCert(%args);
-  return undef if !$cert;
+  if ($certType = $self->_sanityCheckIn('getCertSHA1', %args)) {
+    if (defined($self->{getCertSHA1}->{$args{$certType}})) {
+      $rc = {CERTSHA1 => $self->{getCertSHA1}->{$args{$certType}}};
+    } else {
+      if($cert = CertNanny::Util->convertCert(%args)) {
+        if ($base64 = MIME::Base64::encode_base64($$cert{CERTDATA})) {
+          if ($sha = Digest::SHA::sha1_base64($base64)) {
+            $rc = {CERTSHA1 => $sha};
+            $self->{getCertSHA1}->{$args{$certType}} = $sha;
+          }
+        }
+      }
+    }
+  }
   
-  $base64 = MIME::Base64::encode_base64($$cert{CERTDATA});
-  return undef if !$base64;
-  
-  $sha = Digest::SHA::sha1_base64($base64);
-  return undef if !$sha;
-  
-  return {CERTSHA1 => $sha};
+  return $rc;
 } ## end sub getCertSHA1
 
 
@@ -890,7 +895,7 @@ sub getTmpFile {
   my $tmpfile = mktemp($template);
 
   push(@{$self->{TMPFILE}}, $tmpfile);
- # CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "get a tmp file");
+  # CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "get a tmp file");
   return $tmpfile;
 } ## end sub getTmpFile
 

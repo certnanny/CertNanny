@@ -525,7 +525,6 @@ sub installRoots {
   #                          root certificates (DIRECTORY|FILE|CHAINFILE|LOCATION)
   #                          default: all three
   #           INSTALLED   => mandatory(used) : hash with already installed roots
-  #           AVAILABLE   => mandatory(used) : hash with available roots
   # 
   # Output: 1 : failure  0 : success 
   #
@@ -552,6 +551,8 @@ sub installRoots {
   my $config    = $options->{CONFIG};
   
   my $rc = undef;
+
+  my $execHook = (ref($self) eq 'CertNanny::Keystore::PKCS12');
   
   # DIRECTORY, FILE and CHAINFILE is identical to the OpenSSL Key, so we use the installRoots of OpenSSL
   $rc = $self->SUPER::installRoots(@_) if $self->can("SUPER::installRoots");
@@ -594,7 +595,7 @@ sub installRoots {
 
           # Trusted Root Certs are only in the PKCS12 File if excludeCAChain is NOT set and excludeRoot is NOT set
           if (!$config->getFlag("keystore.$entryname.key.excludeCAChain") && !$config->getFlag("keystore.$entryname.key.excludeRoot")) {
-            foreach (keys($installedRootCAs)) {
+            foreach (keys(%{$installedRootCAs})) {
               $certHash{$_} = $installedRootCAs->{$_};
             }
           }  
@@ -646,9 +647,16 @@ sub installRoots {
               $rc = CertNanny::Util->runCommand(\@cmd);
 
               if (!$rc) {
+                # Everything ok. Let's replace the old PKCS12
                 $rc = !CertNanny::Util->writeFile(SRCFILE => $tmpP12,
                                                   DSTFILE => $config->get("keystore.$entryname.location") . ".new",
                                                   FORCE   => 1);
+                if (!$rc) {
+                  $self->{Hook}->{Type}   .= 'LOCATION' . ',';
+                  $self->{Hook}->{File}   .= $config->get("keystore.$entryname.location") . ',';
+                  $self->{Hook}->{FP}     .= '-' . ',';
+                  $self->{Hook}->{Target} .= $config->get("keystore.$entryname.location") . ',';
+                }
               }
             }
             # cleanup 
@@ -661,6 +669,15 @@ sub installRoots {
         }
       }
     }
+  }
+
+  if ($execHook and defined($self->{Hook})) {
+    $self->_executeHook($entry->{hook}->{roots}->{install}->{post},
+                        '__TYPE__'        => $self->{Hook}->{Type},
+                        '__CERTFILE__'    => $self->{Hook}->{File},
+                        '__FINGERPRINT__' => $self->{Hook}->{FP},
+                        '__TARGET__'      => $self->{Hook}->{Target});
+    delete($self->{Hook});
   }
 
   CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "Install all available root certificates");
