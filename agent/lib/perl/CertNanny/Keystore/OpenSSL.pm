@@ -1180,7 +1180,8 @@ sub getInstalledCAs {
   my $entryname = $options->{ENTRYNAME};
   my $config    = $options->{CONFIG};
   
-  my $rc = undef;
+  #if no root ca location defined return only an empty hash
+  my $rc = {};
   
   my %locSearch = ('directory' => $config->get("keystore.$entryname.TrustedRootCA.GENERATED.Directory", 'FILE'),
                    'file'      => $config->get("keystore.$entryname.TrustedRootCA.GENERATED.File",      'FILE'),

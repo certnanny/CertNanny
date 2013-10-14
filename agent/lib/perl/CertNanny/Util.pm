@@ -310,7 +310,7 @@ sub writeFile {
   #
   # Example: $self->writeFile(DSTFILE => $filename, SRCCONTENT => $data, FORCE => 1);
   #
-  CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "write file/content to disk");
+  #CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "write file/content to disk");
   my $self = (shift)->getInstance();
   my %args = (@_);
 
@@ -375,7 +375,7 @@ sub writeFile {
     }
   }
 
-  CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "write file/content to disk");
+  #CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "write file/content to disk");
   # Todo RC-Logik umkehren
   return !$rc;
 } ## end sub writeFile
@@ -879,7 +879,7 @@ sub getTmpFile {
   # NOTE: this is UNSAFE (beware of race conditions). We cannot use a file
   # handle here because we are calling external programs to use these
   # temporary files.
-  CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "get a tmp file");
+  #CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "get a tmp file");
   my $self = (shift)->getInstance();
   
   my $tmpdir = $self->{CONFIG}->get('path.tmpdir', 'FILE');
@@ -890,7 +890,7 @@ sub getTmpFile {
   my $tmpfile = mktemp($template);
 
   push(@{$self->{TMPFILE}}, $tmpfile);
-  CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "get a tmp file");
+ # CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "get a tmp file");
   return $tmpfile;
 } ## end sub getTmpFile
 
