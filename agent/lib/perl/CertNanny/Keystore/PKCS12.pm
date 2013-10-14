@@ -645,6 +645,10 @@ sub installRoots {
                 $rc = !CertNanny::Util->writeFile(SRCFILE => $tmpP12,
                                                   DSTFILE => $config->get("keystore.$entryname.location") . ".new",
                                                   FORCE   => 1);
+                # $self->_executeHook($entry->{hook}->{roots}->{install}->{post},
+                #                 '__TYPE__'        => 'LOCATION',
+                #                 '__TARGET__'      => $config-get("keystore.$entryname.location", 'FILE'));
+                                                  
               }
             }
             # cleanup 
