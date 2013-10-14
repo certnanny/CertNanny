@@ -1541,41 +1541,48 @@ sub k_syncRootCAs {
   #  -<certSHA1> #3
   #   ...
 
+  my %locSearch = ('directory' => $config->get("keystore.$entryname.TrustedRootCA.GENERATED.Directory", 'FILE'),
+                   'file'      => $config->get("keystore.$entryname.TrustedRootCA.GENERATED.File",      'FILE'),
+                   'chainfile' => $config->get("keystore.$entryname.TrustedRootCA.GENERATED.ChainFile", 'FILE'),
+                   'location'  => $config->get("keystore.$entryname.location",                          'FILE'));
+
   # First fetch available root certificates
   my $availableRootCAs = $self->k_getAvailableRootCAs();
   if (!defined($availableRootCAs)) {
     $rc = CertNanny::Logging->error("No root certificates found in " . $config-get("keystore.$entryname.TrustedRootCA.AUTHORITATIVE.Directory", 'FILE'));
   }
-  
+
   if (!$rc) {
     # then compare against DIR, FILE and CHAINFILE in case of an 
     # inconsistence rebuild DIR, FILE or CHAINIFLE
     foreach my $target ('DIRECTORY', 'FILE', 'CHAINFILE', 'LOCATION') {
-      # Fetch installed root certificates into
-      # Todo Dumper Löschen      
-      # print Dumper($target);
-      my $installedRootCAs = $self->getInstalledCAs(TARGET => $target);
+      if (defined($locSearch{lc($target)})) {
+        # Fetch installed root certificates into
+        # Todo Dumper Löschen      
+        # print Dumper($target);
+        my $installedRootCAs = $self->getInstalledCAs(TARGET => $target);
   
-      my $rebuild = 0;
-      # comparison $installedRootCAs to $availableRootCAs
-      foreach my $certSHA1 (keys ($installedRootCAs)) {
-        $rebuild ||= !exists($availableRootCAs->{$certSHA1});
-        last if $rebuild;
-      }  
-
-      if (!$rebuild) {
-        # comparison $availableRootCAs to $installedRootCAs
-        foreach my $certSHA1 (keys ($availableRootCAs)) {
-          $rebuild ||= !exists($installedRootCAs->{$certSHA1});
+        my $rebuild = 0;
+        # comparison $installedRootCAs to $availableRootCAs
+        foreach my $certSHA1 (keys ($installedRootCAs)) {
+          $rebuild ||= !exists($availableRootCAs->{$certSHA1});
           last if $rebuild;
-        }
-      }
+        }  
 
-      if ($rebuild) {
-        CertNanny::Logging->debug("rebuilding " . lc($target) . ".");
-        $self->installRoots(TARGET    => $target,
-                            INSTALLED => $installedRootCAs,
-                            AVAILABLE => $availableRootCAs);
+        if (!$rebuild) {
+          # comparison $availableRootCAs to $installedRootCAs
+	        foreach my $certSHA1 (keys ($availableRootCAs)) {
+	          $rebuild ||= !exists($installedRootCAs->{$certSHA1});
+	          last if $rebuild;
+	        }
+        }
+
+	      if ($rebuild) {
+	        CertNanny::Logging->debug("rebuilding " . lc($target) . ".");
+		      $self->installRoots(TARGET    => $target,
+		                          INSTALLED => $installedRootCAs,
+		                          AVAILABLE => $availableRootCAs);
+		    }
       }
     }
   }

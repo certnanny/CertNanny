@@ -16,7 +16,7 @@ use Exporter;
 use Carp;
 
 # use IO::File;
-# use File::Spec;
+use File::Spec;
 use File::Copy;
 # use File::Basename;
 use Data::Dumper;
@@ -242,9 +242,9 @@ sub getKey {
   
   if ($data =~ s{ \A .* (?=-----BEGIN) }{}xms) {
     $rc = {KEYDATA   => $data,
-           KEYTYPE   => 'PKCS8',
-           KEYFORMAT => 'DER',
-           KEYPASS   => ''};
+           KEYTYPE   => 'OpenSSL',
+           KEYPASS   =>  $self->_getPin(),
+           KEYFORMAT => 'PEM'};
     $self->{myKey} = $rc;
   }
 
@@ -419,7 +419,10 @@ sub importP12 {
   my $config    =  $args{CONFIG};
   #CertNanny::Logging->debug( "import pkcs12 file entry". Dumper($entry));
  
-  if(! copy($args{FILENAME},$entry->{initialenroll}->{targetLocation})){
+  my $origin = File::Spec->canonpath($args{FILENAME}); 
+  my $dest = File::Spec->canonpath($entry->{initialenroll}->{targetLocation});
+  
+  if(! copy($origin,$dest)){
   	 CertNanny::Logging->error("Could not write new p12 Keystore, file already exists ?!$entry->{location} to $args{FILENAME} ");
 #  if (!CertNanny::Util->writeFile(DSTFILE    => $entry->{initialenroll}->{targetLocation},
 #                                 SRCFILE => $args{FILENAME} ,
@@ -478,7 +481,7 @@ sub getInstalledCAs {
   my $entryname = $options->{ENTRYNAME};
   my $config    = $options->{CONFIG};
   
-  my $rc = undef;
+  my $rc = {};
   
   my $certFound = {};
   
