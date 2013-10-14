@@ -16,7 +16,7 @@ use Exporter;
 use Carp;
 
 # use IO::File;
-# use File::Spec;
+use File::Spec;
 use File::Copy;
 # use File::Basename;
 use Data::Dumper;
@@ -242,9 +242,9 @@ sub getKey {
   
   if ($data =~ s{ \A .* (?=-----BEGIN) }{}xms) {
     $rc = {KEYDATA   => $data,
-           KEYTYPE   => 'OPENSSL',
-           KEYFORMAT => 'PEM',
-           KEYPASS   => $self->_getPin()};
+           KEYTYPE   => 'OpenSSL',
+           KEYPASS   =>  $self->_getPin(),
+           KEYFORMAT => 'PEM'};
     $self->{myKey} = $rc;
   }
 
@@ -419,7 +419,10 @@ sub importP12 {
   my $config    =  $args{CONFIG};
   #CertNanny::Logging->debug( "import pkcs12 file entry". Dumper($entry));
  
-  if(! copy($args{FILENAME},$entry->{initialenroll}->{targetLocation})){
+  my $origin = File::Spec->canonpath($args{FILENAME}); 
+  my $dest = File::Spec->canonpath($entry->{initialenroll}->{targetLocation});
+  
+  if(! copy($origin,$dest)){
   	 CertNanny::Logging->error("Could not write new p12 Keystore, file already exists ?!$entry->{location} to $args{FILENAME} ");
 #  if (!CertNanny::Util->writeFile(DSTFILE    => $entry->{initialenroll}->{targetLocation},
 #                                 SRCFILE => $args{FILENAME} ,
@@ -478,7 +481,7 @@ sub getInstalledCAs {
   my $entryname = $options->{ENTRYNAME};
   my $config    = $options->{CONFIG};
   
-  my $rc = undef;
+  my $rc = {};
   
   my $certFound = {};
   
@@ -547,6 +550,8 @@ sub installRoots {
   my $config    = $options->{CONFIG};
   
   my $rc = undef;
+
+  my $execHook = (ref($self) eq 'CertNanny::Keystore::PKCS12');
   
   # DIRECTORY, FILE and CHAINFILE is identical to the OpenSSL Key, so we use the installRoots of OpenSSL
   $rc = $self->SUPER::installRoots(@_) if $self->can("SUPER::installRoots");
@@ -589,7 +594,7 @@ sub installRoots {
 
           # Trusted Root Certs are only in the PKCS12 File if excludeCAChain is NOT set and excludeRoot is NOT set
           if (!$config->getFlag("keystore.$entryname.key.excludeCAChain") && !$config->getFlag("keystore.$entryname.key.excludeRoot")) {
-            foreach (keys($installedRootCAs)) {
+            foreach (keys(%{$installedRootCAs})) {
               $certHash{$_} = $installedRootCAs->{$_};
             }
           }  
@@ -645,10 +650,12 @@ sub installRoots {
                 $rc = !CertNanny::Util->writeFile(SRCFILE => $tmpP12,
                                                   DSTFILE => $config->get("keystore.$entryname.location") . ".new",
                                                   FORCE   => 1);
-                # $self->_executeHook($entry->{hook}->{roots}->{install}->{post},
-                #                 '__TYPE__'        => 'LOCATION',
-                #                 '__TARGET__'      => $config-get("keystore.$entryname.location", 'FILE'));
-                                                  
+                if (!$rc) {
+                  $self->{Hook}->{Type}   .= 'LOCATION' . ',';
+                  $self->{Hook}->{File}   .= $config->get("keystore.$entryname.location") . ',';
+                  $self->{Hook}->{FP}     .= '-' . ',';
+                  $self->{Hook}->{Target} .= $config->get("keystore.$entryname.location") . ',';
+                }
               }
             }
             # cleanup 
@@ -661,6 +668,15 @@ sub installRoots {
         }
       }
     }
+  }
+
+  if ($execHook and defined($self->{Hook})) {
+    $self->_executeHook($entry->{hook}->{roots}->{install}->{post},
+                        '__TYPE__'        => $self->{Hook}->{Type},
+                        '__CERTFILE__'    => $self->{Hook}->{File},
+                        '__FINGERPRINT__' => $self->{Hook}->{FP},
+                        '__TARGET__'      => $self->{Hook}->{Target});
+    delete($self->{Hook});
   }
 
   CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "Install all available root certificates");

@@ -440,7 +440,7 @@ sub do_renew {
 
   my $keystore = $args{KEYSTORE};
   
-  $keystore->{INSTANCE}->k_executionHook();
+  $keystore->k_executionHook();
 
   if (defined $self->{ITEMS}->{$args{ENTRY}}->{rootcaupdate}->{enable}
       && $self->{ITEMS}->{$args{ENTRY}}->{rootcaupdate}->{enable} eq "true") {
