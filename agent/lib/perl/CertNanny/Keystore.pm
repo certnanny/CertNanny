@@ -1172,7 +1172,7 @@ sub k_warnExpiry {
   # call k_warnExpiry hook for notification event
   my $self         = shift;
   my $notification = shift;
-  return $self->_executeHook($self->{OPTIONS}->{ENTRY}->{hook}->{warnexpiry},
+  return $self->_executeHook($self->{INSTANCE}->{OPTIONS}->{ENTRY}->{hook}->{warnexpiry},
                              '__NOTAFTER__'  => $self->{CERT}->{CERTINFO}->{NotAfter},
                              '__NOTBEFORE__' => $self->{CERT}->{CERTINFO}->{NotBefore},
                              '__STATE__'     => $self->{STATE}->{DATA}->{RENEWAL}->{STATUS},);
@@ -1182,8 +1182,8 @@ sub k_executionHook {
   # call k_execution hook for CN monitoring event
   my $self         = shift;
   my $notification = shift;
-  
-  return $self->_executeHook($self->{OPTIONS}->{ENTRY}->{hook}->{execution},
+
+  return $self->_executeHook($self->{INSTANCE}->{OPTIONS}->{ENTRY}->{hook}->{execution},
                              '__NOTAFTER__'  => $self->{CERT}->{CERTINFO}->{NotAfter},
                              '__NOTBEFORE__' => $self->{CERT}->{CERTINFO}->{NotBefore},
                              '__STATE__'     => $self->{STATE}->{DATA}->{RENEWAL}->{STATUS},);

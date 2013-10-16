@@ -398,7 +398,7 @@ In order to use this feature a root CA certificate dir must be configured ! inst
 If rootcaupdate is enabled it will be envoked before each renew, or for root only keystores with the updateRootCA command. 
 
 Required configuration:
-keystore.LABEL.rootcacert.1 = .../trustedRootCAs 
+keystore.DEFAULT.TrustedRootCA.AUTHORITATIVE.Directory 
 #Enable Automatic root CA update via SCEP  (required)
 keystore.DEFAULT.rootcaupdate.enable = true
 
@@ -884,7 +884,7 @@ any)
 
 IMPORTANT: define at least one Root Certificate to use in your setup:
 IMPORTANT: if you plan to automatically update root CAs via SCEP make this a directory! 
-keystore.DEFAULT.rootcacert.1 = ...
+keystore.DEFAULT.TrustedRootCA.AUTHORITATIVE.Directory = ...
 
 =back
 
@@ -1138,6 +1138,9 @@ Default: no
 
 Example: yes
 
+=item keystore.LABEL.TrustedRootCA.AUTHORITATIVE.Directory
+
+or
 
 =item keystore.LABEL.rootcacert.1
 
@@ -1360,6 +1363,7 @@ If the CA certificate chain contains less certificates than specified
 here the additionally referenced files will not be created.
 
 Example: 
+    
     keystore.LABEL.cacert.0 = /etc/apache/ssl.crt/rootca.crt
     keystore.LABEL.cacert.1 = /etc/apache/ssl.crt/level2ca.crt
 

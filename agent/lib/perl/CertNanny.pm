@@ -440,7 +440,9 @@ sub do_renew {
 
   my $keystore = $args{KEYSTORE};
   
-  $keystore->k_executionHook();
+   if($self->{ITEMS}->{$args{ENTRY}}->{'location'} ne 'rootonly'){
+     $keystore->k_executionHook();
+  }
 
   if (defined $self->{ITEMS}->{$args{ENTRY}}->{rootcaupdate}->{enable}
       && $self->{ITEMS}->{$args{ENTRY}}->{rootcaupdate}->{enable} eq "true") {
