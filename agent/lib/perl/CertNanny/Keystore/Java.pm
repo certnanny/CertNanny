@@ -875,20 +875,30 @@ sub installRoots {
             CertNanny::Logging->debug("Importing root cert " . $availableRootCAs->{$certSHA1}->{CERTINFO}->{SubjectName});
             my $tmpFile = CertNanny::Util->getTmpFile();
             CertNanny::Util->writeFile(DSTFILE => $tmpFile,
-                                       SRCFILE => $availableRootCAs->{$certSHA1}->{CERTDATA});
+                                       SRCFILE => $availableRootCAs->{$certSHA1}->{CERTFILE});
             @cmd = $self->_buildKeytoolCmd($locName, '-importcert', '-file', $tmpFile, '-trustcacerts', '-alias', $availableRootCAs->{$certSHA1}->{CERTALIAS});
             if (CertNanny::Util->runCommand(\@cmd, HIDEPWD => 1)) {
               CertNanny::Logging->error("Error importing root cert " . $availableRootCAs->{$certSHA1}->{CERTINFO}->{SubjectName});
             }
-            # Postinstallhook
-            $self->_executeHook($entry->{hook}->{roots}->{install}->{post},
-                                '__TYPE__'        => 'FILE',
-                                '__CERTFILE__'    => $availableRootCAs->{$certSHA1}->{CERTFILE},
-                                '__FINGERPRINT__' => $availableRootCAs->{$certSHA1}->{CERTINFO}->{CertificateFingerprint},
-                                '__TARGET__'      => $locName);
+            # collect Postinstallhook information
+            $self->{Hook}->{Type}   .= 'FILE' . ','                                                               if ($self->{Hook}->{Type}   !~ m/FILE/);
+            $self->{Hook}->{File}   .= $availableRootCAs->{$certSHA1}->{CERTFILE} . ','                           if ($self->{Hook}->{File}   !~ m/$availableRootCAs->{$certSHA1}->{CERTFILE}/);
+            $self->{Hook}->{FP}     .= $availableRootCAs->{$certSHA1}->{CERTINFO}->{CertificateFingerprint} . ',' if ($self->{Hook}->{FP}     !~ m/$availableRootCAs->{$certSHA1}->{CERTINFO}->{CertificateFingerprint}/);
+            $self->{Hook}->{Target} .= $entry->{location} . ','                                                   if ($self->{Hook}->{Target} !~ m/$entry->{location}/);
           }
         }
       
+        if (defined($self->{Hook})) {
+          # execute Postinstallhook
+          $self->_executeHook($entry->{hook}->{roots}->{install}->{post},
+                              '__TYPE__'        => $self->{Hook}->{Type},
+                              '__CERTFILE__'    => $self->{Hook}->{File},
+                              '__FINGERPRINT__' => $self->{Hook}->{FP},
+                              '__TARGET__'      => $self->{Hook}->{Target});
+          delete($self->{Hook});
+        }
+      
+        
         # copy the temp keystore to $location an delete temp keystore
         if (!File::Copy::copy($locName, $entry->{location})) {
           $rc = CertNanny::Logging->error("Could not copy new store <$locName> to current store <$entry->{location}>");
