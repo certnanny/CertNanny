@@ -184,7 +184,7 @@ sub getCert {
   my $entryname = $options->{ENTRYNAME};
   my $config    = $options->{CONFIG};
   
-  my $rc = 0;
+  my $rc = undef;
   my $certData;
 
   if (defined $args{CERTDATA}) {
@@ -219,6 +219,8 @@ sub getCert {
              CERTFORMAT => 'PEM',
              CERTREST   => $2};
     }
+  } else {
+    $rc = undef;
   }
   CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "Get main certificate from keystore");
   return $rc
