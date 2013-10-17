@@ -225,11 +225,11 @@ sub do_enroll {
     $save{type}= $entry->{type} ;
     $entry->{type}                        = 'OpenSSL';   
     $save{location}= $entry->{location} ;
-    $entry->{location}                    = $entry->{initialenroll}->{auth}->{cert};
+    $entry->{location}                    = CertNanny::Config->get("keystore.$entryname.initialenroll.auth.cert", 'FILE');
     $save{keyformat}= $entry->{key}->{format} ;
     $entry->{key}->{format}               = 'PEM';
     $save{keyfile}= $entry->{key}->{file} ;
-    $entry->{key}->{file}                 = $entry->{initialenroll}->{auth}->{key};
+    $entry->{key}->{file}                 = CertNanny::Config->get("keystore.$entryname.initialenroll.auth.key", 'FILE');
     $save{pin}= $entry->{key}->{pin} ;
     $entry->{key}->{pin}                  = $entry->{initialenroll}->{auth}->{pin};
 
