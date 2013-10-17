@@ -322,8 +322,8 @@ sub installCert {
     }
 
     push(@newkeystore, {DESCRIPTION => "End entity private key",
-                        FILENAME    => $entry->{key}->{file},
-                        CONTENT     => $newkey->{KEYDATA}});
+                        DSTFILE     => $entry->{key}->{file},
+                        SRCCONTENT  => $newkey->{KEYDATA}});
   } ## end unless ($self->_hasEngine()...)
 
   ######################################################################
@@ -339,8 +339,8 @@ sub installCert {
   }
 
   push(@newkeystore, {DESCRIPTION => "End entity certificate",
-                      FILENAME    => $entry->{location},
-                      CONTENT     => $newcert->{CERTDATA}});
+                      DSTFILE     => $entry->{location},
+                      SRCCONTENT  => $newcert->{CERTDATA}});
 
   ######################################################################
   ### CA certificates...
@@ -366,8 +366,8 @@ sub installCert {
 
     if (defined $cacert) {
       push(@newkeystore, {DESCRIPTION => "CA certificate level $ii",
-                          FILENAME    => $destfile,
-                          CONTENT     => $cacert->{CERTDATA}});
+                          DSTFILE     => $destfile,
+                          SRCCONTENT  => $cacert->{CERTDATA}});
     } else {
       CertNanny::Logging->error("Could not convert CA certificate for level $ii");
       CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "installs a new main certificate from the SCEPT server in the keystore");
@@ -453,8 +453,8 @@ sub installCert {
 
       $filename = File::Spec->catfile($dir, $filename);
 
-      if (!CertNanny::Util->writeFile(DSTFILE    => $filename,
-                                      SRCCONTENT => $cert->{CERTDATA},
+      if (!CertNanny::Util->writeFile(SRCCONTENT => $cert->{CERTDATA},
+                                      DSTFILE    => $filename,
                                       FORCE      => 1)
         ) {
         CertNanny::Logging->error("installCert(): Could not write root certificate $filename");

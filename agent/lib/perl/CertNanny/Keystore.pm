@@ -169,6 +169,7 @@ sub DESTROY {
   }
 } ## end sub DESTROY
 
+
 sub dummy () {
 #  Abstract methods to be implemented by the instances
 #    NOT needed in Keystore Class. Only for documentation
@@ -709,7 +710,6 @@ sub k_convertKey {
 
 
 sub k_saveInstallFile {
-
   # File/keystore installation convenience method
   # This method is very careful about rolling back all modifications if
   # any error happened. Unless something really ugly happens, the original
@@ -721,14 +721,17 @@ sub k_saveInstallFile {
   # options:
   # filespec-hashref or array containing filespec-hashrefs
   # examples:
-  # $self->k_saveInstallFile({ FILENAME => 'foo', CONTENT => $data, DESCRIPTION => 'some file...'});
+  # $self->k_saveInstallFile({DSTFILE => 'foo', SRCCONTENT => $data,     DESCRIPTION => 'some file...'});
+  # $self->k_saveInstallFile({DSTFILE => 'foo', SRCFILE => $srcFilename, DESCRIPTION => 'other file...'});
   # or
   # @files = (
-  #    { FILENAME => 'foo', CONTENT => $data1, DESCRIPTION => 'some file...'},
-  #    { FILENAME => 'bar', CONTENT => $data2, DESCRIPTION => 'other file...'},
+  #    { DSTFILE => 'foo', SRCCONTENT => $data1, DESCRIPTION => 'some file...'},
+  #    { DSTFILE => 'bar', SRCFILE    => $file1, DESCRIPTION => 'other file...'},
+  #    { DSTFILE => 'bar', SRCCONTENT => $data2, DESCRIPTION => 'yet another file...'},
   # );
   # $self->k_saveInstallFile(@files);
   #
+  CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "Save install a File");
   my ($self, @args) = @_;
 
   my $error = 0;
@@ -740,17 +743,16 @@ WRITEFILES:
   foreach my $entry (@args) {
    
     # file to replace
-    my $filename = $entry->{FILENAME};
+    my $filename = $entry->{DSTFILE};
 
     my $ii      = 0;
     my $tmpfile = $filename . ".new";
 
     # write content data to suitable temporary file
     my $tries = 10;
-    while ( ($ii < $tries )
-           && (!CertNanny::Util->writeFile(DSTFILE    => $tmpfile,
-                                          SRCCONTENT => $entry->{CONTENT}))
-      ) {
+    while (($ii < $tries ) && (!CertNanny::Util->writeFile(SRCCONTENT => $entry->{SRCCONTENT},
+                                                           SRCFILE    => $entry->{SRCFILE},
+                                                           DSTFILE    => $tmpfile))) {
       # writeFile() will not overwrite existing files, an error
       # indicates that e. g. the file already existed, so:
       # try next filename candidate
@@ -760,7 +762,6 @@ WRITEFILES:
 
     # error: could not write one of the tempory files
     if (($ii == $tries) || (!-e $tmpfile)) {
-
       # remember to clean up the files created up to now
       $error = 1;
       last WRITEFILES;
@@ -775,10 +776,8 @@ WRITEFILES:
     # operation due to permission problems or because this is not
     # supported by the target system
     if (scalar(@stats)) {
-
       #           uid        gid
       chown $stats[4], $stats[5], $tmpfile;
-
       #          mode, integer - which is OK for chmod
       chmod $stats[2] & 07777, $tmpfile;    # mask off file type
     }
@@ -790,7 +789,6 @@ WRITEFILES:
   ###########################################################################
   # error checking for temporary file creation
   if ($error) {
-
     # something went wrong, clean up and bail out
     foreach my $entry (@args) {
       unlink $entry->{TMPFILENAME};
@@ -805,7 +803,7 @@ WRITEFILES:
 
   my @original_files = ();
   foreach my $entry (@args) {
-    my $file       = $entry->{FILENAME};
+    my $file       = $entry->{DSTFILE};
     my $backupfile = $file . ".backup";
 
     # remove already existing backup file
@@ -816,14 +814,11 @@ WRITEFILES:
     # check if it still persists
     if (-e $backupfile) {
       CertNanny::Logging->error("k_saveInstallFile(): could not unlink backup file $backupfile");
-
       # clean up and bail out
-
       # undo rename operations
       foreach my $undo (@original_files) {
         rename $undo->{DST}, $undo->{SRC};
       }
-
       # clean up temporary files
       foreach my $entry (@args) {
         CertNanny::Logging->error("k_saveInstallFile(): remove tempfile Entry $entry->{TMPFILENAME} ");
@@ -834,21 +829,15 @@ WRITEFILES:
 
     # rename orignal files: file -> file.backup
     if (-e $file) {
-
       # only if the file exists
-      if (
-        (!rename $file, $backupfile)    # but cannot be moved away
-        || (-e $file)
-        ) {                             # or still exists after moving
+      if ((!rename $file, $backupfile) ||    # but cannot be moved away
+          (-e $file)) {                      # or still exists after moving
         CertNanny::Logging->error("k_saveInstallFile(): could not rename $file to backup file $backupfile");
-
         # undo rename operations
         foreach my $undo (@original_files) {
           rename $undo->{DST}, $undo->{SRC};
         }
-
-    CertNanny::Logging->debug("unlink tempfiles if defined ->TMPFILENAME: ". Dumper($entry));
-    
+        CertNanny::Logging->debug("unlink tempfiles if defined ->TMPFILENAME: ". Dumper($entry));
         # clean up temporary files
         foreach my $entry (@args) {
           unlink $entry->{TMPFILENAME};
@@ -857,9 +846,8 @@ WRITEFILES:
       } ## end if ((!rename $file, $backupfile...))
 
       # remember what we did here already
-      push(@original_files,
-           {SRC => $file,
-            DST => $backupfile,});
+      push(@original_files, {SRC => $file,
+                             DST => $backupfile});
     } ## end if (-e $file)
   } ## end foreach my $entry (@args)
 
@@ -867,7 +855,7 @@ WRITEFILES:
   # files to original file names
   foreach my $entry (@args) {
     my $tmpfile = $entry->{TMPFILENAME};
-    my $file    = $entry->{FILENAME};
+    my $file    = $entry->{DSTFILE};
 
     my $msg = "Installing file $file";
     if (exists $entry->{DESCRIPTION}) {
@@ -877,18 +865,14 @@ WRITEFILES:
     CertNanny::Logging->info($msg);
 
     if (!rename $tmpfile, $file) {
-
       # should not happen!
       # ... but we have to handle this nevertheless
-
       CertNanny::Logging->error("k_saveInstallFile(): could not rename $tmpfile to target file $file");
-
       # undo rename operations
       foreach my $undo (@original_files) {
         unlink $undo->{SRC};
         rename $undo->{DST}, $undo->{SRC};
       }
-
       # clean up temporary files
       foreach my $entry (@args) {
         unlink $entry->{TMPFILENAME};
@@ -897,6 +881,7 @@ WRITEFILES:
     } ## end if (!rename $tmpfile, ...)
   } ## end foreach my $entry (@args)
 
+  CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "Save install a File");
   return 1;
 } ## end sub k_saveInstallFile
 
@@ -1034,8 +1019,8 @@ sub k_getNextTrustAnchor {
   }
 
   if (!CertNanny::Util->writeFile(DSTFILE => $certchainfile,
-                                   SRCCONTENT  => $pemchain,
-                                   FORCE    => 0)) {
+                                  SRCCONTENT  => $pemchain,
+                                  FORCE    => 0)) {
     CertNanny::Logging->error("Could not write certificatechain file");
   } else {
     my $enroller = $self->_getEnroller();

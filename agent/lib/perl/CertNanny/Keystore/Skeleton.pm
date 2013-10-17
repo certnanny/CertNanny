@@ -91,8 +91,8 @@ sub nuts_and_bolts {
 # if (! defined $newcert) ...
 #
 # Atomic file installation (see CertNanny::Keystore::k_saveInstallFile()), example:
-# if (!$self->k_saveInstallFile({FILENAME => $destfile1, CONTENT => data1, DESCRIPTION => 'file1...'},
-#                               {FILENAME => $destfile2, CONTENT => data2, DESCRIPTION => 'file2...'})) ...
+# if (!$self->k_saveInstallFile({DSTFILE => $destfile1, SRCCONTENT => data1, DESCRIPTION => 'file1...'},
+#                               {DSTFILE => $destfile2, SRCFILE    => file2, DESCRIPTION => 'file2...'})) ...
 #
 }
 

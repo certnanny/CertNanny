@@ -459,8 +459,8 @@ sub installCert {
 
     # schedule for installation
     push(@newkeystore, {DESCRIPTION => "End entity $ext file",
-                        FILENAME    => $oldlocation . $ext,
-                        CONTENT     => $data});
+                        DSTFILE     => $oldlocation . $ext,
+                        SRCCONTENT  => $data});
   } ## end foreach my $ext (qw(.crl .rdb .kdb .sth))
 
   ######################################################################
