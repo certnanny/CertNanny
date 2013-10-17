@@ -962,12 +962,6 @@ sub installRoots {
             if (CertNanny::Util->runCommand(\@cmd, HIDEPWD => 1)) {
               CertNanny::Logging->error("Error importing root cert " . $availableRootCAs->{$certSHA1}->{CERTINFO}->{SubjectName});
             }
-            # Postinstallhook
-            $self->_executeHook($entry->{hook}->{roots}->{install}->{post},
-                                '__TYPE__'        => 'FILE',
-                                '__CERTFILE__'    => $availableRootCAs->{$certSHA1}->{CERTFILE},
-                                '__FINGERPRINT__' => $availableRootCAs->{$certSHA1}->{CERTINFO}->{CertificateFingerprint},
-                                '__TARGET__'      => $locName);
           }
         }
       

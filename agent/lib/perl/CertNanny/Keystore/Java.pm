@@ -887,18 +887,7 @@ sub installRoots {
             $self->{hook}->{Target} .= $entry->{location} . ','                                                   if (defined($self->{hook}->{Target}) && ($self->{hook}->{Target} !~ m/$entry->{location}/s));
           }
         }
-      
-        if (defined($self->{hook})) {
-          # execute Postinstallhook
-          $self->_executeHook($entry->{hook}->{roots}->{install}->{post},
-                              '__TYPE__'        => $self->{hook}->{Type},
-                              '__CERTFILE__'    => $self->{hook}->{File},
-                              '__FINGERPRINT__' => $self->{hook}->{FP},
-                              '__TARGET__'      => $self->{hook}->{Target});
-          delete($self->{hook});
-        }
-      
-        
+
         # copy the temp keystore to $location an delete temp keystore
         if (!File::Copy::copy($locName, $entry->{location})) {
           $rc = CertNanny::Logging->error("Could not copy new store <$locName> to current store <$entry->{location}>");
