@@ -230,7 +230,6 @@ sub getCert {
       if (!defined $certData) {
         $rc = CertNanny::Logging->error("getCert(): Could not read instance certificate file $args{CERTFILE}");
         CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "get main certificate from keystore");
-        return undef;
       }
     } else {
       $certData = $args{CERTDATA};
