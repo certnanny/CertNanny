@@ -129,11 +129,12 @@ sub log2Console {
 
 sub log2File {
   my $self = (shift)->getInstance();
+  my $clear = shift || undef;
 
   if ($logTarget != 2) {
     if (my $file = $self->{CONFIG}->get("logfile", "FILE")) {
       $self->debug('Logging is redirected to ' . $self->{CONFIG}->get('logfile'));
-
+      eval {unlink $file} if $clear;
       #TODO sub logFile Fehlerbehandlung
       #write alle messages into a file
       $| = 1;
