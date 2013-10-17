@@ -1571,9 +1571,24 @@ sub k_syncRootCAs {
 
 	      if ($rebuild) {
 	        CertNanny::Logging->debug("rebuilding " . lc($target) . ".");
+          $self->_executeHook($entry->{hook}->{roots}->{install}->{pre},
+                              '__TYPE__'        => $self->{hook}->{Type},
+                              '__CERTFILE__'    => $self->{hook}->{File},
+                              '__FINGERPRINT__' => $self->{hook}->{FP},
+                              '__TARGET__'      => $self->{hook}->{Target});
+
 		      $self->installRoots(TARGET    => $target,
 		                          INSTALLED => $installedRootCAs,
 		                          AVAILABLE => $availableRootCAs);
+
+          if (defined($self->{hook})) {
+            $self->_executeHook($entry->{hook}->{roots}->{install}->{post},
+                                '__TYPE__'        => $self->{hook}->{Type},
+                                '__CERTFILE__'    => $self->{hook}->{File},
+                                '__FINGERPRINT__' => $self->{hook}->{FP},
+                                '__TARGET__'      => $self->{hook}->{Target});
+            delete($self->{hook});
+          }
 		    }
       }
     }

@@ -552,8 +552,6 @@ sub installRoots {
   
   my $rc = undef;
 
-  my $execHook = (ref($self) eq 'CertNanny::Keystore::PKCS12');
-  
   # DIRECTORY, FILE and CHAINFILE is identical to the OpenSSL Key, so we use the installRoots of OpenSSL
   $rc = $self->SUPER::installRoots(@_) if $self->can("SUPER::installRoots");
 
@@ -653,10 +651,10 @@ sub installRoots {
                 if ($rc) {
                   CertNanny::Logging->error("Could not install new keystore");
                 } else {
-                  $self->{Hook}->{Type}   .= 'LOCATION' . ',';
-                  $self->{Hook}->{File}   .= $config->get("keystore.$entryname.location") . ',';
-                  $self->{Hook}->{FP}     .= '-' . ',';
-                  $self->{Hook}->{Target} .= $config->get("keystore.$entryname.location") . ',';
+                  $self->{hook}->{Type}   .= 'LOCATION' . ',';
+                  $self->{hook}->{File}   .= $config->get("keystore.$entryname.location") . ',';
+                  $self->{hook}->{FP}     .= '-' . ',';
+                  $self->{hook}->{Target} .= $config->get("keystore.$entryname.location") . ',';
                 }
               }
             }
@@ -670,15 +668,6 @@ sub installRoots {
         }
       }
     }
-  }
-
-  if ($execHook and defined($self->{Hook})) {
-    $self->_executeHook($entry->{hook}->{roots}->{install}->{post},
-                        '__TYPE__'        => $self->{Hook}->{Type},
-                        '__CERTFILE__'    => $self->{Hook}->{File},
-                        '__FINGERPRINT__' => $self->{Hook}->{FP},
-                        '__TARGET__'      => $self->{Hook}->{Target});
-    delete($self->{Hook});
   }
 
   CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "Install all available root certificates");
