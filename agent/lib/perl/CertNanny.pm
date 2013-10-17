@@ -175,23 +175,28 @@ sub do_check {
 
   my $keystore = $args{KEYSTORE};
   $keystore->{CERT} = $keystore->{INSTANCE}->getCert();
-  $keystore->{CERT}->{CERTINFO} =
-    CertNanny::Util->getCertInfoHash(%{$keystore->{CERT}});
+  
+  if (defined($keystore->{CERT})) {
+    $keystore->{CERT}->{CERTINFO} = CertNanny::Util->getCertInfoHash(%{$keystore->{CERT}});
 
-  if (!$keystore->{INSTANCE}->k_checkValidity(0)) {
-    CertNanny::Logging->error("Certificate has expired. No automatic renewal can be performed.");
-    return 1;
-  }
+    if (!$keystore->{INSTANCE}->k_checkValidity(0)) {
+      CertNanny::Logging->error("Certificate has expired. No automatic renewal can be performed.");
+      return 1;
+    }
 
-  if (!$keystore->{INSTANCE}->k_checkValidity($self->{ITEMS}->{$args{ENTRY}}->{autorenew_days})) {
-    CertNanny::Logging->info("Certificate is to be scheduled for automatic renewal ($self->{ITEMS}->{$args{ENTRY}}->{autorenew_days}; days prior to expiry)");
-  }else{
-  	CertNanny::Logging->info("Certificate has not be scheduled for automatic renewal ($self->{ITEMS}->{$args{ENTRY}}->{autorenew_days}; days prior to expiry)");  	
-  }
+    if (!$keystore->{INSTANCE}->k_checkValidity($self->{ITEMS}->{$args{ENTRY}}->{autorenew_days})) {
+      CertNanny::Logging->info("Certificate is to be scheduled for automatic renewal ($self->{ITEMS}->{$args{ENTRY}}->{autorenew_days}; days prior to expiry)");
+    } else {
+    	CertNanny::Logging->info("Certificate has not be scheduled for automatic renewal ($self->{ITEMS}->{$args{ENTRY}}->{autorenew_days}; days prior to expiry)");  	
+    }
 
-  if (!$keystore->{INSTANCE}->k_checkValidity($self->{ITEMS}->{$args{ENTRY}}->{warnexpiry_days})) {
-    CertNanny::Logging->notice("Certificate is valid for less than $self->{ITEMS}->{$args{ENTRY}}->{warnexpiry_days} days");
-    $keystore->{INSTANCE}->k_warnExpiry();
+    if (!$keystore->{INSTANCE}->k_checkValidity($self->{ITEMS}->{$args{ENTRY}}->{warnexpiry_days})) {
+      CertNanny::Logging->notice("Certificate is valid for less than $self->{ITEMS}->{$args{ENTRY}}->{warnexpiry_days} days");
+      $keystore->{INSTANCE}->k_warnExpiry();
+    }
+  } else {
+    CertNanny::Logging->error("Could not parse instance certificate");
+    return undef;
   }
   return 1;
 } ## end sub do_check
@@ -301,7 +306,7 @@ sub do_enroll {
 	      CertNanny::Logging->info("Initial enrollment completed successfully. Onbehalf.");
 	      $newkeystore->{INSTANCE}->k_storeState() || croak "Could not write state file $newkeystore->{STATE}->{FILE}";
 	    }
-	}else{
+	} else {
 		
 		CertNanny::Logging->info("Initial enrollment request still pending.");
 	}
