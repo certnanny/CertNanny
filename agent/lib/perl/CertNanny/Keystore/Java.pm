@@ -881,10 +881,10 @@ sub installRoots {
               CertNanny::Logging->error("Error importing root cert " . $availableRootCAs->{$certSHA1}->{CERTINFO}->{SubjectName});
             }
             # collect Postinstallhook information
-            $self->{Hook}->{Type}   .= 'FILE' . ','                                                               if ($self->{Hook}->{Type}   !~ m/FILE/);
-            $self->{Hook}->{File}   .= $availableRootCAs->{$certSHA1}->{CERTFILE} . ','                           if ($self->{Hook}->{File}   !~ m/$availableRootCAs->{$certSHA1}->{CERTFILE}/);
-            $self->{Hook}->{FP}     .= $availableRootCAs->{$certSHA1}->{CERTINFO}->{CertificateFingerprint} . ',' if ($self->{Hook}->{FP}     !~ m/$availableRootCAs->{$certSHA1}->{CERTINFO}->{CertificateFingerprint}/);
-            $self->{Hook}->{Target} .= $entry->{location} . ','                                                   if ($self->{Hook}->{Target} !~ m/$entry->{location}/);
+            $self->{Hook}->{Type}   .= 'FILE' . ','                                                               if (defined($self->{Hook}->{Type})   && ($self->{Hook}->{Type}   !~ m/FILE/s));
+            $self->{Hook}->{File}   .= $availableRootCAs->{$certSHA1}->{CERTFILE} . ','                           if (defined($self->{Hook}->{File})   && ($self->{Hook}->{File}   !~ m/$availableRootCAs->{$certSHA1}->{CERTFILE}/s));
+            $self->{Hook}->{FP}     .= $availableRootCAs->{$certSHA1}->{CERTINFO}->{CertificateFingerprint} . ',' if (defined($self->{Hook}->{FP})     && ($self->{Hook}->{FP}     !~ m/$availableRootCAs->{$certSHA1}->{CERTINFO}->{CertificateFingerprint}/s));
+            $self->{Hook}->{Target} .= $entry->{location} . ','                                                   if (defined($self->{Hook}->{Target}) && ($self->{Hook}->{Target} !~ m/$entry->{location}/s));
           }
         }
       
