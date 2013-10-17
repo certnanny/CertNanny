@@ -1572,10 +1572,7 @@ sub k_syncRootCAs {
 	      if ($rebuild) {
 	        CertNanny::Logging->debug("rebuilding " . lc($target) . ".");
           $self->_executeHook($entry->{hook}->{roots}->{install}->{pre},
-                              '__TYPE__'        => $self->{hook}->{Type},
-                              '__CERTFILE__'    => $self->{hook}->{File},
-                              '__FINGERPRINT__' => $self->{hook}->{FP},
-                              '__TARGET__'      => $self->{hook}->{Target});
+                              '__ENTRY__'       => $entryname);
 
 		      $self->installRoots(TARGET    => $target,
 		                          INSTALLED => $installedRootCAs,
@@ -1995,7 +1992,7 @@ sub _sendRequest {
         CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "Sending request");
         return 0;
       } else {
-        CertNanny::Logging->debug("Compleated clean up after initial enrollment and p12 import.");
+        CertNanny::Logging->debug("Completed clean up after initial enrollment and p12 import.");
         if (   $entry->{initialenroll}->{auth}->{mode} eq "password"
             or $entry->{initialenroll}->{auth}->{mode} eq "anonymous") {
 
