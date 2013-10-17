@@ -646,8 +646,9 @@ sub installRoots {
 
               if (!$rc) {
                 # Everything ok. Let's replace the old PKCS12
-                $rc = !$self->k_saveInstallFile(SRCFILE => $tmpP12,
-                                                DSTFILE => $config->get("keystore.$entryname.location"));
+                $rc = !$self->k_saveInstallFile({SRCFILE     => $tmpP12,
+                                                 DSTFILE     => $config->get("keystore.$entryname.location", 'FILE'),
+                                                 DESCRIPTION => 'PKCS12 keystore replacement'});
                 if ($rc) {
                   CertNanny::Logging->error("Could not install new keystore");
                 } else {
