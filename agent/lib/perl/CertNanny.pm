@@ -445,40 +445,36 @@ sub do_renew {
 
   my $keystore = $args{KEYSTORE};
   
-   if($self->{ITEMS}->{$args{ENTRY}}->{'location'} ne 'rootonly'){
-     $keystore->k_executionHook();
+  if($self->{ITEMS}->{$args{ENTRY}}->{'location'} ne 'rootonly') {
+    $keystore->k_executionHook();
   }
 
-  if (defined $self->{ITEMS}->{$args{ENTRY}}->{rootcaupdate}->{enable}
-      && $self->{ITEMS}->{$args{ENTRY}}->{rootcaupdate}->{enable} eq "true") {
+  if (defined $self->{ITEMS}->{$args{ENTRY}}->{rootcaupdate}->{enable} &&
+      $self->{ITEMS}->{$args{ENTRY}}->{rootcaupdate}->{enable} eq "true") {
     CertNanny::Logging->debug("RootCA update activated running k_getNextTrustAnchor");
     $keystore->{INSTANCE}->k_getNextTrustAnchor();
     
-    if( $keystore->{INSTANCE}->k_syncRootCAs() != 0 ){
+    if( $keystore->{INSTANCE}->k_syncRootCAs() != 0 ) {
     	CertNanny::Logging->debug("syncRoots failed.");
-    };
-    
+    }
   } else {
     CertNanny::Logging->debug("RootCA update deactivated");
   }
 
-  if($self->{ITEMS}->{$args{ENTRY}}->{'location'} eq 'rootonly'){
+  if($self->{ITEMS}->{$args{ENTRY}}->{'location'} eq 'rootonly') {
   	 CertNanny::Logging->debug("rootonly keystore skip certificfate check and renewal");
-  }else{
-  	
-  
+  } else {
 	  if (!$keystore->{INSTANCE}->k_checkValidity(0)) {
 	    CertNanny::Logging->error("Certificate has expired. No automatic renewal can be performed.");
 	    return 1;
 	  }
 	
 	  if (!$keystore->{INSTANCE}->k_checkValidity($self->{ITEMS}->{$args{ENTRY}}->{autorenew_days})) {
-	
 	    # schedule automatic renewal
 	    CertNanny::Util->backoffTime($self->{CONFIG});
 	    $keystore->{INSTANCE}->k_renew();
-	  }else{
-	  	    CertNanny::Logging->debug("Certificate is still valid for more than $self->{ITEMS}->{ $args{ENTRY} }->{warnexpiry_days} days");
+	  } else {
+	  	CertNanny::Logging->debug("Certificate is still valid for more than $self->{ITEMS}->{ $args{ENTRY} }->{warnexpiry_days} days");
 	  }
 	
 	  if (!$keystore->{INSTANCE}->k_checkValidity($self->{ITEMS}->{$args{ENTRY}}->{warnexpiry_days})) {
@@ -498,15 +494,12 @@ sub do_sync {
 
   my $keystore = $args{KEYSTORE};
 
-  #  my $root
-
   if (!$keystore->{INSTANCE}->k_checkValidity(0)) {
     CertNanny::Logging->error("Certificate has expired. No automatic renewal can be performed.");
     return 1;
   }
 
   if (!$keystore->{INSTANCE}->k_checkValidity($self->{ITEMS}->{$args{ENTRY}}->{autorenew_days})) {
-
     # schedule automatic renewal
     CertNanny::Util->backoffTime($self->{CONFIG});
     $keystore->{INSTANCE}->k_renew();
