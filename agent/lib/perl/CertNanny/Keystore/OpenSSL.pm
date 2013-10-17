@@ -1285,10 +1285,10 @@ sub installRoots {
                                    TARGET  => $locInstall{directory},
                                    CLEANUP => 0);
 
-          $self->{Hook}->{Type}   .= 'DIRECTORY' . ','                                                  if ($self->{Hook}->{Type}   !~ m/DIRECTORY/);
-          $self->{Hook}->{File}   .= $rootCertHash->{$item}->{CERTFILE} . ','                           if ($self->{Hook}->{File}   !~ m/$rootCertHash->{$item}->{CERTFILE}/);
-          $self->{Hook}->{FP}     .= $rootCertHash->{$item}->{CERTINFO}->{CertificateFingerprint} . ',' if ($self->{Hook}->{FP}     !~ m/$rootCertHash->{$item}->{CERTINFO}->{CertificateFingerprint}/);
-          $self->{Hook}->{Target} .= $locInstall{directory} . ','                                       if ($self->{Hook}->{Target} !~ m/$locInstall{directory}/);
+          $self->{Hook}->{Type}   .= 'DIRECTORY' . ','                                                  if (defined($self->{Hook}->{Type})   && ($self->{Hook}->{Type}   !~ m/DIRECTORY/s));
+          $self->{Hook}->{File}   .= $rootCertHash->{$item}->{CERTFILE} . ','                           if (defined($self->{Hook}->{File})   && ($self->{Hook}->{File}   !~ m/$rootCertHash->{$item}->{CERTFILE}/s));
+          $self->{Hook}->{FP}     .= $rootCertHash->{$item}->{CERTINFO}->{CertificateFingerprint} . ',' if (defined($self->{Hook}->{FP})     && ($self->{Hook}->{FP}     !~ m/$rootCertHash->{$item}->{CERTINFO}->{CertificateFingerprint}/s));
+          $self->{Hook}->{Target} .= $locInstall{directory} . ','                                       if (defined($self->{Hook}->{Target}) && ($self->{Hook}->{Target} !~ m/$locInstall{directory}/s));
         }  
       }  
 
@@ -1303,17 +1303,17 @@ sub installRoots {
                                        APPEND  => 1);
 
             if (defined($locInstall{'file'}) and (!defined($args{TARGET}) or ('FILE' =~ m/^$args{TARGET}/))) {
-              $self->{Hook}->{Type}   .= 'FILE' . ','                                                       if ($self->{Hook}->{Type}   !~ m/FILE/);
-              $self->{Hook}->{File}   .= $rootCertHash->{$item}->{CERTFILE} . ','                           if ($self->{Hook}->{File}   !~ m/$rootCertHash->{$item}->{CERTFILE}/);
-              $self->{Hook}->{FP}     .= $rootCertHash->{$item}->{CERTINFO}->{CertificateFingerprint} . ',' if ($self->{Hook}->{FP}     !~ m/$rootCertHash->{$item}->{CERTINFO}->{CertificateFingerprint}/);
-              $self->{Hook}->{Target} .= $locInstall{file} . ','                                            if ($self->{Hook}->{Target} !~ m/$locInstall{file}/);
+              $self->{Hook}->{Type}   .= 'FILE' . ','                                                       if (defined($self->{Hook}->{Type})   && ($self->{Hook}->{Type}   !~ m/FILE/s));
+              $self->{Hook}->{File}   .= $rootCertHash->{$item}->{CERTFILE} . ','                           if (defined($self->{Hook}->{File})   && ($self->{Hook}->{File}   !~ m/$rootCertHash->{$item}->{CERTFILE}/s));
+              $self->{Hook}->{FP}     .= $rootCertHash->{$item}->{CERTINFO}->{CertificateFingerprint} . ',' if (defined($self->{Hook}->{FP})     && ($self->{Hook}->{FP}     !~ m/$rootCertHash->{$item}->{CERTINFO}->{CertificateFingerprint}/s));
+              $self->{Hook}->{Target} .= $locInstall{file} . ','                                            if (defined($self->{Hook}->{Target}) && ($self->{Hook}->{Target} !~ m/$locInstall{file}/s));
             }
 
             if (defined($locInstall{'chainfile'}) and (!defined($args{TARGET}) or ('CHAINFILE' =~ m/^$args{TARGET}/))) {
-              $self->{Hook}->{Type}   .= 'CHAINFILE' . ','                                                  if ($self->{Hook}->{Type}   !~ m/CHAINFILE/);
-              $self->{Hook}->{File}   .= $rootCertHash->{$item}->{CERTFILE} . ','                           if ($self->{Hook}->{File}   !~ m/$rootCertHash->{$item}->{CERTFILE}/);
-              $self->{Hook}->{FP}     .= $rootCertHash->{$item}->{CERTINFO}->{CertificateFingerprint} . ',' if ($self->{Hook}->{FP}     !~ m/$rootCertHash->{$item}->{CERTINFO}->{CertificateFingerprint}/);
-              $self->{Hook}->{Target} .= $locInstall{chainfile} . ','                                       if ($self->{Hook}->{Target} !~ m/$locInstall{chainfile}/);
+              $self->{Hook}->{Type}   .= 'CHAINFILE' . ','                                                  if (defined($self->{Hook}->{Type})   && ($self->{Hook}->{Type}   !~ m/CHAINFILE/s));
+              $self->{Hook}->{File}   .= $rootCertHash->{$item}->{CERTFILE} . ','                           if (defined($self->{Hook}->{File})   && ($self->{Hook}->{File}   !~ m/$rootCertHash->{$item}->{CERTFILE}/s));
+              $self->{Hook}->{FP}     .= $rootCertHash->{$item}->{CERTINFO}->{CertificateFingerprint} . ',' if (defined($self->{Hook}->{FP})     && ($self->{Hook}->{FP}     !~ m/$rootCertHash->{$item}->{CERTINFO}->{CertificateFingerprint}/s));
+              $self->{Hook}->{Target} .= $locInstall{chainfile} . ','                                       if (defined($self->{Hook}->{Target}) && ($self->{Hook}->{Target} !~ m/$locInstall{chainfile}/s));
             }
           }
 
