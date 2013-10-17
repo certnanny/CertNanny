@@ -1018,10 +1018,10 @@ sub k_getNextTrustAnchor {
     $pemchain .= "-----BEGIN CERTIFICATE-----\n" . $cert->{CERTINFO}->{Certificate} . "-----END CERTIFICATE-----\n"
   }
 
-  if (!CertNanny::Util->writeFile(DSTFILE => $certchainfile,
-                                  SRCCONTENT  => $pemchain,
-                                  FORCE    => 0)) {
-    CertNanny::Logging->error("Could not write certificatechain file");
+  if (!defined($pemchain) || !defined($certchainfile) || !CertNanny::Util->writeFile(SRCCONTENT => $pemchain,
+                                                                                     DSTFILE    => $certchainfile,
+                                                                                     FORCE      => 0)) {
+    CertNanny::Logging->error("Could not build certificatechain file");
   } else {
     my $enroller = $self->_getEnroller();
     my %certs    = $enroller->getNextCA($certchainfile);
@@ -1104,12 +1104,12 @@ sub k_getNextTrustAnchor {
                   my $newCAFileName = join("-", @newCAfilePart);
                   $newCAFileName .= ".pem";
 
-                  my $RootCertFile = File::Spec->catfile($entry->{TrustedRootCA}->{AUTHORITATIVE}->{Directory}, $newCAFileName);
+                  my $RootCertFile = File::Spec->catfile($config->get("keystore.$entryname.TrustedRootCA.AUTHORITATIVE.Directory", 'FILE'), $newCAFileName);
                   CertNanny::Logging->debug("newRootCertFile:" . $RootCertFile ."\n content: ". $pemCACert);
                   
-                  if (!CertNanny::Util->writeFile(DSTFILE    => $RootCertFile,
-                                                  SRCCONTENT => $pemCACert,
-                                                  FORCE      => 1)) {
+                  if (!defined($pemCACert) || !defined($RootCertFile) || !CertNanny::Util->writeFile(SRCCONTENT => $pemCACert,
+                                                                                                     DSTFILE    => $RootCertFile,
+                                                                                                     FORCE      => 1)) {
                     CertNanny::Logging->error("Could not write new Root CA into trusted roots dir " . $entry->{TrustedRootCA}->{authoritative}->{dir});
                     last;
                   }
@@ -1591,7 +1591,7 @@ sub k_syncRootCAs {
     }
   }
 
-  CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "synchronize the uinstalled root certificates with the avaiable ones");
+  CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "synchronize the installed root certificates with the avaiable ones");
   return $rc;
 }
 
