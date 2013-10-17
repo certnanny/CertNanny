@@ -205,8 +205,8 @@ sub installCert {
 
   # schedule for installation
   push(@newkeystore, {DESCRIPTION => "PKCS#12 file",
-                      FILENAME    => $self->{OPTIONS}->{ENTRY}->{location},
-                      CONTENT     => $data});
+                      DSTFILE     => $self->{OPTIONS}->{ENTRY}->{location},
+                      SRCCONTENT  => $data});
 
   if (!$self->k_saveInstallFile(@newkeystore)) {    # if any error happened
     CertNanny::Logging->error("Could not install new keystore");
@@ -648,10 +648,11 @@ sub installRoots {
 
               if (!$rc) {
                 # Everything ok. Let's replace the old PKCS12
-                $rc = !CertNanny::Util->writeFile(SRCFILE => $tmpP12,
-                                                  DSTFILE => $config->get("keystore.$entryname.location") . ".new",
-                                                  FORCE   => 1);
-                if (!$rc) {
+                $rc = !$self->k_saveInstallFile(SRCFILE => $tmpP12,
+                                                DSTFILE => $config->get("keystore.$entryname.location"));
+                if ($rc) {
+                  CertNanny::Logging->error("Could not install new keystore");
+                } else {
                   $self->{Hook}->{Type}   .= 'LOCATION' . ',';
                   $self->{Hook}->{File}   .= $config->get("keystore.$entryname.location") . ',';
                   $self->{Hook}->{FP}     .= '-' . ',';
