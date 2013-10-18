@@ -145,7 +145,7 @@ sub getCert {
                                              '-clcerts' => '-clcerts');
       }
       $certData = CertNanny::Util->runCommand(\@cmd, WANTOUT => 1);
-      if (!defined($certData)) {
+      if (!$certData) {
         $rc = CertNanny::Logging->error("getCert(): Could not read instance certificate file $args{CERTFILE}");
       }
     } else {
