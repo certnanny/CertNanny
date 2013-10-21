@@ -1625,8 +1625,9 @@ sub k_executeHook {
     }
 
     CertNanny::Logging->info("Exec: $hook");
+    my $rc = CertNanny::Util->runCommand($hook);
     CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "Executing Hook");
-    return CertNanny::Util->runCommand($hook);
+    return $rc;
   } ## end else [ if ($hook =~ /::/) ]
 } ## end sub k_executeHook
 
