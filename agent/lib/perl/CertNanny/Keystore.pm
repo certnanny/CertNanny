@@ -1142,36 +1142,6 @@ sub k_getDefaultEngineSection {
 }
 
 
-#sub k_warnExpiryHook {
-#  # call k_warnExpiryHook for notification event
-#  my $self         = shift;
-#  
-#  my $options   = $self->{OPTIONS};
-#  my $entryname = $options->{ENTRYNAME};
-#  my $config    = $options->{CONFIG};
-#
-#  return $self->k_executeHook($config->get("keystore.$entryname.hook.warnexpiry"));
-#} ## end sub k_warnExpiryHook
-
-#sub k_executionHook {
-#  # call k_executionHook for CN monitoring event
-#  my $self         = shift;
-#  
-#  print Dumper($self);
-#  
-#  my $options   = $self->{OPTIONS};
-#  my $entry     = $options->{ENTRY};
-#  my $entryname = $options->{ENTRYNAME};
-#  my $config    = $options->{CONFIG};
-#
-#  my $hook = $config->get("keystore.$entryname.hook.execution");
-#  return $self->k_executeHook($hook,
-#                              '__NOTAFTER__'  => $self->{CERT}->{CERTINFO}->{NotAfter},
-#                              '__NOTBEFORE__' => $self->{CERT}->{CERTINFO}->{NotBefore},
-#                              '__STATE__'     => $self->{STATE}->{DATA}->{RENEWAL}->{STATUS},);
-#} ## end sub k_executionHook
-
-
 sub k_getRootCerts {
   ###########################################################################
   #
