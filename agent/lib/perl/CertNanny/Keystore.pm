@@ -580,17 +580,17 @@ sub k_convertKey {
   # KEYPASS => private key pass phrase
   # or undef on error
   my $self = shift;
+
+  my %convertOptions = (KEYFORMAT => 'DER',
+                        KEYTYPE   => 'OpenSSL',
+                        OUTFORMAT => 'DER',
+                        OUTTYPE   => 'OpenSSL',
+                        @_);    # argument pair list
+
   my $options   = $self->{OPTIONS};
   my $entry     = $options->{ENTRY};
   my $entryname = $options->{ENTRYNAME};
   my $config    = $options->{CONFIG};
-
-  my %convertOptions = (KEYFORMAT => 'DER',
-                 KEYTYPE   => 'OpenSSL',
-                 OUTFORMAT => 'DER',
-                 OUTTYPE   => 'OpenSSL',
-                 @_,    # argument pair list
-                );
 
   # sanity checks
   foreach my $key (qw( KEYFORMAT OUTFORMAT )) {
@@ -640,9 +640,7 @@ sub k_convertKey {
     } ## end if (!defined $convertOptions{...})
   } ## end else [ if ($convertOptions{KEYTYPE} ...)]
 
-  if ($convertOptions{OUTTYPE} eq 'PKCS8') {
-    push(@cmd, '-topk8');
-  }
+  push(@cmd, '-topk8') if ($convertOptions{OUTTYPE} eq 'PKCS8');
 
   push(@cmd, '-inform', $convertOptions{KEYFORMAT}, '-outform', $convertOptions{OUTFORMAT},);
 
@@ -667,24 +665,15 @@ sub k_convertKey {
   }
 
   $ENV{PASSIN} = "";
-  if (defined($convertOptions{KEYPASS}) && ($convertOptions{KEYPASS} ne "")) {
-    $ENV{PASSIN} = $convertOptions{KEYPASS};
-  }
-  if ($ENV{PASSIN} ne "") {
-    push(@cmd, '-passin', 'env:PASSIN');
-  }
+  $ENV{PASSIN} = $convertOptions{KEYPASS} if (defined($convertOptions{KEYPASS}) && ($convertOptions{KEYPASS} ne ""));
+  push(@cmd, '-passin', 'env:PASSIN') if ($ENV{PASSIN} ne "");
 
   $ENV{PASSOUT} = "";
   if (defined $convertOptions{OUTPASS} && ($convertOptions{OUTPASS} ne "")) {
     $ENV{PASSOUT} = $convertOptions{OUTPASS};
-    if (   ($convertOptions{KEYTYPE} eq 'OpenSSL')
-        && ($convertOptions{OUTTYPE} eq 'OpenSSL')) {
-      push(@cmd, '-des3');
-    }
+    push(@cmd, '-des3') if (($convertOptions{KEYTYPE} eq 'OpenSSL') && ($convertOptions{OUTTYPE} eq 'OpenSSL'));
   }
-  if ($ENV{PASSOUT} ne "") {
-    push(@cmd, '-passout', 'env:PASSOUT');
-  }
+  push(@cmd, '-passout', 'env:PASSOUT') if ($ENV{PASSOUT} ne "");
 
   my $cmd = join(' ', @cmd);
 
