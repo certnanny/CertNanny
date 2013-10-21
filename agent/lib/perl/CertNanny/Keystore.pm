@@ -1142,26 +1142,34 @@ sub k_getDefaultEngineSection {
 }
 
 
-sub k_warnExpiry {
-  # call k_warnExpiry hook for notification event
-  my $self         = shift;
-  my $notification = shift;
-  return $self->_executeHook($self->{INSTANCE}->{OPTIONS}->{ENTRY}->{hook}->{warnexpiry},
-                             '__NOTAFTER__'  => $self->{CERT}->{CERTINFO}->{NotAfter},
-                             '__NOTBEFORE__' => $self->{CERT}->{CERTINFO}->{NotBefore},
-                             '__STATE__'     => $self->{STATE}->{DATA}->{RENEWAL}->{STATUS},);
-} ## end sub k_warnExpiry
+#sub k_warnExpiryHook {
+#  # call k_warnExpiryHook for notification event
+#  my $self         = shift;
+#  
+#  my $options   = $self->{OPTIONS};
+#  my $entryname = $options->{ENTRYNAME};
+#  my $config    = $options->{CONFIG};
+#
+#  return $self->k_executeHook($config->get("keystore.$entryname.hook.warnexpiry"));
+#} ## end sub k_warnExpiryHook
 
-sub k_executionHook {
-  # call k_execution hook for CN monitoring event
-  my $self         = shift;
-  my $notification = shift;
-
-  return $self->_executeHook($self->{INSTANCE}->{OPTIONS}->{ENTRY}->{hook}->{execution},
-                             '__NOTAFTER__'  => $self->{CERT}->{CERTINFO}->{NotAfter},
-                             '__NOTBEFORE__' => $self->{CERT}->{CERTINFO}->{NotBefore},
-                             '__STATE__'     => $self->{STATE}->{DATA}->{RENEWAL}->{STATUS},);
-} ## end sub k_warnExpiry
+#sub k_executionHook {
+#  # call k_executionHook for CN monitoring event
+#  my $self         = shift;
+#  
+#  print Dumper($self);
+#  
+#  my $options   = $self->{OPTIONS};
+#  my $entry     = $options->{ENTRY};
+#  my $entryname = $options->{ENTRYNAME};
+#  my $config    = $options->{CONFIG};
+#
+#  my $hook = $config->get("keystore.$entryname.hook.execution");
+#  return $self->k_executeHook($hook,
+#                              '__NOTAFTER__'  => $self->{CERT}->{CERTINFO}->{NotAfter},
+#                              '__NOTBEFORE__' => $self->{CERT}->{CERTINFO}->{NotBefore},
+#                              '__STATE__'     => $self->{STATE}->{DATA}->{RENEWAL}->{STATUS},);
+#} ## end sub k_executionHook
 
 
 sub k_getRootCerts {
@@ -1560,19 +1568,19 @@ sub k_syncRootCAs {
 
 	      if ($rebuild) {
 	        CertNanny::Logging->debug("rebuilding " . lc($target) . ".");
-          $self->_executeHook($entry->{hook}->{rootCA}->{install}->{pre},
-                              '__ENTRY__'       => $entryname);
+          $self->k_executeHook($entry->{hook}->{rootCA}->{install}->{pre},
+                               '__ENTRY__'       => $entryname);
 
 		      $self->installRoots(TARGET    => $target,
 		                          INSTALLED => $installedRootCAs,
 		                          AVAILABLE => $availableRootCAs);
 
           if (defined($self->{hook})) {
-            $self->_executeHook($entry->{hook}->{rootCA}->{install}->{post},
-                                '__TYPE__'        => $self->{hook}->{Type},
-                                '__CERTFILE__'    => $self->{hook}->{File},
-                                '__FINGERPRINT__' => $self->{hook}->{FP},
-                                '__TARGET__'      => $self->{hook}->{Target});
+            $self->k_executeHook($entry->{hook}->{rootCA}->{install}->{post},
+                                 '__TYPE__'        => $self->{hook}->{Type},
+                                 '__CERTFILE__'    => $self->{hook}->{File},
+                                 '__FINGERPRINT__' => $self->{hook}->{FP},
+                                 '__TARGET__'      => $self->{hook}->{Target});
             delete($self->{hook});
           }
 		    }
@@ -1594,7 +1602,7 @@ sub _verifyCertificateChain {
 }
 
 
-sub _executeHook {
+sub k_executeHook {
   ###########################################################################
   #
   # call an execution hook
@@ -1605,13 +1613,16 @@ sub _executeHook {
   # 
   # Output: 1 : success  0 : failure  # : returncode of the hook command 
   #
-  CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "start _executeHook");
+  CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "Executing Hook");
   my $self = shift;
   my $hook = shift;
   my %args = ('__ENTRY__'       => $self->{INSTANCE}->{OPTIONS}->{ENTRYNAME}           || $self->{OPTIONS}->{ENTRYNAME},
               '__SUBJECT__'     => qq ( "$self->{CERT}->{CERTINFO}->{SubjectName}" )   || 'UnknownSubject',
               '__SERIAL__'      => $self->{CERT}->{CERTINFO}->{SerialNumber}           || 'UnknownSerial',
               '__FINGERPRINT__' => $self->{CERT}->{CERTINFO}->{CertificateFingerprint} || 'UnknownFingerprint',
+              '__NOTAFTER__'    => $self->{CERT}->{CERTINFO}->{NotAfter},
+              '__NOTBEFORE__'   => $self->{CERT}->{CERTINFO}->{NotBefore},
+              '__STATE__'       => $self->{STATE}->{DATA}->{RENEWAL}->{STATUS},              
               @_);    # argument pair list
 
   # hook not defined -> success
@@ -1644,10 +1655,10 @@ sub _executeHook {
     }
 
     CertNanny::Logging->info("Exec: $hook");
-    CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "hook execution of $hook ");
+    CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "Executing Hook");
     return CertNanny::Util->runCommand($hook);
   } ## end else [ if ($hook =~ /::/) ]
-} ## end sub _executeHook
+} ## end sub k_executeHook
 
 
 sub k_getCaCerts {
@@ -1889,11 +1900,9 @@ sub _sendRequest {
       return undef;
     }
 
-    $self->_executeHook($entry->{hook}->{renewal}->{install}->{pre},
-                        '__NOTAFTER__'          => $self->{CERT}->{CERTINFO}->{NotAfter},
-                        '__NOTBEFORE__'         => $self->{CERT}->{CERTINFO}->{NotBefore},
-                        '__NEWCERT_NOTAFTER__'  => $newcert->{CERTINFO}->{NotAfter},
-                        '__NEWCERT_NOTBEFORE__' => $newcert->{CERTINFO}->{NotBefore},);
+    $self->k_executeHook($entry->{hook}->{renewal}->{install}->{pre},
+                         '__NEWCERT_NOTAFTER__'  => $newcert->{CERTINFO}->{NotAfter},
+                         '__NEWCERT_NOTBEFORE__' => $newcert->{CERTINFO}->{NotBefore},);
 
     if (exists $entry->{INITIALENROLLEMNT}
         and $entry->{INITIALENROLLEMNT} eq 'yes') {
@@ -2006,11 +2015,9 @@ sub _sendRequest {
     if (defined $rc and $rc) {
       $self->_renewalState("completed");
 
-      $self->_executeHook($entry->{hook}->{renewal}->{install}->{post},
-                          '__NOTAFTER__'          => $self->{CERT}->{CERTINFO}->{NotAfter},
-                          '__NOTBEFORE__'         => $self->{CERT}->{CERTINFO}->{NotBefore},
-                          '__NEWCERT_NOTAFTER__'  => $newcert->{CERTINFO}->{NotAfter},
-                          '__NEWCERT_NOTBEFORE__' => $newcert->{CERTINFO}->{NotBefore},);
+      $self->k_executeHook($entry->{hook}->{renewal}->{install}->{post},
+                           '__NEWCERT_NOTAFTER__'  => $newcert->{CERTINFO}->{NotAfter},
+                           '__NEWCERT_NOTBEFORE__' => $newcert->{CERTINFO}->{NotBefore},);
 
       # done
       CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "Sending request");
@@ -2073,9 +2080,9 @@ sub _renewalState {
 
   if (@_) {
     $self->{STATE}->{DATA}->{RENEWAL}->{STATUS} = shift;
-    my $hook = $self->{INSTANCE}->{OPTIONS}->{ENTRY}->{hook}->{renewal}->{state}
-      || $self->{OPTIONS}->{ENTRY}->{hook}->{renewal}->{state};
-    $self->_executeHook($hook, '__STATE__' => $self->{STATE}->{DATA}->{RENEWAL}->{STATUS},);
+    my $hook = $self->{INSTANCE}->{OPTIONS}->{ENTRY}->{hook}->{renewal}->{state} || 
+               $self->{OPTIONS}->{ENTRY}->{hook}->{renewal}->{state};
+    $self->k_executeHook($hook);
   }
   return $self->{STATE}->{DATA}->{RENEWAL}->{STATUS};
 } ## end sub _renewalState
