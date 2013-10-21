@@ -366,8 +366,6 @@ sub writeFile {
         $rc = CertNanny::Logging->error("writeFile(): input file open failed");
       }
       if (!$rc) {
-        binmode IN;
-        binmode OUT;
         while (<IN>) {
           print OUT;
         }
