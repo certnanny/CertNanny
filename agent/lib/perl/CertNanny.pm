@@ -446,7 +446,7 @@ sub do_renew {
   my $config    = $options->{CONFIG};
   
   if($self->{ITEMS}->{$entryname}->{'location'} ne 'rootonly') {
-    $keystore->_executeHook($config->get("keystore.$entryname.hook.execution"));
+    $keystore->k_executeHook($config->get("keystore.$entryname.hook.execution"));
   }
 
   if (defined $self->{ITEMS}->{$entryname}->{rootcaupdate}->{enable} &&
