@@ -1345,7 +1345,7 @@ sub installRoots {
               }    
               # Target chainfile part is finished. now write Target
               # put tmp-file to the right location     
-              if (!File::Copy::copy($tmpFile, $locInstall{'file'})) {
+              if (!File::Copy::copy($tmpFile, $locInstall{'chainfile'})) {
                 CertNanny::Logging->error("Could not install new TrusteRootCA ChainFile to " . $locInstall{'file'} . ".");
               }
             }    
