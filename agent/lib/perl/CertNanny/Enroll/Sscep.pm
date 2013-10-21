@@ -421,12 +421,12 @@ sub defaultOptions {
       $value = `$1`;
       chomp $value;
     }
-    $custmetadata{'CNMCUST' . uc($key)} = $value;
+    $custmetadata{'cnmcust' . lc($key)} = $value;
   } ## end foreach my $key (keys %{$userconfig...})
 
   # now send %metadata hash to SCEP server via GET request
 META: foreach my $key (keys %custmetadata) {
-    next META if $key eq 'CNMCUSTINHERIT';
+    next META if $key eq 'cnmcustinherit';
     my $value = $custmetadata{$key};
     $monitor .= '&' . $key . '=' . $value;
   }
