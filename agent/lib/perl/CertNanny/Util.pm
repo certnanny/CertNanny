@@ -1062,7 +1062,8 @@ sub getMacAddresses {
   # 2013-01-30 Martin Bartosch: minor changes
   #
   my $self = (shift)->getInstance();
-
+  my $rc = 0;
+  
   my $command;
   my $s = ':';    # the separator: ":" for Unix, "-" for Win
   if ($^O eq 'MSWin32') {
@@ -1077,20 +1078,26 @@ sub getMacAddresses {
   #print "DEBUG: OS is $^O\n";
 
   local $/;       # slurp
-
-  open(my $cmd, '-|', $command) or die "unable to run $command";
+  
+  open(my $cmd, '-|', $command) or $rc=1 ;
   my $ifconfigout = <$cmd>;
   close $cmd;
 
   #print "DEBUG: full command output:\n$ifconfigout DEBUG: end of full output\n\n\nDEBUG: found MAC addresses:\n";
-
-  my @result;
+if($rc == 0){
+   my @result;
   while ($ifconfigout =~ s/\b([\da-f]{1,2}$s[\da-f]{1,2}$s[\da-f]{1,2}$s[\da-f]{1,2}$s[\da-f]{1,2}$s[\da-f]{1,2})\b//i) {
     my $mac = $1;
     $mac =~ s/-/:/g;    # in case we have windows output, harmonise it
     push @result, $mac;
   }
   return @result;
+}else{
+ CertNanny::Logging->info(" unable to determine MAC addresses - ifconfig not available ? ");
+ my @result;
+  return @result ;
+}
+
 } ## end sub getMacAddresses
 
 
@@ -1104,11 +1111,14 @@ sub fetchFileList {
   # Test if $configfileglob contains regular files
   @myList = glob "'${myGlob}'";
   foreach my $item (@myList) {
-    push(@tmpList, $item) if -T "$item";
-    if (-d "$item") {
+   CertNanny::Logging->debug("found item: $item");
+    push(@tmpList, $item) if -T $item;
+    if (-d $item) {
+     CertNanny::Logging->debug("Found directory! ");
       if (opendir(DIR, $item)) {
         while (defined(my $file = readdir(DIR))) {
           my $osFileName = File::Spec->catfile($item, $file);
+          CertNanny::Logging->debug("found file: ". $osFileName);
           push(@tmpList, $osFileName) if -T $osFileName;
         }
         closedir(DIR);
