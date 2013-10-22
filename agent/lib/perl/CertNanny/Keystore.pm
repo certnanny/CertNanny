@@ -826,9 +826,10 @@ WRITEFILES:
         foreach my $undo (@original_files) {
           rename $undo->{DST}, $undo->{SRC};
         }
-        CertNanny::Logging->debug("unlink tempfiles if defined ->TMPFILENAME: ". Dumper($entry));
+       
         # clean up temporary files
         foreach my $entry (@args) {
+          CertNanny::Logging->debug("unlink tempfiles if defined ->TMPFILENAME: ". $entry->{TMPFILENAME});
           unlink $entry->{TMPFILENAME};
         }
         return undef;
@@ -1156,18 +1157,41 @@ sub k_getRootCerts {
   #           CERTFORMAT => cert format (PEM, DER)
   CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "get all root certificates from the configuration that are currently valid");
   my $self   = shift;
-  
+   
   my $options   = $self->{OPTIONS};
   my $entry     = $options->{ENTRY};
   my $entryname = $options->{ENTRYNAME};
   my $config    = $options->{CONFIG};
+  
+  
 
   my @result = ();
   my $res;
   my $locRootCA = $config->get("keystore.$entryname.TrustedRootCA.AUTHORITATIVE.Directory", 'FILE');
-  foreach (@{CertNanny::Util->fetchFileList($locRootCA)}) {
+  my @rootCACerts;
+  
+   CertNanny::Logging->debug("Authratative Root CA Dir: $locRootCA");
+
+    if (-d $locRootCA) {
+     CertNanny::Logging->debug("read directory: $locRootCA");
+      if (opendir(DIR, $locRootCA)) {
+        while (defined(my $file = readdir(DIR))) {
+         if($file ne '.' and $file ne '..'){
+           my $osFileName = File::Spec->catfile($locRootCA, $file);
+           CertNanny::Logging->debug("found file: ". $osFileName);
+           push(@rootCACerts, $osFileName) if -T $osFileName;
+         }
+        }
+        closedir(DIR);
+      }
+    }
+  
+  
+  foreach (@rootCACerts) {
     push(@result, $res) if ($res = $self->_checkCert($_));
   }
+  CertNanny::Logging->debug("get all available root certificates from ". $config->get("keystore.$entryname.TrustedRootCA.AUTHORITATIVE.Directory", 'FILE'));
+  
   CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "get all root certificates from the configuration that are currently valid");
   return \@result;
 } ## end sub k_getRootCerts
@@ -1195,7 +1219,7 @@ sub k_getAvailableRootCAs {
   my $entry     = $options->{ENTRY};
   my $entryname = $options->{ENTRYNAME};
   my $config    = $options->{CONFIG};
-  
+    
   my $rc = undef;
 
   if (defined($self->{INSTANCE}->{availableRootCAs})) {
@@ -1508,9 +1532,9 @@ sub k_syncRootCAs {
                    'location'  => $config->get("keystore.$entryname.location",                          'FILE'));
 
   # First fetch available root certificates
-  my $availableRootCAs = $self->k_getAvailableRootCAs();
+  my $availableRootCAs = $self->k_getRootCerts();
   if (!defined($availableRootCAs)) {
-    $rc = CertNanny::Logging->error("No root certificates found in " . $config-get("keystore.$entryname.TrustedRootCA.AUTHORITATIVE.Directory", 'FILE'));
+    $rc = CertNanny::Logging->error("No root certificates found in " . $config->get("keystore.$entryname.TrustedRootCA.AUTHORITATIVE.Directory", 'FILE'));
   }
 
   if (!$rc) {
