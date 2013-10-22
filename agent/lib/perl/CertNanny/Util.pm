@@ -1102,10 +1102,11 @@ sub fetchFileList {
   my (@myList, @tmpList);
 
   # Test if $configfileglob contains regular files
-  @myList = glob "'${myGlob}'";
+  @myList = glob qq("${myGlob}");
   foreach my $item (@myList) {
-    push(@tmpList, $item) if -T "$item";
-    if (-d "$item") {
+    $item = File::Spec->catfile(File::Spec->canonpath($item));
+    push(@tmpList, $item) if -T $item;
+    if (-d $item) {
       if (opendir(DIR, $item)) {
         while (defined(my $file = readdir(DIR))) {
           my $osFileName = File::Spec->catfile($item, $file);
