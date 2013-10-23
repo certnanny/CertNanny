@@ -523,11 +523,11 @@ sub _parseFile {
 
       # Test if $configFileGlob contains regular files
       @configFileList = @{CertNanny::Util->fetchFileList($configFileGlob)};
+   
       if (!@configFileList) {
         $configFileGlob = $configPath . $configFileGlob;
         @configFileList = @{CertNanny::Util->fetchFileList($configFileGlob)};
       }
-
       foreach (@configFileList) {
         $self->_parseFile((fileparse($_))[1], $_);
       }
