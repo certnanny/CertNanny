@@ -70,7 +70,7 @@ die "Could not read config file $cmdLineParam{cfg}. Stopped" unless (-r $cmdLine
 return 1 unless CertNanny::Config->getInstance(CONFIG => $cmdLineParam{cfg});
 CertNanny::Util->getInstance(CONFIG => CertNanny::Config->getInstance(CONFIG => $cmdLineParam{cfg}));
 CertNanny::Logging->getInstance(CONFIG => CertNanny::Config->getInstance(CONFIG => $cmdLineParam{cfg}));
-CertNanny::Logging->log2File(1);
+CertNanny::Logging->log2File();
 #CertNanny::Logging->log2Console();
 
 # Instantiate CertNanny
