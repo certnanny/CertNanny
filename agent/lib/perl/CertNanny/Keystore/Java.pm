@@ -739,12 +739,12 @@ sub getInstalledCAs {
       my @cmd = $self->_buildKeytoolCmd($locName, '-list');
       @certList = CertNanny::Util->runCommand(\@cmd, WANTOUT => 1, HIDEPWD => 1);
       foreach (@certList) {
-        if ($_ =~ m/^([^,]*), ([0-3][0-9]\.[0-1][0-9]\.20[0-9][0-9]), (PrivateKeyEntry|trustedCertEntry),.*$/) { # gets Privat Key as well
-        # if ($_ =~ m/^([^,]*), ([0-3][0-9]\.[0-1][0-9]\.20[0-9][0-9]), (trustedCertEntry),.*$/) {
+        if ($_ =~ m/^([^,]*), (.*?), (PrivateKeyEntry|trustedCertEntry),.*$/) { # gets Privat Key as well
           ($certAlias, $certCreateDate, $certType) = ($1, $2, $3);
         }
         if ($_ =~ m/^[^:]*\): ([0-9A-F:]*).*$/) {
           $certFingerprint = $1;
+          CertNanny::Logging->debug( "certFingerprint $certFingerprint , certalias $certAlias , certCreateDate $certCreateDate, certType $certType , doller: $_ " );
           @cmd = $self->_buildKeytoolCmd($locName, '-list', '-rfc', '-alias', $certAlias);
 
           $certData = CertNanny::Util->runCommand(\@cmd, WANTOUT => 1, HIDEPWD => 1);
@@ -822,37 +822,12 @@ sub installRoots {
   # run only if no TARGET is defined or TARGET is LOCATION
   if (!$rc) {
     my $installedRootCAs = $args{INSTALLED};
-    my $availableRootCAs = $args{AVAILABLE};
 
     my @cmd;
     my $certData;
-
+    my $availableRootCAs = $self->k_getAvailableRootCAs();
     if (!defined($availableRootCAs)) {
-      my $rootCertList = $self->k_getRootCerts();
-      if (!defined($rootCertList)) {
-        $rc = CertNanny::Logging->error("No root certificates found in " . $config-get("keystore.$entryname.TrustedRootCA.AUTHORITATIVE.Directory", 'FILE'));
-      }
-  
-      if (!$rc) {
-        my $availableRootCAs = {};
-        # Foreach available root cert get the SHA1
-        foreach my $certRef (@{$rootCertList}) {
-          my $certSHA1 = CertNanny::Util->getCertSHA1(%{$certRef})->{CERTSHA1};
-          if (exists($availableRootCAs->{$certSHA1})) {
-            if (exists($availableRootCAs->{$certSHA1}->{CERTFILE}) and ($certRef->{CERTFILE})) {
-              CertNanny::Logging->debug("Identical root certificate in <" . $availableRootCAs->{$certSHA1}->{CERTFILE} . "> and <" . $certRef->{CERTFILE} . ">");
-            } else {
-              CertNanny::Logging->debug("Identical root certificate <" . $availableRootCAs->{$certSHA1}->{CERTINFO}->{SubjectName} . "> found.");
-            }
-          } else {
-            $availableRootCAs->{$certSHA1} = $certRef;
-          }
-        }
-      }
-    }
-
-    if (!defined($availableRootCAs)) {
-      $rc = CertNanny::Logging->error("No root certificates found in " . $config-get("keystore.$entryname.TrustedRootCA.AUTHORITATIVE.dir", 'FILE'));
+      $rc = CertNanny::Logging->error("No root certificates found in " . $config-get("keystore.$entryname.TrustedRootCA.AUTHORITATIVE.Directory", 'FILE'));
     } else {
       # build a new temp keystore; Start with a copy of the existing one
       my $locName = $self->_generateKeystore();
@@ -872,11 +847,15 @@ sub installRoots {
         # copy every root CA, that does not exist in $installedRootCAs to keystore
         foreach my $certSHA1 (keys ($availableRootCAs)) {
           if (!exists($installedRootCAs->{$certSHA1})) {
-            CertNanny::Logging->debug("Importing root cert " . $availableRootCAs->{$certSHA1}->{CERTINFO}->{SubjectName});
+            CertNanny::Logging->debug("Importing root cert " . $availableRootCAs->{$certSHA1}->{CERTINFO}->{SubjectName} . " " . Dumper($availableRootCAs->{$certSHA1}));
             my $tmpFile = CertNanny::Util->getTmpFile();
             CertNanny::Util->writeFile(DSTFILE => $tmpFile,
                                        SRCFILE => $availableRootCAs->{$certSHA1}->{CERTFILE});
-            @cmd = $self->_buildKeytoolCmd($locName, '-importcert', '-file', $tmpFile, '-trustcacerts', '-alias', $availableRootCAs->{$certSHA1}->{CERTALIAS});
+            my $alias = 'newRoot';
+            if ($availableRootCAs->{$certSHA1}->{CERTINFO}->{SubjectName} =~ /CN=([^,]+).*/) {
+              ($alias = $1) =~ s/\s/_/g;
+            }
+            @cmd = $self->_buildKeytoolCmd($locName, '-importcert', '-file', $tmpFile, '-trustcacerts');
             if (CertNanny::Util->runCommand(\@cmd, HIDEPWD => 1)) {
               CertNanny::Logging->error("Error importing root cert " . $availableRootCAs->{$certSHA1}->{CERTINFO}->{SubjectName});
             }
@@ -913,7 +892,7 @@ sub _buildKeytoolCmd {
   my $options = $self->{OPTIONS};
   my $entry   = $options->{ENTRY};
 
-  my @cmd = (qq("$options->{keytool}"), -storepass => qq("$entry->{store}->{pin}"));
+  my @cmd = (qq("$options->{keytool}"), -noprompt, -storepass => qq("$entry->{store}->{pin}"));
   push(@cmd, -provider  => qq("$entry->{provider}"))      if ($entry->{provider});
   push(@cmd, -storetype => qq("$entry->{key}->{format}")) if ($entry->{key}->{format});
   push(@cmd, -keystore  => qq("$location"))               if ($location);
