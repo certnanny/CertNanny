@@ -1073,34 +1073,37 @@ sub getMacAddresses {
     $command = "lsdev | egrep -w 'ent[0-9]+' | cut -d ' ' -f 1 | while read adapter; do entstat -d \$adapter | grep 'Hardware Address:'; done";
   } else {
     my $ifconfig = $self->{CONFIG}->get('cmd.ifconfig', 'FILE');
-    if ($ifconfig and $ifconfig ne '') {
-      $command = "$ifconfig -a";
-    } else {
+    if($ifconfig and $ifconfig ne ''){
+     $command = "$ifconfig -a";
+    }else{
       $command = "ifconfig -a";
     }
+    
   }
 
   #print "DEBUG: OS is $^O\n";
 
   local $/;       # slurp
   
-  open(my $cmd, '-|', $command) or $rc = 1 ;
+  open(my $cmd, '-|', $command) or $rc=1 ;
   my $ifconfigout = <$cmd>;
   close $cmd;
 
   #print "DEBUG: full command output:\n$ifconfigout DEBUG: end of full output\n\n\nDEBUG: found MAC addresses:\n";
-  my @result;
-  if ($rc == 0) {
-    while ($ifconfigout =~ s/\b([\da-f]{1,2}$s[\da-f]{1,2}$s[\da-f]{1,2}$s[\da-f]{1,2}$s[\da-f]{1,2}$s[\da-f]{1,2})\b//i) {
-      my $mac = $1;
-      $mac =~ s/-/:/g;    # in case we have windows output, harmonise it
-      push @result, $mac;
-    }
-  } else {
-    CertNanny::Logging->info(" unable to determine MAC addresses - ifconfig not available ? ");
+if($rc == 0){
+   my @result;
+  while ($ifconfigout =~ s/\b([\da-f]{1,2}$s[\da-f]{1,2}$s[\da-f]{1,2}$s[\da-f]{1,2}$s[\da-f]{1,2}$s[\da-f]{1,2})\b//i) {
+    my $mac = $1;
+    $mac =~ s/-/:/g;    # in case we have windows output, harmonise it
+    push @result, $mac;
   }
-
   return @result;
+}else{
+ CertNanny::Logging->info(" unable to determine MAC addresses - ifconfig not available ? ");
+ my @result;
+  return @result ;
+}
+
 } ## end sub getMacAddresses
 
 
@@ -1110,7 +1113,6 @@ sub fetchFileList {
   my $myGlob = shift;
   
   my (@myList, @tmpList);
-
   # Test if $configfileglob contains regular files
   @myList = glob ("'$myGlob'") ;
   foreach my $item (@myList) {
@@ -1121,7 +1123,7 @@ sub fetchFileList {
       push(@tmpList, $item);
     } else {
       if (-d $item) {
-        CertNanny::Logging->debug("Found directory: $item");
+       CertNanny::Logging->debug("Found directory: $item");
         if (opendir(DIR, $item)) {
           while (defined(my $file = readdir(DIR))) {
             my $osFileName = File::Spec->catfile($item, $file);
