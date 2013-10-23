@@ -1072,7 +1072,13 @@ sub getMacAddresses {
   } elsif ($^O eq 'aix') {
     $command = "lsdev | egrep -w 'ent[0-9]+' | cut -d ' ' -f 1 | while read adapter; do entstat -d \$adapter | grep 'Hardware Address:'; done";
   } else {
-    $command = "ifconfig -a";
+    my $ifconfig = $self->{CONFIG}->get('cmd.ifconfig', 'FILE');
+    if($ifconfig and $ifconfig ne ''){
+     $command = "$ifconfig -a";
+    }else{
+      $command = "ifconfig -a";
+    }
+    
   }
 
   #print "DEBUG: OS is $^O\n";
@@ -1107,21 +1113,31 @@ sub fetchFileList {
   my $myGlob = shift;
   
   my (@myList, @tmpList);
-
   # Test if $configfileglob contains regular files
-  @myList = glob "'${myGlob}'";
+  @myList = glob ("'$myGlob'") ;
   foreach my $item (@myList) {
-   CertNanny::Logging->debug("found item: $item");
-    push(@tmpList, $item) if -T $item;
-    if (-d $item) {
-     CertNanny::Logging->debug("Found directory! ");
-      if (opendir(DIR, $item)) {
-        while (defined(my $file = readdir(DIR))) {
-          my $osFileName = File::Spec->catfile($item, $file);
-          CertNanny::Logging->debug("found file: ". $osFileName);
-          push(@tmpList, $osFileName) if -T $osFileName;
+    $item =~ s/^["']*|["']*$//g;
+    $item = File::Spec->canonpath($item);
+    if (-T $item) {
+      CertNanny::Logging->debug("Found file: $item");
+      push(@tmpList, $item);
+    } else {
+      if (-d $item) {
+       CertNanny::Logging->debug("Found directory: $item");
+        if (opendir(DIR, $item)) {
+          while (defined(my $file = readdir(DIR))) {
+            my $osFileName = File::Spec->catfile($item, $file);
+            if (-T $osFileName) {
+              CertNanny::Logging->debug("Found file: $osFileName");
+              push(@tmpList, $osFileName);
+            } else {
+              CertNanny::Logging->debug("Found non-file: $osFileName");
+            }
+          }
+          closedir(DIR);
         }
-        closedir(DIR);
+      } else {
+        CertNanny::Logging->debug("What the fuck is that: $item");
       }
     }
   } ## end foreach my $item (@myList)

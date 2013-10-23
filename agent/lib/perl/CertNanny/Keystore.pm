@@ -1168,26 +1168,27 @@ sub k_getRootCerts {
   my @result = ();
   my $res;
   my $locRootCA = $config->get("keystore.$entryname.TrustedRootCA.AUTHORITATIVE.Directory", 'FILE');
-  my @rootCACerts;
-  
-   CertNanny::Logging->debug("Authratative Root CA Dir: $locRootCA");
-
-    if (-d $locRootCA) {
-     CertNanny::Logging->debug("read directory: $locRootCA");
-      if (opendir(DIR, $locRootCA)) {
-        while (defined(my $file = readdir(DIR))) {
-         if($file ne '.' and $file ne '..'){
-           my $osFileName = File::Spec->catfile($locRootCA, $file);
-           CertNanny::Logging->debug("found file: ". $osFileName);
-           push(@rootCACerts, $osFileName) if -T $osFileName;
-         }
-        }
-        closedir(DIR);
-      }
-    }
-  
-  
-  foreach (@rootCACerts) {
+  CertNanny::Logging->debug("Authoritative Root CA Dir: $locRootCA");
+#  my @rootCACerts;
+#  
+#
+#    if (-d $locRootCA) {
+#     CertNanny::Logging->debug("read directory: $locRootCA");
+#      if (opendir(DIR, $locRootCA)) {
+#        while (defined(my $file = readdir(DIR))) {
+#         if($file ne '.' and $file ne '..'){
+#           my $osFileName = File::Spec->catfile($locRootCA, $file);
+#           CertNanny::Logging->debug("found file: ". $osFileName);
+#           push(@rootCACerts, $osFileName) if -T $osFileName;
+#         }
+#        }
+#        closedir(DIR);
+#      }
+#    }
+#  
+#  
+#  foreach (@rootCACerts) {
+  foreach (@{CertNanny::Util->fetchFileList($locRootCA)}) {
     push(@result, $res) if ($res = $self->_checkCert($_));
   }
   CertNanny::Logging->debug("get all available root certificates from ". $config->get("keystore.$entryname.TrustedRootCA.AUTHORITATIVE.Directory", 'FILE'));
@@ -1532,7 +1533,7 @@ sub k_syncRootCAs {
                    'location'  => $config->get("keystore.$entryname.location",                          'FILE'));
 
   # First fetch available root certificates
-  my $availableRootCAs = $self->k_getRootCerts();
+  my $availableRootCAs = $self->k_getAvailableRootCAs();
   if (!defined($availableRootCAs)) {
     $rc = CertNanny::Logging->error("No root certificates found in " . $config->get("keystore.$entryname.TrustedRootCA.AUTHORITATIVE.Directory", 'FILE'));
   }
