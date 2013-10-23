@@ -744,7 +744,6 @@ sub getInstalledCAs {
         }
         if ($_ =~ m/^[^:]*\): ([0-9A-F:]*).*$/) {
           $certFingerprint = $1;
-          CertNanny::Logging->debug( "certFingerprint $certFingerprint , certalias $certAlias , certCreateDate $certCreateDate, certType $certType , doller: $_ " );
           @cmd = $self->_buildKeytoolCmd($locName, '-list', '-rfc', '-alias', $certAlias);
 
           $certData = CertNanny::Util->runCommand(\@cmd, WANTOUT => 1, HIDEPWD => 1);
