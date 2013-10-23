@@ -1073,9 +1073,9 @@ sub getMacAddresses {
     $command = "lsdev | egrep -w 'ent[0-9]+' | cut -d ' ' -f 1 | while read adapter; do entstat -d \$adapter | grep 'Hardware Address:'; done";
   } else {
     my $ifconfig = $self->{CONFIG}->get('cmd.ifconfig', 'FILE');
-    if($ifconfig and $ifconfig ne ''){
-     $command = "$ifconfig -a";
-    }else{
+    if ($ifconfig and $ifconfig ne '') {
+      $command = "$ifconfig -a";
+    } else {
       $command = "ifconfig -a";
     }
     
@@ -1090,20 +1090,18 @@ sub getMacAddresses {
   close $cmd;
 
   #print "DEBUG: full command output:\n$ifconfigout DEBUG: end of full output\n\n\nDEBUG: found MAC addresses:\n";
-if($rc == 0){
-   my @result;
-  while ($ifconfigout =~ s/\b([\da-f]{1,2}$s[\da-f]{1,2}$s[\da-f]{1,2}$s[\da-f]{1,2}$s[\da-f]{1,2}$s[\da-f]{1,2})\b//i) {
-    my $mac = $1;
-    $mac =~ s/-/:/g;    # in case we have windows output, harmonise it
-    push @result, $mac;
+  my @result;
+  if ($rc == 0) {
+    while ($ifconfigout =~ s/\b([\da-f]{1,2}$s[\da-f]{1,2}$s[\da-f]{1,2}$s[\da-f]{1,2}$s[\da-f]{1,2}$s[\da-f]{1,2})\b//i) {
+      my $mac = $1;
+      $mac =~ s/-/:/g;    # in case we have windows output, harmonise it
+      push @result, $mac;
+    }
+  } else {
+    CertNanny::Logging->info(" unable to determine MAC addresses - ifconfig not available ? ");
   }
-  return @result;
-}else{
- CertNanny::Logging->info(" unable to determine MAC addresses - ifconfig not available ? ");
- my @result;
-  return @result ;
-}
 
+  return @result ;
 } ## end sub getMacAddresses
 
 
