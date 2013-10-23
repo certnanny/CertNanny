@@ -157,7 +157,6 @@ sub setOption {
 
 
 sub do_enroll {
-  CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "Enrollment");
   my $self      = (shift)->getInstance();
   my %args      = (@_);
 
@@ -243,10 +242,7 @@ sub do_enroll {
                                                ENTRYNAME => $entryname);
 
     if ($newkeystore) {
-      if (!$newkeystore->{INSTANCE}->k_retrieveState()) {
-        CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "Enrollment");
-        return undef;
-      }
+      $newkeystore->{INSTANCE}->k_retrieveState() or return undef;
       my $renewalstate = $newkeystore->{INSTANCE}->{STATE}->{DATA}->{RENEWAL}->{STATUS};
   
       if ($renewalstate eq 'sendrequest') {
@@ -267,7 +263,6 @@ sub do_enroll {
     } else {
       CertNanny::Logging->info("Initial enrollment request still pending.");
     }
-    CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "Enrollment");
     return 1;
   } else {
     if ($self->{ITEMS}->{$entryname}->{initialenroll}->{auth}->{mode} eq 'password' or
@@ -345,7 +340,6 @@ sub do_enroll {
 #        $newkeystore->{INSTANCE}->k_convertCert(%convopts)->{CERTDATA};
       } else {
         CertNanny::Logging->error("Could not parse instance certificate");
-        CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "Enrollment");
         return undef;
       }
 
@@ -375,19 +369,17 @@ sub do_enroll {
         unlink $selfsigncert;
         CertNanny::Logging->info("Initial enrollment completed successfully. Mode:" . $self->{ITEMS}->{$entryname}->{initialenroll}->{auth}->{mode});
       }
-      CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "Enrollment");
+
       return 1;
     } else {
       CertNanny::Logging->error("Initial enrollment authentication method " . $self->{ITEMS}->{$entryname}->{initialenroll}->{auth}->{mode} . " not supported");
     }
   } ## end else [ if ($self->{ITEMS}->{$entryname...})]
-  CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "Enrollment");
   return 1;
 } ## end sub do_enroll
 
 
 sub do_info {
-  CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "Info");
   my $self = (shift)->getInstance();
   my %args = (@_);
 
@@ -400,13 +392,11 @@ sub do_info {
   my $info = $instance->k_getInfo("SubjectName", "NotAfter");
   print Dumper $info;
 
-  CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "Info");
   return 1;
 } ## end sub do_info
 
 
 sub do_check {
-  CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "Check");
   my $self = (shift)->getInstance();
   my %args = (@_);
 
@@ -423,7 +413,6 @@ sub do_check {
 
     if (!$instance->k_checkValidity(0)) {
       CertNanny::Logging->error("Certificate has expired. No automatic renewal can be performed.");
-      CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "Check");
       return 1;
     }
 
@@ -435,22 +424,18 @@ sub do_check {
 
     if (!$instance->k_checkValidity($self->{ITEMS}->{$args{ENTRYNAME}}->{warnexpiry_days})) {
       CertNanny::Logging->notice("Certificate is valid for less than $self->{ITEMS}->{$args{ENTRYNAME}}->{warnexpiry_days} days");
-      CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "Check");
       return $instance->k_executeHook($config->get("keystore.$entryname.hook.warnexpiry"));
 #      $keystore->{INSTANCE}->k_warnExpiryHook();
     }
   } else {
     CertNanny::Logging->error("Could not parse instance certificate");
-    CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "Check");
     return undef;
   }
-  CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "Check");
   return 1;
 } ## end sub do_check
 
 
 sub do_renew {
-  CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "Renew");
   my $self   = (shift)->getInstance();
   my %args = (@_);
   
@@ -481,7 +466,6 @@ sub do_renew {
   } else {
 	  if (!$instance->k_checkValidity(0)) {
 	    CertNanny::Logging->error("Certificate has expired. No automatic renewal can be performed.");
-      CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "Renew");
 	    return 1;
 	  }
 	
@@ -500,13 +484,11 @@ sub do_renew {
 	  }
   }
   
-  CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "Renew");
   return 1;
 } ## end sub do_renew
 
 
 sub do_sync {
-  CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "Sync");
   my $self = (shift)->getInstance();
   my %args = (@_);
 
@@ -518,7 +500,6 @@ sub do_sync {
 
   if (!$instance->k_checkValidity(0)) {
     CertNanny::Logging->error("Certificate has expired. No automatic renewal can be performed.");
-    CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "Sync");
     return 1;
   }
 
@@ -535,13 +516,11 @@ sub do_sync {
     $keystore->{INSTANCE}->k_warnExpiryHook();
   }
 
-  CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "Sync");
   return 1;
 } ## end sub do_sync
 
 
 sub do_test {
-  CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "Test");
   my $self = (shift)->getInstance();
   my %args = (@_);
 
@@ -553,13 +532,11 @@ sub do_test {
   CertNanny::Logging->log2Console(); 
   my $ret = $args{KEYSTORE}->{INSTANCE}->$cmd(@ARGV);
 
-  CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "Test");
   return 1;
 } ## end sub do_test
 
 
 sub do_updateRootCA {
-  CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "Update Root CA");
   my $self = (shift)->getInstance();
   my %args = (@_);
 
@@ -578,7 +555,6 @@ sub do_updateRootCA {
     CertNanny::Logging->debug("RootCA update deactivated");
   }
 
-  CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "Update Root CA");
   return 1;
 } ## end sub do_updateRootCA
 
