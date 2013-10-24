@@ -751,7 +751,7 @@ sub getInstalledCAs {
 
           while ($certRef and ($certData = $certRef->{CERTDATA})) {
             my $certInfo = CertNanny::Util->getCertInfoHash(CERTDATA => $certData);
-            if (defined($certInfo)) {
+            if (defined($certInfo) ) {
               if (my $certTyp = $self->k_getCertType(CERTINFO => $certInfo)) { 
                 $certSha1 = CertNanny::Util->getCertSHA1(%{$certRef});
                 $self->{$certTyp}->{$certSha1->{CERTSHA1}}->{CERTALIAS}       = $certAlias;
@@ -761,6 +761,7 @@ sub getInstalledCAs {
                 $self->{$certTyp}->{$certSha1->{CERTSHA1}}->{CERTDATA}        = $certData;
                 $self->{$certTyp}->{$certSha1->{CERTSHA1}}->{CERTFORMAT}      = $certRef->{CERTFORMAT};
                 $self->{$certTyp}->{$certSha1->{CERTSHA1}}->{CERTINFO}        = $certInfo;
+                CertNanny::Logging->debug("found installed root cert: ". $self->{$certTyp}->{$certSha1->{CERTSHA1}}->{CERTINFO}->{SubjectName}. " Fingerprint $certFingerprint" );
                 if ($certTyp eq 'installedRootCAs') {
                   $rc->{$certSha1->{CERTSHA1}} = $self->{$certTyp}->{$certSha1->{CERTSHA1}}
                 }
@@ -846,7 +847,7 @@ sub installRoots {
         # copy every root CA, that does not exist in $installedRootCAs to keystore
         foreach my $certSHA1 (keys ($availableRootCAs)) {
           if (!exists($installedRootCAs->{$certSHA1})) {
-            CertNanny::Logging->debug("Importing root cert " . $availableRootCAs->{$certSHA1}->{CERTINFO}->{SubjectName} . " " . Dumper($availableRootCAs->{$certSHA1}));
+            CertNanny::Logging->debug("Importing root cert " . $availableRootCAs->{$certSHA1}->{CERTINFO}->{SubjectName});
             my $tmpFile = CertNanny::Util->getTmpFile();
             CertNanny::Util->writeFile(DSTFILE => $tmpFile,
                                        SRCFILE => $availableRootCAs->{$certSHA1}->{CERTFILE});
@@ -854,7 +855,7 @@ sub installRoots {
             if ($availableRootCAs->{$certSHA1}->{CERTINFO}->{SubjectName} =~ /CN=([^,]+).*/) {
               ($alias = $1) =~ s/\s/_/g;
             }
-            @cmd = $self->_buildKeytoolCmd($locName, '-importcert', '-file', $tmpFile, '-trustcacerts');
+            @cmd = $self->_buildKeytoolCmd($locName, '-importcert', '-file', $tmpFile, '-trustcacerts', '-alias' , $alias );
             if (CertNanny::Util->runCommand(\@cmd, HIDEPWD => 1)) {
               CertNanny::Logging->error("Error importing root cert " . $availableRootCAs->{$certSHA1}->{CERTINFO}->{SubjectName});
             }

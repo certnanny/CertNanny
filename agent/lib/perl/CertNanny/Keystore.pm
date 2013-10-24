@@ -16,7 +16,7 @@ use File::Glob qw(:globally :nocase);
 use File::Spec;
 use File::Copy;
 use File::Temp;
-use File::stat;
+#use File::stat;    #DO NOT INCLUDE OR UR BREAK stat !!!!!
 use File::Basename;
 
 use English;
@@ -1522,8 +1522,11 @@ sub k_syncRootCAs {
   if (!$rc) {
     # then compare against DIR, FILE and CHAINFILE in case of an 
     # inconsistence rebuild DIR, FILE or CHAINIFLE
+    my $doHook =  0;
     foreach my $target ('DIRECTORY', 'FILE', 'CHAINFILE', 'LOCATION') {
       if (defined($locSearch{lc($target)})) {
+        next if ((($target eq 'CHAINFILE') || ($target eq 'LOCATION')) && defined($locSearch{'location'}) && ($locSearch{'location'} eq 'rootonly'));
+        CertNanny::Logging->debug((caller(0))[3], "Target: $target/$locSearch{lc($target)}");
         # Fetch installed root certificates into
         my $installedRootCAs = $self->getInstalledCAs(TARGET => $target);
   
@@ -1531,37 +1534,45 @@ sub k_syncRootCAs {
         # comparison $installedRootCAs to $availableRootCAs
         foreach my $certSHA1 (keys (%{$installedRootCAs})) {
           $rebuild ||= !exists($availableRootCAs->{$certSHA1});
-          last if $rebuild;
+          if ($rebuild) {
+            CertNanny::Logging->debug("Target: $target/$locSearch{lc($target)}: Installed Root CA $installedRootCAs->{$certSHA1}->{CERTINFO}->{SubjectName} missing in available root CAs.");
+            last;
+          }
         }  
 
         if (!$rebuild) {
           # comparison $availableRootCAs to $installedRootCAs
 	        foreach my $certSHA1 (keys (%{$availableRootCAs})) {
 	          $rebuild ||= !exists($installedRootCAs->{$certSHA1});
-	          last if $rebuild;
+            if ($rebuild) {
+              CertNanny::Logging->debug("Target: $target/$locSearch{lc($target)}: Available Root CA $availableRootCAs->{$certSHA1}->{CERTINFO}->{SubjectName} missing in installed root CAs.");
+              last;
+            }
 	        }
         }
 
 	      if ($rebuild) {
-	        CertNanny::Logging->debug("rebuilding " . lc($target) . ".");
-          $self->k_executeHook($entry->{hook}->{rootCA}->{install}->{pre},
-                               '__ENTRY__'       => $entryname);
+	        CertNanny::Logging->debug("Target: $target/$locSearch{lc($target)}: Rebuilding.");
+	        if (!$doHook) {
+            $self->k_executeHook($entry->{hook}->{rootCA}->{install}->{pre},
+                                 '__ENTRY__'       => $entryname);
+            $doHook = 1;
+	        }
 
 		      $self->installRoots(TARGET    => $target,
 		                          INSTALLED => $installedRootCAs,
 		                          AVAILABLE => $availableRootCAs);
-
-          if (defined($self->{hook})) {
-            $self->k_executeHook($entry->{hook}->{rootCA}->{install}->{post},
-                                 '__TYPE__'        => $self->{hook}->{Type},
-                                 '__CERTFILE__'    => $self->{hook}->{File},
-                                 '__FINGERPRINT__' => $self->{hook}->{FP},
-                                 '__TARGET__'      => $self->{hook}->{Target});
-            delete($self->{hook});
-          }
 		    }
       }
     }
+    if ($doHook && defined($self->{hook})) {
+      $self->k_executeHook($entry->{hook}->{rootCA}->{install}->{post},
+                           '__TYPE__'        => $self->{hook}->{Type},
+                           '__CERTFILE__'    => $self->{hook}->{File},
+                           '__FINGERPRINT__' => $self->{hook}->{FP},
+                           '__TARGET__'      => $self->{hook}->{Target});
+    }
+    eval {delete($self->{hook});};
   }
 
   CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "synchronize the installed root certificates with the available ones");
