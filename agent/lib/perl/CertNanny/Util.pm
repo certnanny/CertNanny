@@ -376,7 +376,6 @@ sub writeFile {
       }
     }
   }
-
   #CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "write file/content to disk");
   # Todo RC-Logik umkehren
   return !$rc;

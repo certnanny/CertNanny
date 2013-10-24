@@ -645,6 +645,7 @@ sub installRoots {
               $rc = CertNanny::Util->runCommand(\@cmd);
 
               if (!$rc) {
+               CertNanny::Logging->debug("install params tmpfile:" .$tmpP12 ." dest file: " .  $config->get("keystore.$entryname.location", 'FILE')  );
                 # Everything ok. Let's replace the old PKCS12
                 $rc = !$self->k_saveInstallFile({SRCFILE     => $tmpP12,
                                                  DSTFILE     => $config->get("keystore.$entryname.location", 'FILE'),
