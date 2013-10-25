@@ -172,7 +172,6 @@ sub do_enroll {
     CertNanny::Logging->info("Start initial enrollment with authentication method certificate.");
     
     $self->{CONFIG} = CertNanny::Config->getInstance();
-    my $keystore;
 
     # Change keystore attributes to instantitate a openSSL keystore with the entrollment certificate
     $entry->{initialenroll}->{targetType}     = $entry->{type};
@@ -206,19 +205,19 @@ sub do_enroll {
       $entry->{certreq} = undef;
     }
     
-    $keystore = CertNanny::Keystore->new(CONFIG    => $self->{CONFIG},
-                                         ENTRY     => $self->{ITEMS}->{$entryname},
-                                         ENTRYNAME => $entryname);
+    my $instance = CertNanny::Keystore->new(CONFIG    => $self->{CONFIG},
+                                            ENTRY     => $self->{ITEMS}->{$entryname},
+                                            ENTRYNAME => $entryname)->{INSTANCE};
 
-    #$keystore->{INSTANCE}->{INITIALENROLLEMNT} = 'yes';
-    $keystore->{INSTANCE}->{OPTIONS}->{ENTRY}->{INITIALENROLLEMNT} = 'yes';
+    #$instance->{INITIALENROLLEMNT} = 'yes';
+    $instance->{OPTIONS}->{ENTRY}->{INITIALENROLLEMNT} = 'yes';
   
     #disable engine specific configuration
-    $keystore->{INSTANCE}->{OPTIONS}->{ENTRY}->{enroll}->{engine_section}  = undef;
-    $keystore->{INSTANCE}->{OPTIONS}->{ENTRY}->{enroll}->{sscep}->{engine} = undef;
+    $instance->{OPTIONS}->{ENTRY}->{enroll}->{engine_section}  = undef;
+    $instance->{OPTIONS}->{ENTRY}->{enroll}->{sscep}->{engine} = undef;
 
     #Start the initial enrollment runining an native openSSL keystore renewal
-    my $ret = $keystore->{INSTANCE}->k_renew();
+    my $ret = $instance->k_renew();
     
     # Restoring old values
     $entry->{type}          = $save{type};   
@@ -238,16 +237,16 @@ sub do_enroll {
     # $self->{CONFIG} = CertNanny::Config->popConf();
     $entry->{INITIALENROLLEMNT} = 'no';
   
-    my $newkeystore = CertNanny::Keystore->new(CONFIG    => $self->{CONFIG},
+    my $newinstance = CertNanny::Keystore->new(CONFIG    => $self->{CONFIG},
                                                ENTRY     => $self->{ITEMS}->{$entryname},
-                                               ENTRYNAME => $entryname);
+                                               ENTRYNAME => $entryname)->{INSTANCE};
 
-    if ($newkeystore) {
-      if (!$newkeystore->{INSTANCE}->k_retrieveState()) {
+    if ($newinstance) {
+      if (!$newinstance->k_retrieveState()) {
         CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "Enrollment");
         return undef;
       }
-      my $renewalstate = $newkeystore->{INSTANCE}->{STATE}->{DATA}->{RENEWAL}->{STATUS};
+      my $renewalstate = $newinstance->{STATE}->{DATA}->{RENEWAL}->{STATUS};
   
       if ($renewalstate eq 'sendrequest') {
         CertNanny::Logging->info("Initial enrollment request still pending.");
@@ -256,13 +255,13 @@ sub do_enroll {
         #$self->{INSTANCE}->k_retrieveState() or return undef;
   
         # check if we can write to the file
-        $newkeystore->{INSTANCE}->k_storeState() || croak "Could not write state file $newkeystore->{STATE}->{FILE}";
+        $newinstance->k_storeState() || croak "Could not write state file $newinstance->{STATE}->{FILE}";
       } ## end if ($renewalstate eq 'sendrequest')
       
       if ($renewalstate eq 'completed') {
-        my $isValid = $newkeystore->{INSTANCE}->k_checkValidity($self->{ITEMS}->{$args{ENTRY}}->{autorenew_days});
+        my $isValid = $newinstance->k_checkValidity($self->{ITEMS}->{$args{ENTRY}}->{autorenew_days});
         CertNanny::Logging->info("Initial enrollment completed successfully. Onbehalf.");
-        $newkeystore->{INSTANCE}->k_storeState() || croak "Could not write state file $newkeystore->{STATE}->{FILE}";
+        $newinstance->k_storeState() || croak "Could not write state file $newinstance->{STATE}->{FILE}";
       }
     } else {
       CertNanny::Logging->info("Initial enrollment request still pending.");
@@ -391,8 +390,7 @@ sub do_info {
   my $self = (shift)->getInstance();
   my %args = (@_);
 
-  my $keystore = $args{KEYSTORE};
-  my $instance = $keystore->{INSTANCE};
+  my $instance = $args{KEYSTORE}->{INSTANCE};
   my $options   = $instance->{OPTIONS};
   my $entryname = $options->{ENTRYNAME};
   my $config    = $options->{CONFIG};
@@ -437,7 +435,7 @@ sub do_check {
       CertNanny::Logging->notice("Certificate is valid for less than $self->{ITEMS}->{$args{ENTRYNAME}}->{warnexpiry_days} days");
       CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "Check");
       return $instance->k_executeHook($config->get("keystore.$entryname.hook.warnexpiry"));
-#      $keystore->{INSTANCE}->k_warnExpiryHook();
+#      $instance->k_warnExpiryHook();
     }
   } else {
     CertNanny::Logging->error("Could not parse instance certificate");
@@ -454,14 +452,13 @@ sub do_renew {
   my $self   = (shift)->getInstance();
   my %args = (@_);
   
-  my $keystore = $args{KEYSTORE};
-  my $instance = $keystore->{INSTANCE};
+  my $instance  = $args{KEYSTORE}->{INSTANCE};
   my $options   = $instance->{OPTIONS};
   my $entryname = $options->{ENTRYNAME};
   my $config    = $options->{CONFIG};
   
   if($self->{ITEMS}->{$entryname}->{'location'} ne 'rootonly') {
-    $keystore->k_executeHook($config->get("keystore.$entryname.hook.execution"));
+    $instance->k_executeHook($config->get("keystore.$entryname.hook.execution"));
   }
 
   if (defined $self->{ITEMS}->{$entryname}->{rootcaupdate}->{enable} &&
@@ -490,11 +487,11 @@ sub do_renew {
       CertNanny::Util->backoffTime($self->{CONFIG});
       $instance->k_renew();
     } else {
-      CertNanny::Logging->debug("Certificate is still valid for more than $self->{ITEMS}->{ $entryname }->{warnexpiry_days} days");
+      CertNanny::Logging->debug("Certificate is still valid for more than $self->{ITEMS}->{$entryname}->{autorenew_days} days");
     }
   
     if (!$instance->k_checkValidity($self->{ITEMS}->{$entryname}->{warnexpiry_days})) {
-      CertNanny::Logging->notice("Certificate is valid for less than $self->{ITEMS}->{ $entryname }->{warnexpiry_days} days");
+      CertNanny::Logging->notice("Certificate is valid for less than $self->{ITEMS}->{$entryname}->{warnexpiry_days} days");
       $instance->k_executeHook($config->get("keystore.$entryname.hook.warnexpiry"));
       # $instance->k_warnExpiryHook();
     }
@@ -510,8 +507,7 @@ sub do_sync {
   my $self = (shift)->getInstance();
   my %args = (@_);
 
-  my $keystore = $args{KEYSTORE};
-  my $instance = $keystore->{INSTANCE};
+  my $instance = $args{KEYSTORE}->{INSTANCE};
   my $options   = $instance->{OPTIONS};
   my $entryname = $options->{ENTRYNAME};
   my $config    = $options->{CONFIG};
@@ -532,7 +528,7 @@ sub do_sync {
     CertNanny::Logging->notice("Certificate is valid for less than $self->{ITEMS}->{ $args{ENTRYNAME} }->{warnexpiry_days} days");
     $instance->k_executeHook($config->get("keystore.$entryname.hook.warnexpiry"));
     # $instance->k_warnExpiryHook();
-    $keystore->{INSTANCE}->k_warnExpiryHook();
+    $instance->k_warnExpiryHook();
   }
 
   CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "Sync");
@@ -563,8 +559,7 @@ sub do_updateRootCA {
   my $self = (shift)->getInstance();
   my %args = (@_);
 
-  my $keystore = $args{KEYSTORE};
-  my $instance = $keystore->{INSTANCE};
+  my $instance  = $args{KEYSTORE}->{INSTANCE};
   my $options   = $instance->{OPTIONS};
   my $entryname = $options->{ENTRYNAME};
   my $config    = $options->{CONFIG};
