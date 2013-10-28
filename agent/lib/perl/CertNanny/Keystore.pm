@@ -21,8 +21,6 @@ use File::Basename;
 
 use English;
 
-use Digest::SHA1 qw(sha1_base64);
-
 use Carp;
 use Data::Dumper;
 
@@ -1162,6 +1160,8 @@ sub k_getRootCerts {
   my $entryname = $options->{ENTRYNAME};
   my $config    = $options->{CONFIG};
   
+  
+
   my @result = ();
   my $res;
   my $locRootCA = $config->get("keystore.$entryname.TrustedRootCA.AUTHORITATIVE.Directory", 'FILE');
@@ -1617,7 +1617,6 @@ sub k_executeHook {
 
   CertNanny::Logging->info("Running external hook function");
 
-  #my $options   = $self->{INSTANCE}->{OPTIONS} || $self->{OPTIONS};
   my $options   = $self->{OPTIONS} ;
   my $entry     = $options->{ENTRY};
   my $entryname = $options->{ENTRYNAME};
@@ -1631,7 +1630,11 @@ sub k_executeHook {
   } else {
     # assume it's an executable
     if (!exists($args{__LOCATION__})) {
-      $args{__LOCATION__} = $config->get("keystore.$entryname.location", 'FILE');
+      if (exists $self->{INSTANCE}->{OPTIONS}->{ENTRY}->{location} and $self->{INSTANCE}->{OPTIONS}->{ENTRY}->{location} ne '') {
+        $args{__LOCATION__} = qq("$self->{INSTANCE}->{OPTIONS}->{ENTRY}->{location}");
+      } else {
+        $args{__LOCATION__} = qq("$self->{OPTIONS}->{ENTRY}->{location}");
+      }
     }
 
     # replace values passed to this function

@@ -40,7 +40,6 @@ use base qw(Exporter);
 use IO::File;
 use File::Basename;
 use File::Glob qw(:globally :case);
-use Digest::SHA1 qw(sha1_base64);
 
 use Data::Dumper;
 
@@ -477,8 +476,7 @@ sub _parseFile {
   return undef if (!defined $handle);
 
   # calculate SHA1
-  my $sha = Digest::SHA1->new();
-  $sha->addfile($handle);
+  my $sha->addfile($handle);
   my $configFileSha = $sha->b64digest;
 
   # avoid double parsing
