@@ -40,7 +40,22 @@ use base qw(Exporter);
 use IO::File;
 use File::Basename;
 use File::Glob qw(:globally :case);
-#use Digest::SHA1 qw(sha1_base64);
+
+
+eval "require Digest::SHA qw(sha1_hex)";
+if ($@) {
+  eval "require Digest::SHA1 qw(sha1_hex)";
+  if ($@) {
+    print STDERR $@;
+    print STDERR "ERROR: Could not load Digest::SHA modul.\n";
+    return undef;
+  } else {
+    Digest::SHA1->import();
+  }
+} else {
+  Digest::SHA->import();
+}
+
 
 use Data::Dumper;
 
