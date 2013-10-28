@@ -1618,7 +1618,8 @@ sub k_executeHook {
 
   CertNanny::Logging->info("Running external hook function");
 
-  my $options   = $self->{INSTANCE}->{OPTIONS} || $self->{OPTIONS};
+  #my $options   = $self->{INSTANCE}->{OPTIONS} || $self->{OPTIONS};
+  my $options   = $self->{OPTIONS} ;
   my $entry     = $options->{ENTRY};
   my $entryname = $options->{ENTRYNAME};
   my $config    = $options->{CONFIG};
