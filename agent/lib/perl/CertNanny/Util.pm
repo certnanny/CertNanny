@@ -545,11 +545,9 @@ sub getCertSHA1 {
       $rc = {CERTSHA1 => $self->{getCertSHA1}->{$args{$certType}}};
     } else {
       if($cert = CertNanny::Util->convertCert(%args)) {
-        if ($base64 = MIME::Base64::encode_base64($$cert{CERTDATA})) {
-          if ($sha = sha1_base64($base64)) {
-            $rc = {CERTSHA1 => $sha};
-            $self->{getCertSHA1}->{$args{$certType}} = $sha;
-          }
+        if ($sha = sha1_base64($$cert{CERTDATA})) {
+          $rc = {CERTSHA1 => $sha};
+          $self->{getCertSHA1}->{$args{$certType}} = $sha;
         }
       }
     }
