@@ -1339,15 +1339,15 @@ sub installRoots {
               # delete EE
               pop(@$chainArrRef);
               # all others add to chainfile
-              while (my $cert = shift(@$chainArrRef)) {
+              while (my $cert = shift($chainArrRef)) {
                 CertNanny::Util->writeFile(DSTFILE => $tmpFile,
                                            SRCFILE => $cert->{CERTFILE}, 
                                            APPEND  => 1);
 
-                $self->{hook}->{Type}   .= 'CHAINFILE' . ','                                 if (defined($self->{hook}->{Type})   && ($self->{hook}->{Type}   !~ m/CHAINFILE/));
-                $self->{hook}->{File}   .= $cert->{CERTFILE} . ','                           if (defined($self->{hook}->{File})   && ($self->{hook}->{File}   !~ m/$cert->{CERTFILE}/));
-                $self->{hook}->{FP}     .= $cert->{CERTINFO}->{CertificateFingerprint} . ',' if (defined($self->{hook}->{FP})     && ($self->{hook}->{FP}     !~ m/$cert->{CERTINFO}->{CertificateFingerprint}/));
-                $self->{hook}->{Target} .= $locInstall{chainfile} . ','                      if (defined($self->{hook}->{Target}) && ($self->{hook}->{Target} !~ m/$locInstall{chainfile}/));
+                $self->{hook}->{Type}   .= 'CHAINFILE' . ','                                 if ($self->{hook}->{Type}   !~ m/CHAINFILE/);
+                $self->{hook}->{File}   .= $cert->{CERTFILE} . ','                           if ($self->{hook}->{File}   !~ m/$cert->{CERTFILE}/);
+                $self->{hook}->{FP}     .= $cert->{CERTINFO}->{CertificateFingerprint} . ',' if ($self->{hook}->{FP}     !~ m/$cert->{CERTINFO}->{CertificateFingerprint}/);
+                $self->{hook}->{Target} .= $locInstall{chainfile} . ','                      if ($self->{hook}->{Target} !~ m/$locInstall{chainfile}/);
               }    
               # Target chainfile part is finished. now write Target
               # put tmp-file to the right location     
