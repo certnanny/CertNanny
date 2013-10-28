@@ -237,10 +237,12 @@ sub do_enroll {
     # $conf->{CONFIG}->{ENTRY}->{INITIALENROLLEMNT} = 'yes';
     # $self->{CONFIG} = CertNanny::Config->popConf();
     $entry->{INITIALENROLLEMNT} = 'no';
+
   
     my $newkeystore = CertNanny::Keystore->new(CONFIG    => $self->{CONFIG},
                                                ENTRY     => $self->{ITEMS}->{$entryname},
                                                ENTRYNAME => $entryname);
+
 
     if ($newkeystore) {
       if (!$newkeystore->{INSTANCE}->k_retrieveState()) {

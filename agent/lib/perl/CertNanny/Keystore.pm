@@ -21,6 +21,8 @@ use File::Basename;
 
 use English;
 
+use Digest::SHA1 qw(sha1_base64);
+
 use Carp;
 use Data::Dumper;
 
