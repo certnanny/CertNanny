@@ -40,7 +40,7 @@ use base qw(Exporter);
 use IO::File;
 use File::Basename;
 use File::Glob qw(:globally :case);
-use Digest::SHA1 qw(sha1_base64);
+#use Digest::SHA1 qw(sha1_base64);
 
 use Data::Dumper;
 
