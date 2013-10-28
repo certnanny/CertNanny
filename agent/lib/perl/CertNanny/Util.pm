@@ -132,9 +132,11 @@ sub runCommand {
     
     if (($output =~ m/\A [[:ascii:]]* \Z/xms)) {
      	#CertNanny::Logging->debug("$output") if ($output);
-	  } else {
+	}
+	else {
 	    #CertNanny::Logging->debug("---Binary Data---") if ($output);
-	  }
+	}
+    
   }
     
   if ($args{WANTOUT}) {
@@ -433,52 +435,54 @@ sub callOpenSSL {
   my %args    = (@_);
 
   my $rc = 0;
-  
+  my $info;
+  # build commandstring
   my $openssl = $self->{CONFIG}->get('cmd.openssl', 'FILE');
-  my @cmd     = (qq("$openssl"), $command);
-  
-  # Input is already sanitychecked. we have either CERTFILE or CERTDATA
-  # If we have CERTFILE, we feed the command via call parameter
-  if (defined($args{CERTFILE})) {
-    push(@cmd, ('-in', qq("$args{CERTFILE}")));
-    push(@cmd, ('-inform', qq("$args{CERTFORMAT}")))
-  }
-
+  my @cmd = (qq("$openssl"), $command);
+  push(@cmd, ('-in', qq("$args{CERTFILE}")))       if (defined $args{CERTFILE});
+  push(@cmd, ('-inform', qq("$args{CERTFORMAT}"))) if (defined $args{CERTFILE});
   foreach (@$params) {
     push(@cmd, -$_);
   }
   my $outfile = CertNanny::Util->getTmpFile();
   push(@cmd, ('>', qq("$outfile")));
 
-  # @cmd complete now export certificate to tempfile
-  my $fh;
+  # export certificate to tempfile
   CertNanny::Logging->debug("Execute: " . join(" ", @cmd));
-  if (open $fh, "| " . join(" ", @cmd)) {
+
+  my $fh;
+  if (!open $fh, "| " . join(" ", @cmd)) {
+    $rc = CertNanny::Logging->error("callOpenSSL(): open error");
+    unlink $outfile;
+  }
+
+  if (!$rc) {
     binmode $fh;
-    # Input is already sanitychecked. we have either CERTFILE or CERTDATA
-    # If we have CERTDATA, we feed the command via STDIN
     print $fh $args{CERTDATA} if (defined $args{CERTDATA});
     close $fh;
 
     if ($? != 0) {
       $rc = CertNanny::Logging->error("callOpenSSL(): Error ASN.1 decoding certificate");
+      unlink $outfile;
     }
-  } else {
-    $rc = CertNanny::Logging->error("callOpenSSL(): open error");
+
+    if (!$rc) {
+      # read certificate
+      open $fh, '<', $outfile;
+      if (!$fh) {
+        $rc = CertNanny::Logging->error("callOpenSSL(): Error analysing ASN.1 decoded certificate");
+        unlink $outfile;
+      }
+    }
   }
 
   if (!$rc) {
-    # read certificate
-    if (open $fh, '<', $outfile) {
-      $rc = CertNanny::Util->parseCertData(\$fh);
-      close $fh;
-    } else {
-      $rc = CertNanny::Logging->error("callOpenSSL(): Error analysing ASN.1 decoded certificate");
-    }
+    $info = CertNanny::Util->parseCertData(\$fh);
+    close $fh;
+    unlink $outfile;
   }
-  unlink $outfile;
-
-  return $rc;
+  
+  return $info;
 } ## end sub callOpenSSL
 
 
