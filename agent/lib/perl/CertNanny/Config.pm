@@ -476,8 +476,7 @@ sub _parseFile {
   return undef if (!defined $handle);
 
   # calculate SHA1
-  my $sha->addfile($handle);
-  my $configFileSha = $sha->b64digest;
+  my $configFileSha = sha1_hex(<$handle>);
 
   # avoid double parsing
   if (exists($self->{CONFIGFILES})) {
