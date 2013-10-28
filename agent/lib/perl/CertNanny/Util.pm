@@ -24,7 +24,19 @@ use File::Temp;
 use Time::Local;
 
 use MIME::Base64;
-use Digest::SHA1;
+eval "require Digest::SHA qw(sha1_hex)";
+if ($@) {
+  eval "require Digest::SHA1 qw(sha1_hex)";
+  if ($@) {
+    print STDERR $@;
+    print STDERR "ERROR: Could not load Digest::SHA modul.\n";
+    return undef;
+  } else {
+    Digest::SHA1->import();
+  }
+} else {
+  Digest::SHA->import();
+}
 
 use Data::Dumper;
 
