@@ -25,6 +25,20 @@ use Time::Local;
 
 use MIME::Base64;
 
+eval "require Digest::SHA qw(sha1_base64)";
+if ($@) {
+  eval "require Digest::SHA1 qw(sha1_base64)";
+  if ($@) {
+    print STDERR $@;
+    print STDERR "ERROR: Could not load Digest::SHA modul.\n";
+    return undef;
+  } else {
+    Digest::SHA1->import();
+  }
+} else {
+  Digest::SHA->import();
+}
+
 use Data::Dumper;
 
 use vars qw(@ISA @EXPORT @EXPORT_OK %EXPORT_TAGS $VERSION);
