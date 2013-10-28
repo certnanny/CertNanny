@@ -24,9 +24,9 @@ use File::Temp;
 use Time::Local;
 
 use MIME::Base64;
-eval "require Digest::SHA qw(sha1_hex)";
+eval "require Digest::SHA qw(sha1_base64)";
 if ($@) {
-  eval "require Digest::SHA1 qw(sha1_hex)";
+  eval "require Digest::SHA1 qw(sha1_base64)";
   if ($@) {
     print STDERR $@;
     print STDERR "ERROR: Could not load Digest::SHA modul.\n";
