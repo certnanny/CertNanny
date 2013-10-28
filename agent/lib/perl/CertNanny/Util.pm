@@ -24,6 +24,7 @@ use File::Temp;
 use Time::Local;
 
 use MIME::Base64;
+use Digest::SHA1;
 
 use Data::Dumper;
 
