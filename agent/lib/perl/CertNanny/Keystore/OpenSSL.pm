@@ -822,6 +822,12 @@ sub selfSign {
 } ## end sub selfSign
 
 
+sub _hasEngine {
+  my $self = shift;
+ 
+  return defined $self->{HSM};
+}
+
 sub generateKey {
   ###########################################################################
   #
@@ -1546,11 +1552,7 @@ sub _writeCAChainFile {
 } ## end sub writeCAChainFile
 
 
-sub _hasEngine {
-  my $self = shift;
- 
-  return defined $self->{HSM};
-}
+
 
 
 1;
