@@ -42,18 +42,18 @@ use File::Basename;
 use File::Glob qw(:globally :case);
 
 
-eval "require Digest::SHA qw(sha1_hex)";
+eval "require Digest::SHA";
 if ($@) {
-  eval "require Digest::SHA1 qw(sha1_hex)";
+  eval "require Digest::SHA1";
   if ($@) {
     print STDERR $@;
     print STDERR "ERROR: Could not load Digest::SHA modul.\n";
     return undef;
   } else {
-    Digest::SHA1->import();
+    Digest::SHA1->import(qw(sha1_hex));
   }
 } else {
-  Digest::SHA->import();
+  Digest::SHA->import(qw(sha1_hex));
 }
 
 

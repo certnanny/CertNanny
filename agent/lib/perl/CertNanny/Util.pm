@@ -25,19 +25,20 @@ use Time::Local;
 
 use MIME::Base64;
 
-eval "require Digest::SHA qw(sha1_base64)";
+eval "require Digest::SHA";
 if ($@) {
-  eval "require Digest::SHA1 qw(sha1_base64)";
+  eval "require Digest::SHA1";
   if ($@) {
     print STDERR $@;
     print STDERR "ERROR: Could not load Digest::SHA modul.\n";
     return undef;
   } else {
-    Digest::SHA1->import();
+    Digest::SHA1->import(qw(sha1_base64));
   }
 } else {
-  Digest::SHA->import();
+  Digest::SHA->import(qw(sha1_base64));
 }
+
 
 use Data::Dumper;
 
