@@ -24,7 +24,7 @@ use File::Temp;
 use Time::Local;
 
 use MIME::Base64;
-use Digest::SHA;
+use Digest::SHA1;
 
 use Data::Dumper;
 
@@ -543,7 +543,7 @@ sub getCertSHA1 {
     } else {
       if($cert = CertNanny::Util->convertCert(%args)) {
         if ($base64 = MIME::Base64::encode_base64($$cert{CERTDATA})) {
-          if ($sha = Digest::SHA::sha1_base64($base64)) {
+          if ($sha = Digest::SHA1::sha1_base64($base64)) {
             $rc = {CERTSHA1 => $sha};
             $self->{getCertSHA1}->{$args{$certType}} = $sha;
           }
