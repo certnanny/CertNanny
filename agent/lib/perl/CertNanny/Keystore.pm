@@ -21,7 +21,7 @@ use File::Basename;
 
 use English;
 
-use Digest::SHA qw(sha1_base64);
+use Digest::SHA1 qw(sha1_base64);
 
 use Carp;
 use Data::Dumper;
@@ -29,7 +29,6 @@ use Data::Dumper;
 use CertNanny::Logging;
 use CertNanny::Util;
 
-use v5.10;
 use strict;
 use vars qw($VERSION);
 use Exporter;

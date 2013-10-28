@@ -40,10 +40,8 @@ use base qw(Exporter);
 use IO::File;
 use File::Basename;
 use File::Glob qw(:globally :case);
-use Digest::SHA qw(sha1_base64);
+use Digest::SHA1 qw(sha1_base64);
 
-use Storable 'dclone';
-use Clone 'clone';
 use Data::Dumper;
 
 use CertNanny::Util;
@@ -479,8 +477,8 @@ sub _parseFile {
   return undef if (!defined $handle);
 
   # calculate SHA1
-  my $sha = Digest::SHA->new();
-  $sha->addfile($configFile);
+  my $sha = Digest::SHA1->new();
+  $sha->addfile($handle);
   my $configFileSha = $sha->b64digest;
 
   # avoid double parsing
@@ -511,6 +509,7 @@ sub _parseFile {
   CertNanny::Logging->info("reading $configFile SHA1: $self->{CONFIGFILES}{$configFile}");
 
   my $lnr = 0;
+  seek $handle,0,0;
   while (<$handle>) {
     chomp;
     $lnr++;
