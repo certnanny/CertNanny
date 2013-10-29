@@ -12,14 +12,15 @@ use Exporter;
 
 $VERSION = 0.10;
 
+
 sub new() {
-    
+
 }
+
 
 sub genkey() {
-    
-}
 
+}
 
 1;
 
@@ -49,7 +50,7 @@ You will need to configure your HSM and thus you need to defined options on how 
 
 There you see the only mandatory setting in this group: type *must* the name of your HSM class and .pm file (without the .pm). For example, the HSM Chil has a classname of Chil and a filename of Chil.pm, so type=Chil is the correct setting.
 
-Additionally, it is recommended to defined a special option group keystore.label.hsm.key which contains all information relevant to key generation. Usually key generation is done by the HSM's special program (e.g. generatekey in Chil's case). They usually take a lot of arguments (like the keysize, e.g. 2048) and it is recommended, that all options in this group are passed to the generation function as (key,value) pairs. This makes it possible to automatically iterate over all entries and pass them to your key generation program enabling both full configuration through config file and support for unexpected settings. Of course, you will overwrite some of these options when initializing your HSM (for example, PIN or key id/filename).
+Additionally, it is recommended to defined a special option group keystore.label.hsm.key which contains all information relevant to key generation. Usually key generation is done by the HSM's special program (e.g. generateKey in Chil's case). They usually take a lot of arguments (like the keysize, e.g. 2048) and it is recommended, that all options in this group are passed to the generation function as (key,value) pairs. This makes it possible to automatically iterate over all entries and pass them to your key generation program enabling both full configuration through config file and support for unexpected settings. Of course, you will overwrite some of these options when initializing your HSM (for example, PIN or key id/filename).
 
 Refer to the Chil and Utimaco implementations for details (their configuration is also documented inside CertNanny's default configuration file).
 
@@ -63,7 +64,7 @@ C<new()>
 
 C<genkey()>
 
-C<createrequest()>
+C<createRequest()>
 
 C<engineid()>
 
@@ -113,7 +114,7 @@ A simple string containing the label of the keystore. May be used for logging in
 
 [Optional]: Generate a new key within the HSM. The exact method may depend on the configuration and implementation. It is expected that it returns the identifier used for the key. This may be the full path to a file or an identifier. It is important that OpenSSL will recognize this key if passed to the usual req & similar. The format is determined by C<keyform()>. If this function is not provided, CertNanny will use OpenSSL's native mechanism with the engine. In that case it will call C<keyform()> and C<engineid()>.
 
-=item createrequest()
+=item createRequest()
 
 [Optional]: Creates a certificate signing request (CSR). Returns a string with the full path to the CSR. If this function is not provided, CertNanny will use OpenSSL's native mechanism with the engine. In that case it will call C<keyform()> and C<engineid()>.
 
@@ -127,7 +128,7 @@ Returns the keyform variable or undef. This usually only returns "engine" and on
 
 =item getEngineConfiguration()
 
-Returns an array reference which contains the configuration for the engine which is written to an OpenSSL configuration file. It is very important that this array has a specific format, so the order is kept as OpenSSL expects a specific order depending on the engine. May return undef if the engine is static (use C<CertNanny::Util::staticEngine()> for this). Otherwise the format is as follows: each entry in the array is a hash reference which contains a single key => value pair:
+Returns an array reference which contains the configuration for the engine which is written to an OpenSSL configuration file. It is very important that this array has a specific format, so the order is kept as OpenSSL expects a specific order depending on the engine. May return undef if the engine is static (use C<CertNanny::Util->staticEngine()> for this). Otherwise the format is as follows: each entry in the array is a hash reference which contains a single key => value pair:
 
 =over 4
 
