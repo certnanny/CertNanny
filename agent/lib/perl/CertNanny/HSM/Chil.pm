@@ -21,131 +21,130 @@ $VERSION = 0.10;
 
 
 sub new() {
-    my $proto = shift;
-	my $class = ref($proto)  || $proto;
-	my $entry_options = shift;
-	my $hsm_options = $entry_options->{hsm};
-	my $config = shift;
-    my $entryname = shift;
-	my $self = {};
-	my @avail_keytypes = ("embed", "hwcrhk");
-	
-	bless $self, $class;
-	
-	#remove type, we know that here
-	delete $hsm_options->{type};
-	
-	
-	my $engine_section = $entry_options->{enroll}->{sscep}->{engine} || 'engine_section';
-    $entry_options->{enroll}->{sscep}->{engine} = $engine_section;
-    $entry_options->{enroll}->{$engine_section}->{engine_id} = $self->engineid();
-    $entry_options->{enroll}->{$engine_section}->{dynamic_path} = $self->{OPTIONS}->{ENTRY}->{hsm}->{dynamic_path};
-    
-    unless(defined $hsm_options->{generatekey} and -x $hsm_options->{generatekey}) {
-        CertNanny::Logging->error("No executable defined or found to generate a key for Chil HSM");
-        return;
-    }
-    
-    unless(defined $hsm_options->{keytype} and (grep $_ eq $hsm_options->{keytype}, @avail_keytypes)) {
-        CertNanny::Logging->error(qq("$hsm_options->{keytype} is not an available keytype."));
-        return;
-    }
-    
-    
-    $self->{hsm_options} = $hsm_options;
-    $self->{ENTRY} = $entry_options;
-    $self->{ENTRYNAME} = $entryname;
-    $self->{CONFIG} = $config;
-	
-	return $self;
-}
+  my $proto          = shift;
+  my $class          = ref($proto) || $proto;
+  my $entry_options  = shift;
+  my $hsm_options    = $entry_options->{hsm};
+  my $config         = shift;
+  my $entryname      = shift;
+  my $self           = {};
+  my @avail_keytypes = ("embed", "hwcrhk");
+
+  bless $self, $class;
+
+  #remove type, we know that here
+  delete $hsm_options->{type};
+
+  my $engine_section = $entry_options->{enroll}->{sscep}->{engine} || 'engine_section';
+  $entry_options->{enroll}->{sscep}->{engine}                 = $engine_section;
+  $entry_options->{enroll}->{$engine_section}->{engine_id}    = $self->engineid();
+  $entry_options->{enroll}->{$engine_section}->{dynamic_path} = $self->{OPTIONS}->{ENTRY}->{hsm}->{dynamic_path};
+
+  unless (defined $hsm_options->{generatekey} and -x $hsm_options->{generatekey}) {
+    CertNanny::Logging->error("No executable defined or found to generate a key for Chil HSM");
+    return undef;
+  }
+
+  unless (defined $hsm_options->{key}->{type} and (grep $_ eq $hsm_options->{key}->{type}, @avail_keytypes)) {
+    CertNanny::Logging->error(qq("$hsm_options->{key}->{type} is not an available keytype."));
+    return undef;
+  }
+
+  $self->{hsm_options} = $hsm_options;
+  $self->{ENTRY}       = $entry_options;
+  $self->{ENTRYNAME}   = $entryname;
+  $self->{CONFIG}      = $config;
+
+  return $self;
+} ## end sub new
+
 
 sub genkey() {
-    my $self = shift;
-    my $key;
-    my @generateopts = ();
-    foreach my $param (keys %{$self->{hsm_options}->{key}}) {
-        push(@generateopts, qq("$param=$self->{hsm_options}->{key}->{$param}"));
-    }
-    
-    my @cmd;
-    push(@cmd, $self->{hsm_options}->{generatekey});
-    push(@cmd, '-b');
-    push(@cmd, $self->{hsm_options}->{keytype});
-    if($self->{hsm_options}->{keytype} eq "embed") {
-        my $keyfile = $self->{ENTRYNAME} . "-key.pem";
-        my $outfile = File::Spec->catfile($self->{ENTRY}->{statedir}, $keyfile);
-        push(@cmd, "embedsavefile=$outfile");
-        $key = $outfile;
-    } else {
-        #hwcrhk key
-        # TODO:
-        # WARNING! THIS CANNOT WORK RIGHT NOW
-        # IT WILL OVERWRITE THE OLD KEY OR FAIL!
-        # DO NOT USE LIKE THIS !!!
-        # How to fix this? - Need to have both keys active
-        # but on installation the new key must replace the old one.
-        # The old one should be archived if possible, else overwritten.
-        # How do applications do this, if they get a new certificate currently?
-        CertNanny::Logging->error("hwcrhk keys not implemented yet. Aborting...");
-        return;
-        $key = $self->{ENTRY}->{location};
-        push(@cmd, "ident=$key");
-    }
-    push(@cmd, @generateopts);
-    
-    my $cmd = join(' ', @cmd);
-	CertNanny::Logging->debug("Execute: $cmd");
-	my $rc = run_command($cmd);
-	if($rc != 0) {
-	    CertNanny::Logging->error("Could not generate new key in HSM, see logging output.");
-	    return;
-	}
-	
-	# It may not actually be a file (see hwcrhk) but we stay in
-	# line with the terminology used in CertNanny.
-	return($key);
-}
+  my $self = shift;
+  my $key;
+  my @generateopts = ();
+  foreach my $param (keys %{$self->{hsm_options}->{key}}) {
+    push(@generateopts, qq("$param=$self->{hsm_options}->{key}->{$param}"));
+  }
+
+  my @cmd;
+  push(@cmd, $self->{hsm_options}->{generatekey});
+  push(@cmd, '-b');
+  push(@cmd, $self->{hsm_options}->{key}->{type});
+  if ($self->{hsm_options}->{key}->{type} eq "embed") {
+    my $keyfile = $self->{ENTRYNAME} . "-key.pem";
+    my $outfile = File::Spec->catfile($self->{ENTRY}->{statedir}, $keyfile);
+    push(@cmd, "embedsavefile=$outfile");
+    $key = $outfile;
+  } else {
+
+    #hwcrhk key
+    # TODO sub genkey WARNING! THIS CANNOT WORK RIGHT NOW
+    # IT WILL OVERWRITE THE OLD KEY OR FAIL!
+    # DO NOT USE LIKE THIS !!!
+    # How to fix this? - Need to have both keys active
+    # but on installation the new key must replace the old one.
+    # The old one should be archived if possible, else overwritten.
+    # How do applications do this, if they get a new certificate currently?
+    CertNanny::Logging->error("hwcrhk keys not implemented yet. Aborting...");
+    return undef;
+    $key = $self->{ENTRY}->{location};
+    push(@cmd, "ident=$key");
+  } ## end else [ if ($self->{hsm_options...})]
+  push(@cmd, @generateopts);
+
+  my $rc = CertNanny::Util->runCommand(\@cmd);
+  if ($rc != 0) {
+    CertNanny::Logging->error("Could not generate new key in HSM, see logging output.");
+    return undef;
+  }
+
+  # It may not actually be a file (see hwcrhk) but we stay in
+  # line with the terminology used in CertNanny.
+  return $key;
+} ## end sub genkey
+
 
 sub keyform() {
-    my $self = shift;
-    if($self->{hsm_options}->{keytype} eq "hwcrhk") {
-        return "engine";
-    } else {
-        return;
-    }
+  my $self = shift;
+  if ($self->{hsm_options}->{key}->{type} eq "hwcrhk") {
+    return "engine";
+  } else {
+    return undef;
+  }
 }
 
+
 sub engineid() {
-    my $self = shift;
-    return "chil";
+  my $self = shift;
+  return "chil";
 }
 
 # too bad, OpenSSL csr generation does not work with this engine
-sub createrequest() {
-    my $self=shift;
-    my $result = shift;
-    my $keyfile = $result->{KEYFILE};
-    my $requestfile = $keyfile;
-    $requestfile =~ s/-key.pem$/-key_req.pem/;
-    $result->{REQUESTFILE} = $requestfile;
-    return $result;
+sub createRequest() {
+  my $self        = shift;
+  my $result      = shift;
+  # Todo pgk: {KEYFILE} oder {key}->{file}
+  my $keyfile     = $result->{KEYFILE};
+  my $requestfile = $keyfile;
+  $requestfile =~ s/-key.pem$/-key_req.pem/;
+  $result->{REQUESTFILE} = $requestfile;
+  return $result;
 }
+
 
 sub getEngineConfiguration() {
-    my $self = shift;
-    
-    if(CertNanny::Util->staticEngine($self->engineid())) {
-        CertNanny::Logging->debug("getEngineConfiguration(): Engine reports to be statically compiled with OpenSSL, not return a configuration as none should be needed.");
-        return;
-    }
-    
-    
-    # NYI: Not yet implemented. See Utimaco.pm for reference / help
-    CertNanny::Logging->error("getEngineConfiguration(): Unfortunately, the engine is not static and dynamic loading is not yet supported. Please make a version of OpenSSL with a static engine or implement this.");
-    die;
-}
+  my $self = shift;
 
+  if (CertNanny::Util->staticEngine($self->engineid())) {
+    CertNanny::Logging->debug("getEngineConfiguration(): Engine reports to be statically compiled with OpenSSL, not return a configuration as none should be needed.");
+    return undef;
+  }
+
+  # NYI: Not yet implemented. See Utimaco.pm for reference / help
+  CertNanny::Logging->error("getEngineConfiguration(): Unfortunately, the engine is not static and dynamic loading is not yet supported. Please make a version of OpenSSL with a static engine or implement this.");
+  die;
+} ## end sub getEngineConfiguration
 
 1;
 
