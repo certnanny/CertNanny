@@ -750,7 +750,7 @@ sub getInstalledCAs {
           $certRef  = $self->getCert(CERTDATA => $certData);
 
           while ($certRef and ($certData = $certRef->{CERTDATA})) {
-            my $certInfo = CertNanny::Util->getCertInfoHash(CERTDATA => $certData);
+            my $certInfo = CertNanny::Util->getCertInfoHash(CERTDATA => $certData , CERTFORMAT => $certRef->{CERTFORMAT} );
             if (defined($certInfo) ) {
               if (my $certTyp = $self->k_getCertType(CERTINFO => $certInfo)) { 
                 $certSha1 = CertNanny::Util->getCertSHA1(%{$certRef});
