@@ -55,6 +55,10 @@ sub new {
   $self->{PIN} = $self->_unStash($entry->{location} . ".sth");
 
   $options->{gsk6cmd} = $config->get('cmd.gsk6cmd', 'FILE');
+  $options->{gskcmd} = $config->get('cmd.gskcmd', 'FILE');
+
+if(defined $options->{gsk6cmd}){
+ 
 
   # on certain platforms we need cannot find the location of the
   #   GSKit library directory ourselves, in this case it must be configured.
@@ -68,6 +72,12 @@ sub new {
   }
 
   $options->{GSKIT_CLASSPATH} = $config->get('path.gskclasspath', 'FILE');
+}else{
+  if(!defined $options->{gskcmd}){
+    croak "gskcmd not found" unless (defined $options->{gsk6cmd});
+  }
+ 
+}
 
   # set key generation operation mode:
   # internal: create RSA key and request with MQ keystore
@@ -145,6 +155,9 @@ sub getCert {
   }
 
   my $gsk6cmd = $options->{gsk6cmd};
+  if(!defined $options->{gsk6cmd}){
+    my $gsk6cmd = $options->{gskcmd};   
+  }
 
   my $label = $self->_getCertLabel();
   if (!defined $label) {
@@ -215,6 +228,10 @@ sub installCert {
   my $config    = $options->{CONFIG};
 
   my $gsk6cmd = $options->{gsk6cmd};
+
+  if(!defined $options->{gsk6cmd}){
+    my $gsk6cmd = $options->{gskcmd};   
+  }
 
   # new MQ keystore base filename
   my $newkeystorebase = File::Spec->catfile($entry->{statedir}, "tmpkeystore-" . $entryname);
@@ -496,7 +513,11 @@ sub getKey {
   my $entry     = $options->{ENTRY};
   my $entryname = $options->{ENTRYNAME};
   my $config    = $options->{CONFIG};
+  
+  my $keydata;
 
+if($options->{gsk6cmd})
+{
   # initialize Java and GSKit environment
   if (!$self->_getIBMJavaEnvironment()) {
     CertNanny::Logging->error("Could not determine IBM Java environment");
@@ -558,8 +579,67 @@ sub getKey {
     unlink $p8file;
     return undef;
   }
-  my $keydata = CertNanny::Util->readFile($p8file);
+  $keydata = CertNanny::Util->readFile($p8file);
   unlink $p8file;
+}else{
+  ##default to new get key for gsk7cmd and up 
+  
+    my $keystore = $entry->{location} . ".kdb";
+
+  my $label = $self->_getCertLabel();
+  if (!defined $label) {
+    CertNanny::Logging->error("Could not get certificate label");
+    return undef;
+  }
+  my $exportp12 = CertNanny::Util->getTmpFile();
+    
+  chmod 0600, $exportp12;
+  
+  my @cmd;
+  @cmd = (qq("$options->{gskcmd}"), '-cert', '-extract', '-db', qq("$keystore"), '-pw', qq("$self->{PIN}"), '-label', qq("$label"), '-type cms', '-target', qq("$exportp12"), '-target_pw' , qq("$self->{PIN}"), '-target_type', 'pkcs12');
+
+  if (CertNanny::Util->RunCommand(\@cmd, HIDEPWD => 1)) {
+    CertNanny::Logging->error("getKey(): could not extract private key");
+    unlink $exportp12;
+    return undef;
+  }
+  
+  my $openssl = $config->get('cmd.openssl', 'FILE');
+  if (!defined $openssl) {
+    CertNanny::Logging->error("No openssl shell specified");
+    return undef;
+  };
+  
+  my @opensslcmd;
+  $ENV{PASSIN} = $self->{PIN};
+  my $exportkey = CertNanny::Util->getTmpFile();
+  chmod 0600, $exportkey;
+  
+  @opensslcmd = (qq("$openssl"), 'pkcs12', '-in', qq("$exportp12"), '-passin', qq("env:PASSIN"),  '-out', qq("$exportkey"), '-nodes' , 'nocerts' );
+
+  if (CertNanny::Util->RunCommand(\@cmd, HIDEPWD => 1)) {
+    CertNanny::Logging->error("getKey(): could not extract private key");
+    unlink $exportkey;
+    return undef;
+  }
+  
+  delete $ENV{PASSIN};
+  $keydata = CertNanny::Util->readFile($exportkey);
+  unlink $exportkey;
+  
+  if ((!defined $keydata) or ($keydata eq "")) {
+    CertNanny::Logging->error("getKey(): Could not convert private key via pkcs12 export");
+    return undef;
+  }
+  
+  CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "get private key for main certificate from keystore via pkcs12 export");
+  
+  return {KEYDATA   => $keydata,
+          KEYTYPE   => 'OpenSSL',
+          KEYFORMAT => 'PEM'};  # no keypass, unencrypted
+ 
+ }
+
 
   if ((!defined $keydata) or ($keydata eq "")) {
     CertNanny::Logging->error("getKey(): Could not convert private key");
@@ -1025,6 +1105,10 @@ sub _getIBMJavaEnvironment {
     # determine classpath for IBM classes
     my $gsk6cmd = $options->{gsk6cmd};
 
+    if(!defined $options->{gsk6cmd}){
+      my $gsk6cmd = $options->{gskcmd};   
+    }
+
     my $cmd = qq("$gsk6cmd") . " -version";
 
     CertNanny::Logging->debug("Execute: $cmd");
@@ -1059,6 +1143,10 @@ sub _getIBMJavaEnvironment {
 
     # determine classpath for IBM classes
     my $gsk6cmd = $options->{gsk6cmd};
+
+    if(!defined $options->{gsk6cmd}){
+      my $gsk6cmd = $options->{gskcmd};   
+    }
 
     my $cmd = ". $gsk6cmd >/dev/null 2>&1 ; echo \$JAVA_FLAGS";
     CertNanny::Logging->debug("Execute: $cmd");
@@ -1115,7 +1203,11 @@ sub _getCertLabel {
   return unless (-r "$filename.kdb");
 
   my $gsk6cmd = $self->{OPTIONS}->{gsk6cmd};
-  croak "Could not get gsk6cmd location" unless defined $gsk6cmd;
+
+  if(!defined $self->{OPTIONS}->{gsk6cmd}){
+    my $gsk6cmd = $self->{OPTIONS}->{gskcmd};   
+  }
+
 
   # get label name for user certificate
   my @cmd = (qq("$gsk6cmd"), '-cert', '-list', 'personal', '-db', qq("$filename.kdb"), '-pw', qq("$self->{PIN}"));

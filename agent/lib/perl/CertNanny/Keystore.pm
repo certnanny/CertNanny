@@ -900,6 +900,7 @@ sub k_checkValidity {
   my $days = shift || 0;
 
   my $notAfter = CertNanny::Util->isoDateToEpoch($self->{CERT}->{CERTINFO}->{NotAfter});
+  CertNanny::Logging->debug("Parsed not After Date: $notAfter ");
 
   return unless defined $notAfter;
 
