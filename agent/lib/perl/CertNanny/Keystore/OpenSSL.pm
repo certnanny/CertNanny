@@ -17,6 +17,7 @@ use Carp;
 
 use IO::File;
 use File::Spec;
+use File::Path;
 use File::Copy;
 use File::Basename;
 use Data::Dumper;
@@ -520,6 +521,50 @@ sub getKey {
 } ## end sub getKey
 
 
+sub getCertLocation {
+  ###########################################################################
+  #
+  # get the key specific locations for certificates
+  # 
+  # Input: caller must provide a hash ref containing 
+  #           TYPE      => TrustedRootCA or CAChain
+  #                        Default: TrustedRootCA
+  # 
+  # Output: caller gets a hash ref:
+  #           <locationname in lowercase> => <Location>
+  #         or undef on error
+  CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "get the key specific locations for certificates");
+  my $self = shift;
+  my %args = (TYPE => 'TrustedRootCA',
+              @_);
+  
+  my $options   = $self->{OPTIONS};
+  my $entry     = $options->{ENTRY};
+  my $entryname = $options->{ENTRYNAME};
+  my $config    = $options->{CONFIG};
+
+  my $rc = undef;
+
+  if ($args{TrustedRootCA}) {
+    foreach ('Directory', 'File', 'ChainFile') {
+      if (my $location = $config->get("keystore.$entryname.TrustedRootCA.GENERATED.$_", 'FILE')) {
+        $rc->{lc($_)} = $location;
+      }
+    }
+  }
+  if ($args{CAChain}) {
+    foreach ('Directory', 'File') {
+      if (my $location = $config->get("keystore.$entryname.CAChain.GENERATED.$_", 'FILE')) {
+        $rc->{lc($_)} = $location;
+      }
+    }
+  }
+
+  CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "get the key specific locations for certificates");
+  return $rc
+} ## end sub getKey
+
+
 sub createRequest {
   ###########################################################################
   #
@@ -799,7 +844,6 @@ sub selfSign {
   CertNanny::Logging->debug("The following configuration was written to $tmpconfigfile:\n" . CertNanny::Util->readFile($tmpconfigfile));
 
   # generate request
-  # Todo pgk: Testen runCommand
   my @cmd = (qq("$openssl"), 'req', '-config', qq("$tmpconfigfile"), '-x509', '-new', '-sha1', '-out', qq("$outfile"), '-key', qq("$entry->{key}->{file}"),);
 
   push(@cmd, ('-passin', 'env:PIN')) unless $pin eq "";
@@ -821,6 +865,7 @@ sub _hasEngine {
  
   return defined $self->{HSM};
 }
+
 
 sub generateKey {
   ###########################################################################
@@ -1446,6 +1491,8 @@ sub _createLocalCerts {
         
           if ($makeTarget) {
             # try to link the file, if it fails (e.g. for Windows Systems) try a copy file to desired location
+            $certTargetDir = File::Spec->canonpath($certTargetDir);
+            eval {File::Path::mkpath($certTargetDir)};
             $target = File::Spec->catfile($certTargetDir, $subject_hash) . '.' . $counter;
             unlink $target if (-e $target);
             $tryCopy = $copy;
