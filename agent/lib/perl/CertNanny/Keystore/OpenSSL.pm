@@ -17,7 +17,6 @@ use Carp;
 
 use IO::File;
 use File::Spec;
-use File::Path;
 use File::Copy;
 use File::Basename;
 use Data::Dumper;
@@ -51,116 +50,122 @@ sub new {
   # propagate PIN to class options
   $self->{PIN} = $entry->{key}->{pin};
  
-  if ($entry->{location} eq 'rootonly') {
-  	CertNanny::Logging->debug("Instantiate root only keystore skip sanity checks");
-  	if (!defined $entry->{rootcaupdate}->{enable}) {
-  		CertNanny::Logging->debug("Rootonly keystored only make sense if rootca update is enabled");
-  	}
-  	 
-  	if (!defined $entry->{rootcaupdate}->{quarantinedir}) {
-  	 	CertNanny::Logging->debug("Rootonly missing quarantinedir");
-  	}
-  	 
-  	if (!defined $entry->{TrustedRootCA}->{AUTHORITATIVE}->{Directory}) {
-  	 	CertNanny::Logging->debug("Rootonly missing TrustedRootCA AUTHORITATIVE Directory");
-  	}
-  } else {
-    if (defined $entry->{INITIALENROLLEMNT} and $entry->{INITIALENROLLEMNT} eq 'yes' ) {
-      CertNanny::Logging->info("Initial enrollment mode, skip check for key and cert file");
-    } else {
-  	  #If not an initial enrollment set default to no 
-      $entry->{INITIALENROLLEMNT} =  'no'; 
-  	
-      # If it's not an Initial Enrollment, we need at least
-      #   - keyfile
-      #   - location
-      if (!defined $entry->{key}->{file} || (!-r $entry->{key}->{file}) && !defined $entry->{hsm}) {
-        croak("keystore.key.file $entry->{key}->{file} not defined, does not exist or unreadable");
-        return undef;
-      }
 
-      if (!defined $entry->{location} || (!-r $entry->{location})) {
-        croak("keystore.location $entry->{location} not defined, does not exist or unreadable");
-        return undef;
-      }
-    } ## end else [ if (defined $config->...)]	
   
-    # desired target formats valid is PEM or DER
-    foreach my $format (qw(FORMAT KEYFORMAT CACERTFORMAT ROOTCACERTFORMAT)) {
-      # assign format if explicitly defined in config
-      if (defined $entry->{lc($format)}) {
-        $self->{$format} = $entry->{lc($format)};
-      }
-
-      # assign default PEM otherwise
-      if (!defined $self->{$format}) {
-        $self->{$format} = $format eq 'FORMAT'
-                           ? 'PEM'            # default for .format
-                           : $self->{FORMAT}; # default for the rest
-      }
-
-      if ($self->{$format} !~ m{ \A (?: DER | PEM ) \z }xms) {
-        croak("Incorrect ." . lc($format) . " specification '" . $self->{$format} . "'");
-        return undef;
-      }
-    } ## end foreach my $format (qw(FORMAT KEYFORMAT CACERTFORMAT ROOTCACERTFORMAT))
-
-    # Keytype defaults to OpenSSL; valid is OpenSSL or PKCS8
-    $self->{KEYTYPE} = $entry->{key}->{type} || 'OpenSSL';
-    if ($self->{KEYTYPE} !~ m{ \A (?: OpenSSL | PKCS8 ) \z }xms) {
-      croak("Incorrect keystore type $self->{KEYTYPE}");
+  if($entry->{location} eq 'rootonly')
+  {
+  	 CertNanny::Logging->debug("Instantiate root only keystore skip sanity checks");
+  	 if(!defined $entry->{rootcaupdate}->{enable}){
+  	 	CertNanny::Logging->debug("Rootonly keystored only make sense if rootca update is enabled");
+  	 }
+  	 
+  	 if(!defined $entry->{rootcaupdate}->{quarantinedir}){
+  	 	CertNanny::Logging->debug("Rootonly missing quarantinedir");
+  	 }
+  	 
+  	 if(!defined $entry->{TrustedRootCA}->{AUTHORITATIVE}->{Directory}){
+  	 	CertNanny::Logging->debug("Rootonly missing TrustedRootCA AUTHORITATIVE Directory");
+  	 }
+  	
+  	
+  }else{
+  	
+  if (defined $entry->{INITIALENROLLEMNT} and $entry->{INITIALENROLLEMNT} eq 'yes' ) {
+    CertNanny::Logging->info("Initial enrollment mode, skip check for key and cert file");
+  } else {
+  	#If not an initial enrollment set default to no 
+  	$entry->{INITIALENROLLEMNT} =  'no'; 
+  	
+    # If it's not an Initial Enrollment, we need at least
+    #   - keyfile
+    #   - location
+    if (!defined $entry->{key}->{file} || (!-r $entry->{key}->{file}) && !defined $entry->{hsm}) {
+      croak("keystore.key.file $entry->{key}->{file} not defined, does not exist or unreadable");
       return undef;
     }
 
-    # SANITY CHECKS
-    # sanity check: DER encoded OpenSSL keys cannot be encrypted
-    if (defined $self->{PIN} && ($self->{PIN} ne "") &&
-                                ($self->{KEYTYPE} eq 'OpenSSL') &&
-                                ($self->{KEYFORMAT} eq 'DER')) {
-      croak("DER encoded OpenSSL keystores cannot be encrypted");
+    if (!defined $entry->{location} || (!-r $entry->{location})) {
+      croak("keystore.location $entry->{location} not defined, does not exist or unreadable");
+      return undef;
+    }
+  } ## end else [ if (defined $config->...)]	
+  
+  # desired target formats valid is PEM or DER
+  foreach my $format (qw(FORMAT KEYFORMAT CACERTFORMAT ROOTCACERTFORMAT)) {
+    # assign format if explicitly defined in config
+    if (defined $entry->{lc($format)}) {
+      $self->{$format} = $entry->{lc($format)};
+    }
+
+    # assign default PEM otherwise
+    if (!defined $self->{$format}) {
+      $self->{$format} = $format eq 'FORMAT'
+        ? 'PEM'            # default for .format
+        : $self->{FORMAT}; # default for the rest
+    }
+
+    if ($self->{$format} !~ m{ \A (?: DER | PEM ) \z }xms) {
+      croak("Incorrect ." . lc($format) . " specification '" . $self->{$format} . "'");
+      return undef;
+    }
+  } ## end foreach my $format (qw(FORMAT KEYFORMAT CACERTFORMAT ROOTCACERTFORMAT))
+
+  # Keytype defaults to OpenSSL; valid is OpenSSL or PKCS8
+  $self->{KEYTYPE} = $entry->{key}->{type} || 'OpenSSL';
+  if ($self->{KEYTYPE} !~ m{ \A (?: OpenSSL | PKCS8 ) \z }xms) {
+    croak("Incorrect keystore type $self->{KEYTYPE}");
+    return undef;
+  }
+
+  # SANITY CHECKS
+  # sanity check: DER encoded OpenSSL keys cannot be encrypted
+  if (defined $self->{PIN} && ($self->{PIN} ne "") &&
+                              ($self->{KEYTYPE} eq 'OpenSSL') &&
+                              ($self->{KEYFORMAT} eq 'DER')) {
+    croak("DER encoded OpenSSL keystores cannot be encrypted");
+    return undef;
+  }
+
+  # sanity check: Root CA bundle in DER format does not make sense
+  if (($self->{ROOTCACERTFORMAT} eq 'DER') && defined $entry->{rootcacertbundle}) {
+    croak("DER encoded Root CA bundles are not supported. Fix .format and/or .rootcacertformat and/or .rootcabundle config settings");
+    return undef;
+  }
+
+  # if we want to use an HSM
+  if ($entry->{hsm}->{type}) {
+    my $hsmtype = $entry->{hsm}->{type};
+    CertNanny::Logging->debug("Using HSM $hsmtype");
+    eval "use CertNanny::HSM::$hsmtype";
+    if ($@) {
+      print STDERR $@;
+      return undef;
+    }
+    eval "\$self->{HSM} = CertNanny::HSM::$hsmtype->new(\$entry, \$config, \$entryname)";
+    if ($@ or not $self->{HSM}) {
+      CertNanny::Logging->error("Could not instantiate HSM: " . $@);
       return undef;
     }
 
-    # sanity check: Root CA bundle in DER format does not make sense
-    if (($self->{ROOTCACERTFORMAT} eq 'DER') && defined $entry->{rootcacertbundle}) {
-      croak("DER encoded Root CA bundles are not supported. Fix .format and/or .rootcacertformat and/or .rootcabundle config settings");
-      return undef;
+    my $hsm = $self->{HSM};
+    unless ($hsm->can('createRequest') and $hsm->can('genkey')) {
+      unless ($hsm->can('engineid')) {
+        croak("HSM does not provide function engineid(), can not continue.");
+      }
+
+      unless ($hsm->can('keyform')) {
+        croak("HSM does not provide function keyform(), can not continue.");
+      }
     }
+  } ## end if ($entry->{hsm}->{type})
 
-    # if we want to use an HSM
-    if ($entry->{hsm}->{type}) {
-      my $hsmtype = $entry->{hsm}->{type};
-      CertNanny::Logging->debug("Using HSM $hsmtype");
-      eval "use CertNanny::HSM::$hsmtype";
-      if ($@) {
-        print STDERR $@;
-        return undef;
-      }
-      eval "\$self->{HSM} = CertNanny::HSM::$hsmtype->new(\$entry, \$config, \$entryname)";
-      if ($@ or not $self->{HSM}) {
-        CertNanny::Logging->error("Could not instantiate HSM: " . $@);
-        return undef;
-      }
+  # RETRIEVE AND STORE STATE
+  # get previous renewal status
+  $self->k_retrieveState() || return undef;
 
-      my $hsm = $self->{HSM};
-      unless ($hsm->can('createRequest') and $hsm->can('genkey')) {
-        unless ($hsm->can('engineid')) {
-          croak("HSM does not provide function engineid(), can not continue.");
-        }
-
-        unless ($hsm->can('keyform')) {
-          croak("HSM does not provide function keyform(), can not continue.");
-        }
-      }
-    } ## end if ($entry->{hsm}->{type})
-
-    # RETRIEVE AND STORE STATE
-    # get previous renewal status
-    $self->k_retrieveState() || return undef;
-
-    # check if we can write to the file
-    $self->k_storeState()    || croak "Could not write state file $self->{STATE}->{FILE}";
-  } #location root only 
+  # check if we can write to the file
+  $self->k_storeState()    || croak "Could not write state file $self->{STATE}->{FILE}";
+  }#location root only 
   # return new keystore object
   return $self;
 } ## end sub new
@@ -521,50 +526,6 @@ sub getKey {
 } ## end sub getKey
 
 
-sub getCertLocation {
-  ###########################################################################
-  #
-  # get the key specific locations for certificates
-  # 
-  # Input: caller must provide a hash ref containing 
-  #           TYPE      => TrustedRootCA or CAChain
-  #                        Default: TrustedRootCA
-  # 
-  # Output: caller gets a hash ref:
-  #           <locationname in lowercase> => <Location>
-  #         or undef on error
-  CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "get the key specific locations for certificates");
-  my $self = shift;
-  my %args = (TYPE => 'TrustedRootCA',
-              @_);
-  
-  my $options   = $self->{OPTIONS};
-  my $entry     = $options->{ENTRY};
-  my $entryname = $options->{ENTRYNAME};
-  my $config    = $options->{CONFIG};
-
-  my $rc = undef;
-
-  if ($args{TrustedRootCA}) {
-    foreach ('Directory', 'File', 'ChainFile') {
-      if (my $location = $config->get("keystore.$entryname.TrustedRootCA.GENERATED.$_", 'FILE')) {
-        $rc->{lc($_)} = $location;
-      }
-    }
-  }
-  if ($args{CAChain}) {
-    foreach ('Directory', 'File') {
-      if (my $location = $config->get("keystore.$entryname.CAChain.GENERATED.$_", 'FILE')) {
-        $rc->{lc($_)} = $location;
-      }
-    }
-  }
-
-  CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "get the key specific locations for certificates");
-  return $rc
-} ## end sub getKey
-
-
 sub createRequest {
   ###########################################################################
   #
@@ -844,6 +805,7 @@ sub selfSign {
   CertNanny::Logging->debug("The following configuration was written to $tmpconfigfile:\n" . CertNanny::Util->readFile($tmpconfigfile));
 
   # generate request
+  # Todo pgk: Testen runCommand
   my @cmd = (qq("$openssl"), 'req', '-config', qq("$tmpconfigfile"), '-x509', '-new', '-sha1', '-out', qq("$outfile"), '-key', qq("$entry->{key}->{file}"),);
 
   push(@cmd, ('-passin', 'env:PIN')) unless $pin eq "";
@@ -865,7 +827,6 @@ sub _hasEngine {
  
   return defined $self->{HSM};
 }
-
 
 sub generateKey {
   ###########################################################################
@@ -1491,8 +1452,6 @@ sub _createLocalCerts {
         
           if ($makeTarget) {
             # try to link the file, if it fails (e.g. for Windows Systems) try a copy file to desired location
-            $certTargetDir = File::Spec->canonpath($certTargetDir);
-            eval {File::Path::mkpath($certTargetDir)};
             $target = File::Spec->catfile($certTargetDir, $subject_hash) . '.' . $counter;
             unlink $target if (-e $target);
             $tryCopy = $copy;
