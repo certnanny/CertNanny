@@ -1534,7 +1534,7 @@ sub k_syncRootCAs {
         foreach my $certSHA1 (keys (%{$installedRootCAs})) {
           $rebuild ||= !exists($availableRootCAs->{$certSHA1});
           if ($rebuild) {
-            CertNanny::Logging->debug("Target: $target/$locSearch{lc($target)}: Installed Root CA $installedRootCAs->{$certSHA1}->{CERTINFO}->{SubjectName} missing in available root CAs.");
+            CertNanny::Logging->info("Target: $target/$locSearch{lc($target)}: Installed Root CA $installedRootCAs->{$certSHA1}->{CERTINFO}->{SubjectName} missing in available root CAs.");
             last;
           }
         }  
@@ -1544,7 +1544,7 @@ sub k_syncRootCAs {
 	        foreach my $certSHA1 (keys (%{$availableRootCAs})) {
 	          $rebuild ||= !exists($installedRootCAs->{$certSHA1});
             if ($rebuild) {
-              CertNanny::Logging->debug("Target: $target/$locSearch{lc($target)}: Available Root CA $availableRootCAs->{$certSHA1}->{CERTINFO}->{SubjectName} missing in installed root CAs.");
+              CertNanny::Logging->info("Target: $target/$locSearch{lc($target)}: Available Root CA $availableRootCAs->{$certSHA1}->{CERTINFO}->{SubjectName} missing in installed root CAs.");
               last;
             }
 	        }

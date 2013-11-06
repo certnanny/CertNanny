@@ -454,7 +454,7 @@ sub callOpenSSL {
   my $openssl = $self->{CONFIG}->get('cmd.openssl', 'FILE');
   my @cmd = (qq("$openssl"), $command);
   push(@cmd, ('-in', qq("$args{CERTFILE}")))       if (defined $args{CERTFILE});
-  push(@cmd, ('-inform', qq("$args{CERTFORMAT}"))) if (defined $args{CERTFILE});
+  push(@cmd, ('-inform', qq("$args{CERTFORMAT}"))) if (defined $args{CERTFORMAT});
   foreach (@$params) {
     push(@cmd, -$_);
   }
