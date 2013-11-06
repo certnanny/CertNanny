@@ -900,6 +900,7 @@ sub k_checkValidity {
   my $days = shift || 0;
 
   my $notAfter = CertNanny::Util->isoDateToEpoch($self->{CERT}->{CERTINFO}->{NotAfter});
+  CertNanny::Logging->debug("Parsed not After Date: $notAfter ");
 
   return unless defined $notAfter;
 
@@ -1528,7 +1529,6 @@ sub k_syncRootCAs {
         CertNanny::Logging->debug((caller(0))[3], "Target: $target/$locSearch{lc($target)}");
         # Fetch installed root certificates into
         my $installedRootCAs = $self->getInstalledCAs(TARGET => $target);
-  
         my $rebuild = 0;
         # comparison $installedRootCAs to $availableRootCAs
         foreach my $certSHA1 (keys (%{$installedRootCAs})) {
@@ -1705,14 +1705,14 @@ sub k_getCertType {
   # 2 installedIntermediateCAs : IssuerName != SubjectName and BasicConstraints ==  CA:TRUE
   # 3 installedEE              : IssuerName != SubjectName and BasicConstraints ==  CA:FALSE
   if ($args{CERTINFO}{IssuerName} eq $args{CERTINFO}{SubjectName}) {
-    if ($args{CERTINFO}{BasicConstraints} eq 'CA:TRUE') {
+    if ($args{CERTINFO}{BasicConstraints} =~ /CA\:TRUE/) {
       $rc = 'installedRootCAs';
     }
   } else {
-    if ($args{CERTINFO}{BasicConstraints} eq 'CA:TRUE') {
+    if ($args{CERTINFO}{BasicConstraints}  =~ /CA\:TRUE/) {
       $rc = 'installedIntermediateCAs';
     } else {
-      if ($args{CERTINFO}{BasicConstraints} eq 'CA:FALSE') {
+      if ($args{CERTINFO}{BasicConstraints}  =~ /CA\:TRUE/) {
         $rc = 'installedEE';
       }
     }
