@@ -741,6 +741,7 @@ sub getInstalledCAs {
       foreach (@certList) {
         if ($_ =~ m/^([^,]*), (.*?), (PrivateKeyEntry|trustedCertEntry),.*$/) { # gets Privat Key as well
           ($certAlias, $certCreateDate, $certType) = ($1, $2, $3);
+           CertNanny::Logging->debug("alias:$certAlias , certCreateDate: $certCreateDate , certType: $certType");
         }
         if ($_ =~ m/^[^:]*\): ([0-9A-F:]*).*$/) {
           $certFingerprint = $1;
