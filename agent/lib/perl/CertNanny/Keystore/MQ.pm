@@ -238,7 +238,7 @@ sub installCert {
   my $newkeystoredb = $newkeystorebase . ".kdb";
 
   foreach my $ext (qw(.crl .rdb .kdb .sth)) {
-    unlink $newkeystoredb.$ext ;
+    unlink $newkeystorebase.$ext ;
   }
 
 
