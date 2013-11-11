@@ -101,7 +101,7 @@ sub hidePin() {
   my @cmd = @_;
   
   for (my $ii = 0; $ii < $#cmd; $ii++) {
-    $cmd[$ii + 1] = "*HIDDEN*" if ($cmd[$ii] =~ /(-pw|-target_pw|-storepass|-keypass)/);
+    $cmd[$ii + 1] = "*HIDDEN*" if ($cmd[$ii] =~ /(-pw|-target_pw|-storepass|-keypass|-srcstorepass|-deststorepass|-srckeypass|-destkeypass)/);
     $cmd[$ii] =~ s/Login=\S+/Login=*HIDDEN*/;
   }
   my $commando = join(' ', @cmd);
