@@ -450,7 +450,6 @@ sub callOpenSSL {
 
   my $rc = 0;
   my $info;
-
   # build commandstring
   my $openssl = $self->{CONFIG}->get('cmd.openssl', 'FILE');
   my @cmd = (qq("$openssl"), $command);
