@@ -356,7 +356,7 @@ sub getKey {
   #         or undef on error
   CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "get private key for main certificate from keystore");
   my $self     = shift;
-  my $keystore = shift || $self->_generateKeystore() || return undef; # defaults to $self->_generateKeystore(), see below
+  my $keystore = shift;
   my $alias    = shift;                                               # defaults to $entry->{alias}, see below
 
   my $options   = $self->{OPTIONS};
@@ -368,47 +368,66 @@ sub getKey {
   
   $alias ||= $entry->{alias};
   
-  my $tmpFile = CertNanny::Util->getTmpFile();
-  CertNanny::Logging->info("Extracting key <$alias> from <$keystore> to tmp. file <$tmpFile> in format <PKCS12>.");
-  my @cmd = (qq("$options->{keytool}"), -importkeystore);
-  push(@cmd, -noprompt);
-  push(@cmd, -srckeystore   => qq("$keystore"));
-  push(@cmd, -srcstorepass  => qq("$entry->{store}->{pin}")) if ($entry->{store}->{pin});
-  push(@cmd, -srcalias      => qq("$alias"));
-  push(@cmd, -srckeypass    => qq("$entry->{key}->{pin}"))   if ($entry->{key}->{pin});
-  push(@cmd, -destkeypass   => qq("$entry->{key}->{pin}"))   if ($entry->{key}->{pin});
-  push(@cmd, -destkeystore  => qq("$tmpFile"));
-  push(@cmd, -deststorepass => qq("$entry->{store}->{pin}")) if ($entry->{store}->{pin});
-  push(@cmd, -deststoretype => 'PKCS12');
+  my @cmd;
+  if (my $tmpKeystore = $self->_generateKeystore($keystore, 'unique')) {
+    if (!defined($entry->{key}->{pin}) || ("$entry->{store}->{pin}" ne "$entry->{key}->{pin}")) {
+      @cmd = (qq("$options->{keytool}"), -keypasswd);
+      push(@cmd, -noprompt);
+      push(@cmd, -keystore   => qq("$tmpKeystore"));
+      push(@cmd, -storepass  => qq("$entry->{store}->{pin}")) if ($entry->{store}->{pin});
+      push(@cmd, -alias      => qq("$alias"));
+      push(@cmd, -keypass    => qq("$entry->{key}->{pin}")) if ($entry->{key}->{pin});
+      push(@cmd, -new        => qq("$entry->{store}->{pin}")) if ($entry->{store}->{pin});
+  
+      $rc = CertNanny::Util->runCommand(\@cmd, WANTOUT => 1, HIDEPWD => 1);
+      if ($rc) {
+        chomp($rc);
+        $rc = CertNanny::Logging->error("getKey(): keytool -importkeystore failed ($rc)");
+      }
+    }
 
-  $rc = CertNanny::Util->runCommand(\@cmd, WANTOUT => 1, HIDEPWD => 1);
-  if ($rc) {
-    chomp($rc);
-    $rc = CertNanny::Logging->error("getKey(): keytool -importkeystore failed ($rc)");
-  }
-
-  my $openssl = $config->get('cmd.openssl', 'FILE');
-  if (!defined $openssl) {
-    $rc = CertNanny::Logging->error("No openssl shell specified");
-  }
-
-  if (!$rc) {
-    # extract private key unencrypted
-    @cmd = (qq("$openssl"), 'pkcs12');
-    push(@cmd, -in => qq("$tmpFile"));
-    push(@cmd, -passin => 'env:PIN');
-    push(@cmd, -nocerts);
-    push(@cmd, -nodes);
-    $ENV{PIN} = $entry->{key}->{pin} || $entry->{store}->{pin};
+    my $tmpFile = CertNanny::Util->getTmpFile();
+    CertNanny::Logging->info("Extracting key <$alias> from <$tmpKeystore/$keystore> to tmp. file <$tmpFile> in format <PKCS12>.");
+    @cmd = (qq("$options->{keytool}"), -importkeystore);
+    push(@cmd, -noprompt);
+    push(@cmd, -srckeystore   => qq("$tmpKeystore"));
+    push(@cmd, -srcstorepass  => qq("$entry->{store}->{pin}")) if ($entry->{store}->{pin});
+    push(@cmd, -srcalias      => qq("$alias"));
+    push(@cmd, -srckeypass    => qq("$entry->{store}->{pin}")) if ($entry->{store}->{pin});
+    push(@cmd, -destkeystore  => qq("$tmpFile"));
+    push(@cmd, -deststorepass => qq("$entry->{store}->{pin}")) if ($entry->{store}->{pin});
+    push(@cmd, -deststoretype => 'PKCS12');
+  
     $rc = CertNanny::Util->runCommand(\@cmd, WANTOUT => 1, HIDEPWD => 1);
-    delete $ENV{PIN};
+    if ($rc) {
+      chomp($rc);
+      $rc = CertNanny::Logging->error("getKey(): keytool -importkeystore failed ($rc)");
+    }
+    unlink($tmpKeystore);
+    
+    my $openssl = $config->get('cmd.openssl', 'FILE');
+    if (!defined $openssl) {
+      $rc = CertNanny::Logging->error("No openssl shell specified");
+    }
+  
     if (!$rc) {
-      $rc = CertNanny::Logging->error("PKCS12 key extraction failed");
-    } else {
-      $rc = {KEYDATA   => $rc,
-             KEYTYPE   => 'OpenSSL',
-             KEYFORMAT => 'PEM'};
-      $self->{myKey} = $rc;
+      # extract private key unencrypted
+      @cmd = (qq("$openssl"), 'pkcs12');
+      push(@cmd, -in => qq("$tmpFile"));
+      push(@cmd, -passin => 'env:PIN');
+      push(@cmd, -nocerts);
+      push(@cmd, -nodes);
+      $ENV{PIN} = $entry->{store}->{pin};
+      $rc = CertNanny::Util->runCommand(\@cmd, WANTOUT => 1, HIDEPWD => 1);
+      delete $ENV{PIN};
+      if (!$rc) {
+        $rc = CertNanny::Logging->error("PKCS12 key extraction failed");
+      } else {
+        $rc = {KEYDATA   => $rc,
+               KEYTYPE   => 'OpenSSL',
+               KEYFORMAT => 'PEM'};
+        $self->{myKey} = $rc;
+      }
     }
   }
   
@@ -947,18 +966,21 @@ sub _buildKeytoolCmd {
 
 
 sub _generateKeystore {
-  my $self = shift;
+  my $self     = shift;
+  my $keystore = shift;
+  my $unique   = shift;
   
   my $options   = $self->{OPTIONS};
   my $entry     = $options->{ENTRY};
   my $entryname = $options->{ENTRYNAME};
   
-  my $newKeystoreLocation = File::Spec->catfile($entry->{statedir}, "$entryname-tmpkeystore");
-
+  my $newKeystoreLocation = $unique ? CertNanny::Util->getTmpFile() : File::Spec->catfile($entry->{statedir}, "$entryname-tmpkeystore");
+  
+  my $sourceKeystoreLocation = $keystore ? $keystore : $entry->{location};
   # if not existent -> create new store as a copy of the current one
   unless (-f $newKeystoreLocation) {
-    if (!File::Copy::copy($entry->{location}, $newKeystoreLocation)) {
-      CertNanny::Logging->error("_generateKeystore(): Could not copy current store to $newKeystoreLocation");
+    if (!File::Copy::copy($sourceKeystoreLocation, $newKeystoreLocation)) {
+      CertNanny::Logging->error("_generateKeystore(): Could not copy $sourceKeystoreLocation to $newKeystoreLocation");
       $newKeystoreLocation = undef;
     }
   }

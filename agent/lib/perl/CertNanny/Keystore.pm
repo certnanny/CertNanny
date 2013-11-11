@@ -1637,6 +1637,7 @@ sub k_executeHook {
       } else {
         $args{__LOCATION__} = qq("$self->{OPTIONS}->{ENTRY}->{location}");
       }
+      $args{__LOCATION__} = File::Spec->canonpath($args{__LOCATION__});
     }
 
     # replace values passed to this function
@@ -1811,8 +1812,9 @@ sub _sendRequest {
     
     my $oldkey = $self->getKey();
 
-    unless ($self->_hasEngine()) {
-
+    if ($self->_hasEngine()) {
+      $oldkeyfile = $oldkey;
+    } else {
       # convert private key to unencrypted PEM format
       # only necessary if no engine support is available
       # otherwise the keystore or engine is responsible for returning
@@ -1840,8 +1842,6 @@ sub _sendRequest {
         CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "Sending request");
         return undef;
       }
-    } else {
-      $oldkeyfile = $oldkey;
     }
 
     CertNanny::Logging->debug("Old keyfile: $oldkeyfile");
