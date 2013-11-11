@@ -73,23 +73,18 @@ CertNanny::Logging->getInstance(CONFIG => CertNanny::Config->getInstance(CONFIG 
 CertNanny::Logging->log2File();
 #CertNanny::Logging->log2Console();
 
-# Instantiate CertNanny
-my $monitor = CertNanny->getInstance(CONFIG => $cmdLineParam{cfg});
 
-$cmdLineParam{sleep} = 300 if !defined $cmdLineParam{sleep};
-$monitor->setOption("sleep", $cmdLineParam{sleep});
-if (defined $cmdLineParam{challengepassword} and $cmdLineParam{challengepassword} ne '') {
-  $monitor->setOption('globalchallengepassword', $cmdLineParam{challengepassword});
-}
 
 foreach my $cmd (@ARGV) {   # command line parameters are already stripped off. @ARGV now only contains commands to be executed
   if ($OSNAME eq 'MSWin32') {
 
     # Windows Service related commands
-    my $servicename = $monitor->getConfigValue("platform.windows.servicename")
-      || "CertNanny";
+     my $servicename = CertNanny::Config->getInstance()->get("platform.windows.servicename") || "CertNanny";
+#    my $servicename = $monitor->getConfigValue("platform.windows.servicename") || "CertNanny";
+      
     if ($cmd eq "install") {
       my $cfgpath         = $cmdLineParam{cfg};
+      my $sleep = $cmdLineParam{cfg} || 300;
       my $servicepath     = File::Spec->catfile($FindBin::Bin, $FindBin::Script);
       my $executable_name = $EXECUTABLE_NAME;
       if ($servicepath =~ /\w+\.exe/) {
@@ -99,7 +94,7 @@ foreach my $cmd (@ARGV) {   # command line parameters are already stripped off. 
       if ($executable_name ne $servicepath) {
         $params_str = qq{"$servicepath"};
       }
-      $params_str = qq{$params_str --cfg "$cfgpath" --sleep $cmdLineParam{sleep}};
+      $params_str = qq{$params_str --cfg "$cfgpath" --sleep $sleep};
       my $ret = Win32::Daemon::CreateService({machine     => '',
                                               name        => $servicename,
                                               display     => $servicename,
@@ -124,10 +119,33 @@ foreach my $cmd (@ARGV) {   # command line parameters are already stripped off. 
         print "Failed to uninstall service: " . Win32::FormatMessage(Win32::Daemon::GetLastError()) . "\n";
         exit 1;
       }
+    }elsif ( ($cmd eq "renew") or ($cmd eq "check" )) {
+     
+       # Instantiate CertNanny
+       my $monitor = CertNanny->getInstance(CONFIG => $cmdLineParam{cfg});
+       
+       $cmdLineParam{sleep} = 300 if !defined $cmdLineParam{sleep};
+       $monitor->setOption("sleep", $cmdLineParam{sleep});
+       if (defined $cmdLineParam{challengepassword} and $cmdLineParam{challengepassword} ne '') {
+         $monitor->setOption('globalchallengepassword', $cmdLineParam{challengepassword});
+       }
+     
+       $monitor->$cmd(%cmdLineParam) || die "Invalid action: $cmd. Stopped";   # execute the command $cmd an give it all the command line parameters as a hash 
     }
+  }else{
+     # Instantiate CertNanny
+     my $monitor = CertNanny->getInstance(CONFIG => $cmdLineParam{cfg});
+     
+     $cmdLineParam{sleep} = 300 if !defined $cmdLineParam{sleep};
+     $monitor->setOption("sleep", $cmdLineParam{sleep});
+     if (defined $cmdLineParam{challengepassword} and $cmdLineParam{challengepassword} ne '') {
+       $monitor->setOption('globalchallengepassword', $cmdLineParam{challengepassword});
+     }
+   
+     $monitor->$cmd(%cmdLineParam) || die "Invalid action: $cmd. Stopped";   # execute the command $cmd an give it all the command line parameters as a hash
+ 
   } ## end if ($OSNAME eq 'MSWin32')
-
-  $monitor->$cmd(%cmdLineParam) || die "Invalid action: $cmd. Stopped";   # execute the command $cmd an give it all the command line parameters as a hash
+  
 } ## end foreach my $cmd (@ARGV)
 
 # if we had commands as arguments, we're done, else we are a service and do a lot of stuff below :)
@@ -200,7 +218,7 @@ if ($OSNAME eq 'MSWin32') {
 #        print $LOG "currtime > starttime\n";
 
         # reinstantiate CertNanny object (make sure that destructor gets called)
-        $monitor = undef;
+        my $monitor = undef;
         $monitor = CertNanny->getInstance(CONFIG => $cmdLineParam{cfg});
 #        print $LOG "new monitor object\n";
 
