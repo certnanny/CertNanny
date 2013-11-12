@@ -209,6 +209,7 @@ sub do_enroll {
     $keystore = CertNanny::Keystore->new(CONFIG    => $self->{CONFIG},
                                          ENTRY     => $self->{ITEMS}->{$entryname},
                                          ENTRYNAME => $entryname);
+    if($keystore){
 
     #$keystore->{INSTANCE}->{INITIALENROLLEMNT} = 'yes';
     $keystore->{INSTANCE}->{OPTIONS}->{ENTRY}->{INITIALENROLLEMNT} = 'yes';
@@ -237,37 +238,38 @@ sub do_enroll {
     # $conf->{CONFIG}->{ENTRY}->{INITIALENROLLEMNT} = 'yes';
     # $self->{CONFIG} = CertNanny::Config->popConf();
     $entry->{INITIALENROLLEMNT} = 'no';
-
-  
+    
     my $newkeystore = CertNanny::Keystore->new(CONFIG    => $self->{CONFIG},
                                                ENTRY     => $self->{ITEMS}->{$entryname},
                                                ENTRYNAME => $entryname);
 
-
     if ($newkeystore) {
-      if (!$newkeystore->{INSTANCE}->k_retrieveState()) {
-        CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "Enrollment");
-        return undef;
-      }
-      my $renewalstate = $newkeystore->{INSTANCE}->{STATE}->{DATA}->{RENEWAL}->{STATUS};
-  
-      if ($renewalstate eq 'sendrequest') {
-        CertNanny::Logging->info("Initial enrollment request still pending.");
-  
-        # get previous renewal status
-        #$self->{INSTANCE}->k_retrieveState() or return undef;
-  
-        # check if we can write to the file
-        $newkeystore->{INSTANCE}->k_storeState() || croak "Could not write state file $newkeystore->{STATE}->{FILE}";
-      } ## end if ($renewalstate eq 'sendrequest')
-      
-      if ($renewalstate eq 'completed') {
-        my $isValid = $newkeystore->{INSTANCE}->k_checkValidity($self->{ITEMS}->{$args{ENTRY}}->{autorenew_days});
-        CertNanny::Logging->info("Initial enrollment completed successfully. Onbehalf.");
-        $newkeystore->{INSTANCE}->k_storeState() || croak "Could not write state file $newkeystore->{STATE}->{FILE}";
-      }
-    } else {
-      CertNanny::Logging->info("Initial enrollment request still pending.");
+       if (!$newkeystore->{INSTANCE}->k_retrieveState()) {
+         CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "Enrollment");
+         return undef;
+       }
+       my $renewalstate = $newkeystore->{INSTANCE}->{STATE}->{DATA}->{RENEWAL}->{STATUS};
+   
+       if ($renewalstate eq 'sendrequest') {
+         CertNanny::Logging->info("Initial enrollment request still pending.");
+   
+         # get previous renewal status
+         #$self->{INSTANCE}->k_retrieveState() or return undef;
+   
+         # check if we can write to the file
+         $newkeystore->{INSTANCE}->k_storeState() || croak "Could not write state file $newkeystore->{STATE}->{FILE}";
+       } ## end if ($renewalstate eq 'sendrequest')
+       
+       if ($renewalstate eq 'completed') {
+         my $isValid = $newkeystore->{INSTANCE}->k_checkValidity($self->{ITEMS}->{$args{ENTRY}}->{autorenew_days});
+         CertNanny::Logging->info("Initial enrollment completed successfully. Onbehalf.");
+         $newkeystore->{INSTANCE}->k_storeState() || croak "Could not write state file $newkeystore->{STATE}->{FILE}";
+       }
+     } else {
+       CertNanny::Logging->info("Initial enrollment request still pending.");
+     }
+    }else{
+       CertNanny::Logging->info("Can't run initial enrollment on behalf, check enrollment on behalf certificate configuration.");
     }
     CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "Enrollment");
     return 1;

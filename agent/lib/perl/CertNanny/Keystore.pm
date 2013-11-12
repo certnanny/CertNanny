@@ -900,6 +900,7 @@ sub k_checkValidity {
   my $days = shift || 0;
 
   my $notAfter = CertNanny::Util->isoDateToEpoch($self->{CERT}->{CERTINFO}->{NotAfter});
+  CertNanny::Logging->debug("Parsed not After Date: $notAfter ");
 
   return unless defined $notAfter;
 
@@ -1528,13 +1529,12 @@ sub k_syncRootCAs {
         CertNanny::Logging->debug((caller(0))[3], "Target: $target/$locSearch{lc($target)}");
         # Fetch installed root certificates into
         my $installedRootCAs = $self->getInstalledCAs(TARGET => $target);
-  
         my $rebuild = 0;
         # comparison $installedRootCAs to $availableRootCAs
         foreach my $certSHA1 (keys (%{$installedRootCAs})) {
           $rebuild ||= !exists($availableRootCAs->{$certSHA1});
           if ($rebuild) {
-            CertNanny::Logging->debug("Target: $target/$locSearch{lc($target)}: Installed Root CA $installedRootCAs->{$certSHA1}->{CERTINFO}->{SubjectName} missing in available root CAs.");
+            CertNanny::Logging->info("Target: $target/$locSearch{lc($target)}: Installed Root CA $installedRootCAs->{$certSHA1}->{CERTINFO}->{SubjectName} missing in available root CAs.");
             last;
           }
         }  
@@ -1544,7 +1544,7 @@ sub k_syncRootCAs {
 	        foreach my $certSHA1 (keys (%{$availableRootCAs})) {
 	          $rebuild ||= !exists($installedRootCAs->{$certSHA1});
             if ($rebuild) {
-              CertNanny::Logging->debug("Target: $target/$locSearch{lc($target)}: Available Root CA $availableRootCAs->{$certSHA1}->{CERTINFO}->{SubjectName} missing in installed root CAs.");
+              CertNanny::Logging->info("Target: $target/$locSearch{lc($target)}: Available Root CA $availableRootCAs->{$certSHA1}->{CERTINFO}->{SubjectName} missing in installed root CAs.");
               last;
             }
 	        }
@@ -1637,6 +1637,7 @@ sub k_executeHook {
       } else {
         $args{__LOCATION__} = qq("$self->{OPTIONS}->{ENTRY}->{location}");
       }
+      $args{__LOCATION__} = File::Spec->canonpath($args{__LOCATION__});
     }
 
     # replace values passed to this function
@@ -1705,14 +1706,14 @@ sub k_getCertType {
   # 2 installedIntermediateCAs : IssuerName != SubjectName and BasicConstraints ==  CA:TRUE
   # 3 installedEE              : IssuerName != SubjectName and BasicConstraints ==  CA:FALSE
   if ($args{CERTINFO}{IssuerName} eq $args{CERTINFO}{SubjectName}) {
-    if ($args{CERTINFO}{BasicConstraints} eq 'CA:TRUE') {
+    if ($args{CERTINFO}{BasicConstraints} =~ /CA\:TRUE/) {
       $rc = 'installedRootCAs';
     }
   } else {
-    if ($args{CERTINFO}{BasicConstraints} eq 'CA:TRUE') {
+    if ($args{CERTINFO}{BasicConstraints}  =~ /CA\:TRUE/) {
       $rc = 'installedIntermediateCAs';
     } else {
-      if ($args{CERTINFO}{BasicConstraints} eq 'CA:FALSE') {
+      if ($args{CERTINFO}{BasicConstraints}  =~ /CA\:TRUE/) {
         $rc = 'installedEE';
       }
     }
@@ -1811,8 +1812,9 @@ sub _sendRequest {
     
     my $oldkey = $self->getKey();
 
-    unless ($self->_hasEngine()) {
-
+    if ($self->_hasEngine()) {
+      $oldkeyfile = $oldkey;
+    } else {
       # convert private key to unencrypted PEM format
       # only necessary if no engine support is available
       # otherwise the keystore or engine is responsible for returning
@@ -1840,8 +1842,6 @@ sub _sendRequest {
         CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "Sending request");
         return undef;
       }
-    } else {
-      $oldkeyfile = $oldkey;
     }
 
     CertNanny::Logging->debug("Old keyfile: $oldkeyfile");

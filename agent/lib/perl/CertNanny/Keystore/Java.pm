@@ -356,64 +356,130 @@ sub getKey {
   #         or undef on error
   CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "get private key for main certificate from keystore");
   my $self     = shift;
-  my $keystore = shift;    # defaults to $self->_generateKeystore(), see below
-  my $alias    = shift;    # defaults to $entry->{alias}, see below
+  my $keystore = shift;
+  my $alias    = shift;                                               # defaults to $entry->{alias}, see below
 
-  my $options = $self->{OPTIONS};
-  my $entry   = $options->{ENTRY};
-  my $config  = $options->{CONFIG};
+  my $options   = $self->{OPTIONS};
+  my $entry     = $options->{ENTRY};
+  my $entryname = $options->{ENTRYNAME};
+  my $config    = $options->{CONFIG};
 
   my $rc = undef;
-
-  $keystore ||= $self->_generateKeystore() || return undef;
-  $alias    ||= $entry->{alias};
-
-  my $pathjavalib = $config->get("path.libjava", "FILE");
-  my $extractkey_jar = File::Spec->catfile($pathjavalib, 'ExtractKey.jar');
-  if (!-r $extractkey_jar) {
-    $rc = CertNanny::Logging->error("getKey(): could not locate ExtractKey.jar file");
-  }
-
-  if (!$rc) {
-    my $classpath = $extractkey_jar;
-    if (defined($ENV{CLASSPATH})) {
-      my $sep = $^O eq 'MSWin32' ? ';' : ':';
-      $classpath = "$ENV{CLASSPATH}$sep$classpath";
+  
+  $alias ||= $entry->{alias};
+  
+  my @cmd;
+  if (my $tmpKeystore = $self->_generateKeystore($keystore, 'unique')) {
+    if (!defined($entry->{key}->{pin}) || ("$entry->{store}->{pin}" ne "$entry->{key}->{pin}")) {
+      @cmd = (qq("$options->{keytool}"), -keypasswd);
+      push(@cmd, -noprompt);
+      push(@cmd, -keystore   => qq("$tmpKeystore"));
+      push(@cmd, -storepass  => qq("$entry->{store}->{pin}")) if ($entry->{store}->{pin});
+      push(@cmd, -alias      => qq("$alias"));
+      push(@cmd, -keypass    => qq("$entry->{key}->{pin}")) if ($entry->{key}->{pin});
+      push(@cmd, -new        => qq("$entry->{store}->{pin}")) if ($entry->{store}->{pin});
+  
+      $rc = CertNanny::Util->runCommand(\@cmd, WANTOUT => 1, HIDEPWD => 1);
+      if ($rc) {
+        chomp($rc);
+        $rc = CertNanny::Logging->error("getKey(): keytool -importkeystore failed ($rc)");
+      }
     }
 
-    CertNanny::Logging->info("Extracting key $alias from $keystore");
-    my @cmd = $self->_buildKeytoolCmd($keystore, -key => qq{"$alias"});
-    shift @cmd;    # remove keytool
-    unshift @cmd, qq{"$options->{java}"},
-                  -cp => qq{"$classpath"},
-                  'de.cynops.java.crypto.keystore.ExtractKey';
-
-
-    # CertNanny::Logging->debug("Execute: " . join(' ', hidepin(@cmd)));
-    #CertNanny::Logging->debug("Execute: " . CertNanny::Util->hidePin(join(' ', @cmd)));
-    #my $data = `@cmd`;
-    #if ($?) {
-    #  chomp($data);
-    #  CertNanny::Logging->error("getKey(): keytool -export failed ($data)");
-    #  return undef;
-    #}
-
-    # Todo pgk: Testen hidePin, runCommand
-    my $data = CertNanny::Util->runCommand(\@cmd, WANTOUT => 1);
-    if ($?) {
-      chomp($data);
-      $rc = CertNanny::Logging->error("getKey(): keytool -export failed ($data)");
-    } else {
-      $rc =  {KEYDATA   => $data,
-              KEYTYPE   => 'PKCS8',
-              KEYFORMAT => 'DER',
-              KEYPASS   => ''};
-      $self->{myKey} = $rc;
+    my $tmpFile = CertNanny::Util->getTmpFile();
+    CertNanny::Logging->info("Extracting key <$alias> from <$tmpKeystore/$keystore> to tmp. file <$tmpFile> in format <PKCS12>.");
+    @cmd = (qq("$options->{keytool}"), -importkeystore);
+    push(@cmd, -noprompt);
+    push(@cmd, -srckeystore   => qq("$tmpKeystore"));
+    push(@cmd, -srcstorepass  => qq("$entry->{store}->{pin}")) if ($entry->{store}->{pin});
+    push(@cmd, -srcalias      => qq("$alias"));
+    push(@cmd, -srckeypass    => qq("$entry->{store}->{pin}")) if ($entry->{store}->{pin});
+    push(@cmd, -destkeystore  => qq("$tmpFile"));
+    push(@cmd, -deststorepass => qq("$entry->{store}->{pin}")) if ($entry->{store}->{pin});
+    push(@cmd, -deststoretype => 'PKCS12');
+  
+    $rc = CertNanny::Util->runCommand(\@cmd, WANTOUT => 1, HIDEPWD => 1);
+    if ($rc) {
+      chomp($rc);
+      $rc = CertNanny::Logging->error("getKey(): keytool -importkeystore failed ($rc)");
+    }
+    unlink($tmpKeystore);
+    
+    my $openssl = $config->get('cmd.openssl', 'FILE');
+    if (!defined $openssl) {
+      $rc = CertNanny::Logging->error("No openssl shell specified");
+    }
+  
+    if (!$rc) {
+      # extract private key unencrypted
+      @cmd = (qq("$openssl"), 'pkcs12');
+      push(@cmd, -in => qq("$tmpFile"));
+      push(@cmd, -passin => 'env:PIN');
+      push(@cmd, -nocerts);
+      push(@cmd, -nodes);
+      $ENV{PIN} = $entry->{store}->{pin};
+      $rc = CertNanny::Util->runCommand(\@cmd, WANTOUT => 1, HIDEPWD => 1);
+      delete $ENV{PIN};
+      if (!$rc) {
+        $rc = CertNanny::Logging->error("PKCS12 key extraction failed");
+      } else {
+        $rc = {KEYDATA   => $rc,
+               KEYTYPE   => 'OpenSSL',
+               KEYFORMAT => 'PEM'};
+        $self->{myKey} = $rc;
+      }
     }
   }
   
   CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "get private key for main certificate from keystore");
   return $rc;
+} ## end sub getKey
+
+
+sub getCertLocation {
+  ###########################################################################
+  #
+  # get the key specific locations for certificates
+  # 
+  # Input: caller must provide a hash ref containing 
+  #           TYPE      => TrustedRootCA or CAChain
+  #                        Default: TrustedRootCA
+  # 
+  # Output: caller gets a hash ref:
+  #           <locationname in lowercase> => <Location>
+  #         or undef on error
+  CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "get the key specific locations for certificates");
+  my $self = shift;
+  my %args = (TYPE => 'TrustedRootCA',
+              @_);
+  
+  my $options   = $self->{OPTIONS};
+  my $entry     = $options->{ENTRY};
+  my $entryname = $options->{ENTRYNAME};
+  my $config    = $options->{CONFIG};
+
+  my $rc = undef;
+
+  if ($args{TrustedRootCA}) {
+    foreach ('Directory', 'File', 'ChainFile') {
+      if (my $location = $config->get("keystore.$entryname.TrustedRootCA.GENERATED.$_", 'FILE')) {
+        $rc->{lc($_)} = $location;
+      }
+    }
+    if (my $location = $config->get("keystore.$entryname.location", 'FILE')) {
+      $rc->{lc($_)} = $location;
+    }
+  }
+  if ($args{CAChain}) {
+    foreach ('Directory', 'File') {
+      if (my $location = $config->get("keystore.$entryname.CAChain.GENERATED.$_", 'FILE')) {
+        $rc->{lc($_)} = $location;
+      }
+    }
+  }
+
+  CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "get the key specific locations for certificates");
+  return $rc
 } ## end sub getKey
 
 
@@ -470,8 +536,10 @@ sub createRequest {
 
   # decide whether we need to export the key (and do that if it's required)
   my $keyfile;
-  unless ($self->_hasEngine()) {
-
+  if ($self->_hasEngine()) {
+    # okay we have an engine, create the correct keyfile variable
+    $keyfile = "${location}?alias=${newalias}";
+  } else {
     # okay no engine, export the key
     my $key = $self->getKey($location, $newalias) or return undef;
     $key->{OUTTYPE}   = 'OpenSSL';
@@ -498,11 +566,6 @@ sub createRequest {
       return undef;
     }
     chmod 0600, $keyfile;
-
-  } else {
-
-    # okay we have an engine, create the correct keyfile variable
-    $keyfile = "${location}?alias=${newalias}";
   }
   my $ret = {REQUESTFILE => $requestfile,
              KEYFILE     => $keyfile,};
@@ -741,6 +804,7 @@ sub getInstalledCAs {
       foreach (@certList) {
         if ($_ =~ m/^([^,]*), (.*?), (PrivateKeyEntry|trustedCertEntry),.*$/) { # gets Privat Key as well
           ($certAlias, $certCreateDate, $certType) = ($1, $2, $3);
+           CertNanny::Logging->debug("alias:$certAlias , certCreateDate: $certCreateDate , certType: $certType");
         }
         if ($_ =~ m/^[^:]*\): ([0-9A-F:]*).*$/) {
           $certFingerprint = $1;
@@ -750,7 +814,7 @@ sub getInstalledCAs {
           $certRef  = $self->getCert(CERTDATA => $certData);
 
           while ($certRef and ($certData = $certRef->{CERTDATA})) {
-            my $certInfo = CertNanny::Util->getCertInfoHash(CERTDATA => $certData);
+            my $certInfo = CertNanny::Util->getCertInfoHash(CERTDATA => $certData , CERTFORMAT => $certRef->{CERTFORMAT} );
             if (defined($certInfo) ) {
               if (my $certTyp = $self->k_getCertType(CERTINFO => $certInfo)) { 
                 $certSha1 = CertNanny::Util->getCertSHA1(%{$certRef});
@@ -881,7 +945,6 @@ sub installRoots {
 } ## end sub installRoots
 
 
-
 sub _buildKeytoolCmd {
   # build a keytool command (as an array) containing all common options, the
   # location (if provided as an argument) and further arguments (if provided)
@@ -903,18 +966,21 @@ sub _buildKeytoolCmd {
 
 
 sub _generateKeystore {
-  my $self = shift;
+  my $self     = shift;
+  my $keystore = shift;
+  my $unique   = shift;
   
   my $options   = $self->{OPTIONS};
   my $entry     = $options->{ENTRY};
   my $entryname = $options->{ENTRYNAME};
   
-  my $newKeystoreLocation = File::Spec->catfile($entry->{statedir}, "$entryname-tmpkeystore");
-
+  my $newKeystoreLocation = $unique ? CertNanny::Util->getTmpFile() : File::Spec->catfile($entry->{statedir}, "$entryname-tmpkeystore");
+  
+  my $sourceKeystoreLocation = $keystore ? $keystore : $entry->{location};
   # if not existent -> create new store as a copy of the current one
   unless (-f $newKeystoreLocation) {
-    if (!File::Copy::copy($entry->{location}, $newKeystoreLocation)) {
-      CertNanny::Logging->error("_generateKeystore(): Could not copy current store to $newKeystoreLocation");
+    if (!File::Copy::copy($sourceKeystoreLocation, $newKeystoreLocation)) {
+      CertNanny::Logging->error("_generateKeystore(): Could not copy $sourceKeystoreLocation to $newKeystoreLocation");
       $newKeystoreLocation = undef;
     }
   }
