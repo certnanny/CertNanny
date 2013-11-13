@@ -1508,11 +1508,14 @@ sub k_syncRootCAs {
   #  -<certSHA1> #3
   #   ...
 
-  my %locSearch = ('directory' => $config->get("keystore.$entryname.TrustedRootCA.GENERATED.Directory", 'FILE'),
-                   'file'      => $config->get("keystore.$entryname.TrustedRootCA.GENERATED.File",      'FILE'),
-                   'chainfile' => $config->get("keystore.$entryname.TrustedRootCA.GENERATED.ChainFile", 'FILE'),
-                   'location'  => $config->get("keystore.$entryname.location",                          'FILE'));
+#  my %locSearch = ('directory' => $config->get("keystore.$entryname.TrustedRootCA.GENERATED.Directory", 'FILE'),
+#                   'file'      => $config->get("keystore.$entryname.TrustedRootCA.GENERATED.File",      'FILE'),
+#                   'chainfile' => $config->get("keystore.$entryname.TrustedRootCA.GENERATED.ChainFile", 'FILE'),
+#                   'location'  => $config->get("keystore.$entryname.location",                          'FILE'));
 
+
+ my %locSearch =  $self->getCertLocation();
+ 
   # First fetch available root certificates
   my $availableRootCAs = $self->k_getAvailableRootCAs();
   if (!defined($availableRootCAs)) {
