@@ -106,12 +106,16 @@ sub new {
     } ## end foreach my $format (qw(FORMAT KEYFORMAT CACERTFORMAT ROOTCACERTFORMAT))
 
     # Keytype defaults to OpenSSL; valid is OpenSSL or PKCS8
+    
     $self->{KEYTYPE} = $entry->{key}->{type} || 'OpenSSL';
+    
+
+    
     if ($self->{KEYTYPE} !~ m{ \A (?: OpenSSL | PKCS8 ) \z }xms) {
       croak("Incorrect keystore type $self->{KEYTYPE}");
       return undef;
     }
-
+    $self->{KEYFORMAT} = $entry->{key}->{format} || 'PEM';
     # SANITY CHECKS
     # sanity check: DER encoded OpenSSL keys cannot be encrypted
     if (defined $self->{PIN} && ($self->{PIN} ne "") &&
@@ -153,6 +157,14 @@ sub new {
         }
       }
     } ## end if ($entry->{hsm}->{type})
+    
+    my $chainfile = $config->get("keystore.$entryname.CAChain.GENERATED.File",      'FILE');
+    unless (-e $chainfile){
+     CertNanny::Logging->debug("Cert chain file defined but doesn not exist $chainfile , force generation");
+      $self->k_getCaCerts();
+      $self->installCertChain();
+    }
+    
 
     # RETRIEVE AND STORE STATE
     # get previous renewal status
@@ -469,6 +481,8 @@ sub installCert {
     CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "installs a new main certificate from the SCEPT server in the keystore");
     return undef;
   }
+  
+  $self->installCertChain();
 
   CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "installs a new main certificate from the SCEPT server in the keystore");
   return 1;
@@ -552,13 +566,13 @@ sub getCertLocation {
       }
     }
   }
-  if ($args{CAChain}) {
-    foreach ('Directory', 'File') {
-      if (my $location = $config->get("keystore.$entryname.CAChain.GENERATED.$_", 'FILE')) {
-        $rc->{lc($_)} = $location;
-      }
-    }
-  }
+#  if ($args{CAChain}) {
+#    foreach ('Directory', 'File') {
+#      if (my $location = $config->get("keystore.$entryname.CAChain.GENERATED.$_", 'FILE')) {
+#        $rc->{lc($_)} = $location;
+#      }
+#    }
+#  }
 
   CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "get the key specific locations for certificates");
   return $rc
@@ -1374,19 +1388,20 @@ sub installRoots {
             $self->k_getCaCerts();
             if (my $chainArrRef = $self->k_buildCertificateChain($self->getCert())) {
               # delete root
+              #CertNanny::Logging->debug("chainfile: ". Dumper($chainArrRef));
               shift(@$chainArrRef);
               # delete EE
-              pop(@$chainArrRef);
+              #pop(@$chainArrRef);
               # all others add to chainfile
               while (my $cert = shift($chainArrRef)) {
                 CertNanny::Util->writeFile(DSTFILE => $tmpFile,
                                            SRCFILE => $cert->{CERTFILE}, 
                                            APPEND  => 1);
 
-                $self->{hook}->{Type}   .= 'CHAINFILE' . ','                                 if ($self->{hook}->{Type}   !~ m/CHAINFILE/);
-                $self->{hook}->{File}   .= $cert->{CERTFILE} . ','                           if ($self->{hook}->{File}   !~ m/$cert->{CERTFILE}/);
-                $self->{hook}->{FP}     .= $cert->{CERTINFO}->{CertificateFingerprint} . ',' if ($self->{hook}->{FP}     !~ m/$cert->{CERTINFO}->{CertificateFingerprint}/);
-                $self->{hook}->{Target} .= $locInstall{chainfile} . ','                      if ($self->{hook}->{Target} !~ m/$locInstall{chainfile}/);
+                $self->{hook}->{Type}   .= 'CHAINFILE' . ','                                 if (defined($self->{hook}->{Type})   &&  $self->{hook}->{Type}   !~ m/CHAINFILE/);
+                $self->{hook}->{File}   .= $cert->{CERTFILE} . ','                           if (defined($self->{hook}->{File})   &&  $self->{hook}->{File}   !~ m/$cert->{CERTFILE}/);
+                $self->{hook}->{FP}     .= $cert->{CERTINFO}->{CertificateFingerprint} . ',' if (defined($self->{hook}->{FP})     &&  $self->{hook}->{FP}    !~ m/$cert->{CERTINFO}->{CertificateFingerprint}/);
+                $self->{hook}->{Target} .= $locInstall{chainfile} . ','                      if (defined($self->{hook}->{Target}) &&  $self->{hook}->{Target} !~ m/$locInstall{chainfile}/);
               }    
               # Target chainfile part is finished. now write Target
               # put tmp-file to the right location     
@@ -1404,6 +1419,58 @@ sub installRoots {
   CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "Install all available root certificates");
   return $rc;
 } ## end sub installRoots
+
+
+sub installCertChain {
+  ###########################################################################
+  #
+  # install certchain file
+  #
+  #
+  ###########################################################################
+  
+  CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "Install installCertChain");
+  my $self = shift;
+  my %args = (@_);
+
+  my $options   = $self->{OPTIONS};
+  my $entry     = $options->{ENTRY};
+  my $entryname = $options->{ENTRYNAME};
+  my $config    = $options->{CONFIG};
+  
+  my $rc = 0;
+
+  my %locInstall = ('file'      => $config->get("keystore.$entryname.CAChain.GENERATED.File",      'FILE'));
+          
+     # write file: Writes all certificates in one PEM file / Chainfile
+    if (defined($locInstall{'file'}) or defined($locInstall{'chainfile'})) {
+ 
+       #delete old chainfile 
+       unlink $locInstall{'file'}; 
+       CertNanny::Logging->debug("install chain file locInstall{'file'}");
+         
+       if (my $chainArrRef = $self->k_buildCertificateChain($self->getCert())) {
+        
+        my @certChain =  @{$chainArrRef};
+        my @reversedChain = reverse @certChain ;
+             
+        foreach my $cert (@reversedChain){
+          CertNanny::Logging->debug("cert chain cert: " . $cert->{'CERTINFO'}->{'SubjectName'});
+          if( !CertNanny::Util->writeFile(DSTFILE =>  $locInstall{'file'},
+                                            SRCFILE => $cert->{CERTFILE}, 
+                                            APPEND  => 1)) {                                                     
+            $rc = CertNanny::Logging->error("installCertChain(): failed to wire cert chain file");                   
+          }       
+        }    
+       } 
+     }
+  
+
+  CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "Install installCertChain");
+  return $rc;
+} ## end sub installRoots
+
+
 
 
 sub _createLocalCerts {
