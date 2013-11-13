@@ -1408,5 +1408,51 @@ sub _getCertLabel {
   return $label;
 } ## end sub _getCertLabel
 
+sub getCertLocation {
+  ###########################################################################
+  #
+  # get the key specific locations for certificates
+  # 
+  # Input: caller must provide a hash ref containing 
+  #           TYPE      => TrustedRootCA or CAChain
+  #                        Default: TrustedRootCA
+  # 
+  # Output: caller gets a hash ref:
+  #           <locationname in lowercase> => <Location>
+  #         or undef on error
+  CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "get the key specific locations for certificates");
+  my $self = shift;
+  my %args = (TYPE => 'TrustedRootCA',
+              @_);
+  
+  my $options   = $self->{OPTIONS};
+  my $entry     = $options->{ENTRY};
+  my $entryname = $options->{ENTRYNAME};
+  my $config    = $options->{CONFIG};
+
+  my $rc = undef;
+
+  if ($args{TrustedRootCA}) {
+    foreach ('Directory', 'File', 'ChainFile') {
+      if (my $location = $config->get("keystore.$entryname.TrustedRootCA.GENERATED.$_", 'FILE')) {
+        $rc->{lc($_)} = $location;
+      }
+    }
+    if (my $location = $config->get("keystore.$entryname.location", 'FILE')) {
+      $rc->{lc($_)} = $location;
+    }
+  }
+  if ($args{CAChain}) {
+    foreach ('Directory', 'File') {
+      if (my $location = $config->get("keystore.$entryname.CAChain.GENERATED.$_", 'FILE')) {
+        $rc->{lc($_)} = $location;
+      }
+    }
+  }
+
+  CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "get the key specific locations for certificates");
+  return $rc
+} ## end sub getKey
+
 
 1;

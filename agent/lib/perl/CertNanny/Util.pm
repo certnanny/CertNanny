@@ -1127,6 +1127,7 @@ sub fetchFileList {
   foreach my $item (@myList) {
     $item =~ s/^["']*|["']*$//g;
     $item = File::Spec->canonpath($item);
+    CertNanny::Logging->debug("cannonpath file: $item");
     if (-T $item) {
       CertNanny::Logging->debug("Found file: $item");
       push(@tmpList, $item);
