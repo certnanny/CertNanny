@@ -561,18 +561,18 @@ sub installRoots {
     my $installedRootCAs = $self->k_getAvailableRootCAs();
 
     if (!defined($installedRootCAs)) {
-      $rc = CertNanny::Logging->error("No root certificates found in " . $config-get("keystore.$entryname.TrustedRootCA.AUTHORITATIVE.Directory", 'FILE'));
+      $rc = CertNanny::Logging->error("No root certificates found in " . $config->get("keystore.$entryname.TrustedRootCA.AUTHORITATIVE.Directory", 'FILE'));
     } else {
       # If this is ok, let's get the privat key
       my $myKey = $self->getKey();
       my $EECert;
       if (!defined($myKey)) {
-        $rc = CertNanny::Logging->error("No private key found in " . $config-get("keystore.$entryname.location", 'FILE'));
+        $rc = CertNanny::Logging->error("No private key found in " . $config->get("keystore.$entryname.location", 'FILE'));
       } else {
         # now let's get the certificate
         $EECert = $self->getCert(CERTTYPE => 'EE');
         if (!defined($EECert)) {
-          $rc = CertNanny::Logging->error("No EE cert found in " . $config-get("keystore.$entryname.location", 'FILE'));
+          $rc = CertNanny::Logging->error("No EE cert found in " . $config->get("keystore.$entryname.location", 'FILE'));
         } else {
           $EECert->{CERTINFO} = CertNanny::Util->getCertInfoHash(CERTDATA   => $EECert->{CERTDATA},
                                                                  CERTFORMAT => 'PEM');
@@ -727,17 +727,19 @@ sub getCertLocation {
   my $entry     = $options->{ENTRY};
   my $entryname = $options->{ENTRYNAME};
   my $config    = $options->{CONFIG};
+  
+  my $rc = {};
 
-  my $rc = undef;
-
-  if ($args{TrustedRootCA}) {
+  if ($args{TYPE}  eq 'TrustedRootCA') {
     foreach ('Directory', 'File', 'ChainFile') {
       if (my $location = $config->get("keystore.$entryname.TrustedRootCA.GENERATED.$_", 'FILE')) {
+       CertNanny::Logging->debug('getCertLocation(): found location: '. $_);
         $rc->{lc($_)} = $location;
       }
     }
     if (my $location = $config->get("keystore.$entryname.location", 'FILE')) {
-      $rc->{lc($_)} = $location;
+     CertNanny::Logging->debug('getCertLocation(): found location: '. $location);
+      $rc->{location} = $location;
     }
   }
   if ($args{CAChain}) {
@@ -747,7 +749,7 @@ sub getCertLocation {
       }
     }
   }
-
+CertNanny::Logging->debug("Root CA locations for $entryname". Dumper($rc));
   CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "get the key specific locations for certificates");
   return $rc
 } ## end sub getKey

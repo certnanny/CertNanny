@@ -1267,12 +1267,12 @@ sub _checkCert {
     my $notAfter  = CertNanny::Util->isoDateToEpoch($certinfo->{NotAfter});
     my $now       = time;
     if ($exclude_expired =~ m{ yes }xmsi && ($now > $notAfter)) {
-      CertNanny::Logging->info("Skipping expired root certificate " . $certinfo->{SubjectName});
+      CertNanny::Logging->debug("Skipping expired root certificate " . $certinfo->{SubjectName});
       $rc = 0;
     }
 
     if ($rc && $exclude_notyetvalid =~ m{ yes }xmsi && ($now < $notBefore)) {
-      CertNanny::Logging->info("Skipping not yet valid root certificate " . $certinfo->{SubjectName});
+      CertNanny::Logging->debug("Skipping not yet valid root certificate " . $certinfo->{SubjectName});
       $rc = 0;
     }
   }
@@ -1514,7 +1514,7 @@ sub k_syncRootCAs {
 #                   'location'  => $config->get("keystore.$entryname.location",                          'FILE'));
 
 
- my %locSearch =  $self->getCertLocation();
+ my %locSearch =  %{$self->getCertLocation('TYPE' => 'TrustedRootCA')};
  
   # First fetch available root certificates
   my $availableRootCAs = $self->k_getAvailableRootCAs();
