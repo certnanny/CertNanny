@@ -86,7 +86,7 @@ sub new {
   # optional keypin defaults to storepin
   if (!defined $entry->{key}->{pin}) {
     $entry->{key}->{pin} = $entry->{store}->{pin};
-    CertNanny::Logging->info("keystore.$entryname.key.pin not defined, defaulting to keystore.$entryname.store.pin");
+    CertNanny::Logging->debug("keystore.$entryname.key.pin not defined, defaulting to keystore.$entryname.store.pin");
 
     # TODO sub new() check that keypin works if we are doing "renew"
   }
@@ -460,14 +460,14 @@ sub getCertLocation {
 
   my $rc = undef;
 
-  if ($args{TrustedRootCA}) {
+  if ($args{TYPE}  eq 'TrustedRootCA') {
     foreach ('Directory', 'File', 'ChainFile') {
       if (my $location = $config->get("keystore.$entryname.TrustedRootCA.GENERATED.$_", 'FILE')) {
         $rc->{lc($_)} = $location;
       }
     }
     if (my $location = $config->get("keystore.$entryname.location", 'FILE')) {
-      $rc->{lc($_)} = $location;
+      $rc->{location} = $location;
     }
   }
   if ($args{CAChain}) {

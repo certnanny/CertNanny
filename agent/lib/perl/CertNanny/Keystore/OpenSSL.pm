@@ -547,7 +547,7 @@ sub getCertLocation {
   # Output: caller gets a hash ref:
   #           <locationname in lowercase> => <Location>
   #         or undef on error
-  CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "get the key specific locations for certificates");
+  CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], " getCertLocation() get the key specific locations for certificates");
   my $self = shift;
   my %args = (TYPE => 'TrustedRootCA',
               @_);
@@ -557,11 +557,12 @@ sub getCertLocation {
   my $entryname = $options->{ENTRYNAME};
   my $config    = $options->{CONFIG};
 
-  my $rc = undef;
+  my $rc = {};
 
-  if ($args{TrustedRootCA}) {
+  if ($args{TYPE}  eq 'TrustedRootCA') {
     foreach ('Directory', 'File', 'ChainFile') {
       if (my $location = $config->get("keystore.$entryname.TrustedRootCA.GENERATED.$_", 'FILE')) {
+        CertNanny::Logging->debug('getCertLocation(): found location: '. $_);
         $rc->{lc($_)} = $location;
       }
     }
