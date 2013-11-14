@@ -315,7 +315,6 @@ Options:
 Actions:
 
   check             Check all configured keystores
-  sync              Synchronize CertNannys keystore with all configured keystores
   renew             Run automatic renewal on all configured keystores
   enroll            Run inital enrollment for configured keystores that do NOT have a certificate installed.
   updateRootCA      Run trusted root CA certificate update via SCEP 
@@ -349,10 +348,14 @@ Uses the specified file for configuration. Mandatory.
 Check the configured keystores and print out warning if the expiry time
 is within the configured warning interval.
 
-=item B<sync>
+=item B<updateRootCA>
  
-Synchronize CerNannys internal keystore with all configured keystores. If 
-s.th. is missing on the one or the other side, it is added.
+Obtain new Root CA certifcates and install into the configured 
+keystore.DEFAULT.TrustedRootCA.AUTHORITATIVE.Directory . 
+Synchronize keystores configured 
+with all RootCA Certificates in a given keystore. If 
+s.th. is missing it is added. If Keystore contains root CAs not found in 
+keystore.DEFAULT.TrustedRootCA.AUTHORITATIVE.Directory they will be deleted. 
 
 =item B<renew>
  
@@ -538,7 +541,7 @@ Common keystore types are
 
 =item * 
 
-MQ keystores to be used for MQ SSL
+MQ keystores to be used for MQ SSL GSKit 
 
 =item * 
 
@@ -552,12 +555,10 @@ OpenSSL "keystores", a raw PEM encoded certificate and an encrypted RSA key
 
 Root Certificates are usually distributed to the machines via the usual 
 deployment mechanisms that are used for software distribution in the
-target environment. For security reasons the distribution of Root 
-Certificates is not in the scope of the automatic renewal process itself. 
+target environment. 
 
-CertNanny may provide means for automatic and secure deployment of 
-root certificates in the future that may be used instead of the usual 
-deployment procedures.
+CertNanny provides means for automatic and secure deployment of 
+new root CA certificates via SCEP.
 
 The machine in question must be able to establish a http connection to 
 the PKI systems.
@@ -610,7 +611,7 @@ The CertNanny script may be invoked in 'check' mode that will only
 check if the configured keystores are valid for more than a configured 
 amount of time (may be used for monitoring integration).
 
-If the readonly warning time is configured a few days shorter than the 
+If the expiry warning time is configured a few days shorter than the 
 automatic renewal period, the system has some time to perform the 
 actual renewal of the new keystore. If for some reason the new keystore 
 is not installed within the planned time period, the alarm still comes 
@@ -703,7 +704,18 @@ the old one
 (6) an optional post-install script or Perl Method is invoked, allowing to
 activate the changes, notify an administrators or similar.
 
+=item *
+
+(7) The keystore is evaluated for the possible instalation or deletion 
+of root CA certificates and a optinal root pre-install script is invoked if configured
+
+=item *
+
+(8) root CA certificates will be installed or deleted  and optinal 
+root post-install script is invoked if configured
+
 =back
+
 
 =head3 1.2.4 Semi-automatic (sandboxed) renewal mode
 
@@ -752,21 +764,20 @@ Root CA (also called the Certificate Chain). During the automatic
 renewal process these CA certificates are sent to the requesting party. 
 The script picks up these certificates and also verifies the Root 
 Certificate sent by the CA against a locally configured list of 
-Root Certificates. This list of trusted Root Certificates must be 
-updated out-of-band by e. g. an automated deployment procedure.
-(Also see appendix.)
+Root Certificates. 
 
 After downloading the new certificate the script builds the 
 certificate chain and adds it to the resulting key store. 
-
+The SCEP server is responsible for delevering all required intermidate CA certificates 
+except the root CA. 
 
 =head3 1.2.6 Implementation
 
 The script itself is written in Perl. It uses OpenSSL for crypto operation 
 and the sscep program for communicating with the PKI systems.
 
-On Win32 platforms you also need CAPICOM and Win32 Deamon.
-
+On Win32 platforms you also need Win32 Deamon and a capi engine for OpenSSL. 
+Currently to access the machine keystore of windows a patched capi engine is required. 
 
 =head3 1.2.7 Features and status
 
@@ -839,9 +850,6 @@ openssl
 
 sscep
 
-=item *
-
-CAPICOM (only for Win32)
 
 =item *
 
@@ -933,6 +941,12 @@ Location of the gsk6cmd binary (optional, used for IBM GSK Keystores only)
 
 Example: /usr/bin/gsk6cmd
 
+=item cmd.gskcmd
+
+Location of the gskcmd binary for GSKit 7 or newer (optional, used for IBM GSK Keystores only)
+
+Example: /usr/bin/gsk7cmd
+
 =item cmd.java
 
 Location of the java binary (optional, used for Java keystores only)
@@ -964,7 +978,7 @@ TODO
 
 =item cmd.gsklib
 
-Location of the GSKit lib directory (optional, only required for GSKit
+Location of the GSKit lib directory (optional, only required for GSKit 6
 keystores on the Windows platform).
 
 Example: c:\Program Files\IBM\gsk7\lib
@@ -1008,7 +1022,7 @@ It is posible to define a longer backofftime to be used at night as example. Out
 
 Example: 
 conditionalwait.time = 50
-conditionalwait.start =  080000     #this would be 8 am 
+conditionalwait.start =  080000   #this would be 8 am 
 conditionalwait.end  =   140000		#this is 2 pm
 
 =back
@@ -1061,7 +1075,7 @@ of distinct keystores.
 
 =item platform.windows.servicename
 
-Name of the Windows service to be installed by cernanny-service.pl. 
+Name of the Windows service to be installed by cernanny install
 
 Default: Certnanny
 
@@ -1182,7 +1196,7 @@ harm) to include non-root CA certificates here, they are simply not considered
 by the program.  The first Root CA certificate must have the index 1.
 Subsequent entries are only read if the index numbers are adjacent.
 
-To enable rootCAupdate via SCEP configure a directory for root certs with the index 1. 
+To enable rootCAupdate via SCEP configure a TrustedRootCA.AUTHORITATIVE.Directory
 
 =back
 
@@ -1239,6 +1253,14 @@ in the old certificate (__NOTBEFORE__, __NOTAFTER__) and the renewed
 certificate (__NEWCERT_NOTBEFORE__, __NEWCERT_NOTAFTER__)
 
 =back
+
+=item keystore.LABEL.hook.rootCA.install.pre
+
+=item keystore.LABEL.hook.rootCA.install.post  
+
+This hooks will be executed if a root certificate is deleted or instaqlled
+into the keystore.
+
 
 =item keystore.LABEL.hook.renewal.state
 
@@ -1384,6 +1406,12 @@ Example:
     
     keystore.LABEL.cacert.0 = /etc/apache/ssl.crt/rootca.crt
     keystore.LABEL.cacert.1 = /etc/apache/ssl.crt/level2ca.crt
+    
+=item keystore.LABEL.TrustedRootCA.AUTHORITATIVE.Directory 
+
+This is a directory for Root CA certificates that are evaluated when 
+renewing a certificate. This is also the directory where new root CA will be installed 
+if root CA update is enabled.      
 
 =item keystore.LABEL.cacertformat
 
@@ -1399,72 +1427,57 @@ Example:
     keystore.LABEL.format = DER
     keystore.LABEL.cacertformat = PEM
 
-=item keystore.LABEL.rootcacertbundle
+=item keystore.LABEL.TrustedRootCA.GENERATED.Directory
 
-This setting is only evaluated when installing the new keystore.
-Specifies a target file containing a concatenation of all Root 
-certificates specified with keystore.LABEL.rootcacert.x in the 
-configuration file.
-
-The file will be overwritten and newly created during installation of
-the new keystore.
-
-May only be specified if .rootcacertformat (or .format) is set to PEM.
+This setting is optinal to generate a OpenSSL style root CA directory. 
+CertNanny will either copy root CAs found in 
+ keystore.LABEL.TrustedRootCA.AUTHORITATIVE.Directory 
+ or on UNIX systems set links to the found certificates. 
+ For each certificate 2 links (or copys) are created as expected by openSSL
+ subject hash folowed by a incremented number if more then one is found. (e.g. 9fb3cb0b.0)
+ One link is using a md5 due to compatibility with oder OpenSSL version, 
+ the 2nd link is based on a sha1 hash of the cert subject.  
+ 
+Certs or links in this directory will be syncronised with AUTHORITATIVE.Directory certificates. 
 
 Default: none
 
 Example:
-    keystore.LABEL.rootcacertformat = PEM
-    keystore.LABEL.rootcacertbundle = /etc/apache/ssl.crt/ca-bundle.crt
+    keystore.LABEL.keystore.LABEL.TrustedRootCA.GENERATED.Directory = /etc/apache/rootCAs/
 
-=item keystore.LABEL.rootcacertdir
+=item keystore.LABEL.TrustedRootCA.GENERATED.File
 
-This setting is only evaluated when installing the new keystore.
-Directory (or file template) for storing Root CA certificates specified 
-in the config file.
+This setting is only optional to generate a concatenated root CA file containing
+alls root CA certificates found in 
+keystore.LABEL.TrustedRootCA.AUTHORITATIVE.Directory . 
 
-If an existing directory is specified, all Root CA certificates specified 
-in the configuration file will be written to this directory. The filenames
-will be rootca-N.pem or rootca-N.der, depending on the certificate format
-selected with .format or .rootcacertformat.
-N is replaced with an integer number, yielding root-1.pem, root-2.pem etc.
-Existing files with the same names will be overwritten.
-
-If the specified path is NOT an existing directory, the last path component
-of the specified path is interpreted as a template name for the Root
-certificates. The path components leading to this template name are
-interpreted as the directory specification.
-
-If this directory exists (and is writable) the Root certificates
-will be written to the file system using the specified
-filename template. The filename template MUST include a '%i' that is
-replaced with the index number of the Root certificate written. (If
-no %i is included in the template name, only the last configured Root
-certificate will be written to this filename).
-
-The certificate file format is determined by .format or .rootcacertformat.
-Existing files with the resulting names will be overwritten.
-
-Default: none
+Certs in this file will be syncronised with AUTHORITATIVE.Directory certificates. 
 
 Example: 
-    keystore.LABEL.rootcacertdir = /etc/apache/ssl.crt/
-    keystore.LABEL.rootcacertdir = /etc/apache/ssl.crt/trustedroot_%i.crt
+    keystore.LABEL.TrustedRootCA.GENERATED.File = /etc/apache/ssl.crt/rootCAs.pem
 
-=item keystore.LABEL.rootcacertformat
+=item keystore.LABEL.TrustedRootCA.GENERATED.ChainFile  
 
-This setting is only evaluated when installing the new keystore.
-Overrides the .format setting when installing the Root CA certificates 
-specified with .rootcacertbundle or .rootcacertdir
-Note that a Root CA certificate bundle can only be created in PEM format.
+This setting is only optional to generate a concatenated root CA file containing
+alls root CA certificates found in 
+keystore.LABEL.TrustedRootCA.AUTHORITATIVE.Directory and additonal certificate chain CAs 
 
-Allowed values: PEM, DER
-
-Default: fall back to value specified with .format
+Certs in this file will be syncronised with AUTHORITATIVE.Directory certificates. 
 
 Example: 
-    keystore.LABEL.format = DER
-    keystore.LABEL.rootcacertformat = PEM
+    keystore.LABEL.TrustedRootCA.GENERATED.ChainFile = /etc/apache/ssl.crt/rootCAs.pem
+
+=item keystore.LABEL.CAChain.GENERATED.File   
+
+This setting is only optional to generate a concatenated ca chain file containing
+the certificates issuing CA up to the root CA cert which has to be trusted in: 
+keystore.LABEL.TrustedRootCA.AUTHORITATIVE.Directory
+
+This chain file is generated if it does not exists or when the certificate is renewed. 
+
+Example: 
+    keystore.LABEL.CAChain.GENERATED.File    = /etc/apache/ssl.crt/mychainfile.pem
+
 
 =back
 
