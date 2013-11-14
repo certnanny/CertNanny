@@ -1432,14 +1432,14 @@ sub getCertLocation {
 
   my $rc = undef;
 
-  if ($args{TrustedRootCA}) {
+  if ($args{TYPE}  eq 'TrustedRootCA') {
     foreach ('Directory', 'File', 'ChainFile') {
       if (my $location = $config->get("keystore.$entryname.TrustedRootCA.GENERATED.$_", 'FILE')) {
         $rc->{lc($_)} = $location;
       }
     }
     if (my $location = $config->get("keystore.$entryname.location", 'FILE')) {
-      $rc->{lc($_)} = $location;
+      $rc->{location} = $location;
     }
   }
   if ($args{CAChain}) {

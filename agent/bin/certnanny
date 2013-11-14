@@ -315,7 +315,6 @@ Options:
 Actions:
 
   check             Check all configured keystores
-  sync              Synchronize CertNannys keystore with all configured keystores
   renew             Run automatic renewal on all configured keystores
   enroll            Run inital enrollment for configured keystores that do NOT have a certificate installed.
   updateRootCA      Run trusted root CA certificate update via SCEP 
@@ -349,10 +348,14 @@ Uses the specified file for configuration. Mandatory.
 Check the configured keystores and print out warning if the expiry time
 is within the configured warning interval.
 
-=item B<sync>
+=item B<updateRootCA>
  
-Synchronize CerNannys internal keystore with all configured keystores. If 
-s.th. is missing on the one or the other side, it is added.
+Obtain new Root CA certifcates and install into the configured 
+keystore.DEFAULT.TrustedRootCA.AUTHORITATIVE.Directory . 
+Synchronize keystores configured 
+with all RootCA Certificates in a given keystore. If 
+s.th. is missing it is added. If Keystore contains root CAs not found in 
+keystore.DEFAULT.TrustedRootCA.AUTHORITATIVE.Directory they will be deleted. 
 
 =item B<renew>
  
@@ -538,7 +541,7 @@ Common keystore types are
 
 =item * 
 
-MQ keystores to be used for MQ SSL
+MQ keystores to be used for MQ SSL GSKit 
 
 =item * 
 
@@ -552,12 +555,10 @@ OpenSSL "keystores", a raw PEM encoded certificate and an encrypted RSA key
 
 Root Certificates are usually distributed to the machines via the usual 
 deployment mechanisms that are used for software distribution in the
-target environment. For security reasons the distribution of Root 
-Certificates is not in the scope of the automatic renewal process itself. 
+target environment. 
 
-CertNanny may provide means for automatic and secure deployment of 
-root certificates in the future that may be used instead of the usual 
-deployment procedures.
+CertNanny provides means for automatic and secure deployment of 
+new root CA certificates via SCEP.
 
 The machine in question must be able to establish a http connection to 
 the PKI systems.
@@ -610,7 +611,7 @@ The CertNanny script may be invoked in 'check' mode that will only
 check if the configured keystores are valid for more than a configured 
 amount of time (may be used for monitoring integration).
 
-If the readonly warning time is configured a few days shorter than the 
+If the expiry warning time is configured a few days shorter than the 
 automatic renewal period, the system has some time to perform the 
 actual renewal of the new keystore. If for some reason the new keystore 
 is not installed within the planned time period, the alarm still comes 
@@ -704,6 +705,19 @@ the old one
 activate the changes, notify an administrators or similar.
 
 =back
+
+=item *
+
+(7) The keystore is evaluated for the possible instalation or deletion 
+of root CA certificates and a optinal root pre-install script is invoked if configured
+
+=item *
+
+(8) root CA certificates will be installed or deleted  and optinal 
+root post-install script is invoked if configured
+
+=back
+
 
 =head3 1.2.4 Semi-automatic (sandboxed) renewal mode
 
