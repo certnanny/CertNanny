@@ -157,7 +157,7 @@ sub new {
         }
       }
     } ## end if ($entry->{hsm}->{type})
-    
+
     my $chainfile = $config->get("keystore.$entryname.CAChain.GENERATED.File",      'FILE');
     unless (-e $chainfile){
      CertNanny::Logging->debug("Cert chain file defined but doesn not exist $chainfile , force generation");
