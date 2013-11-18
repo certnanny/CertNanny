@@ -292,9 +292,23 @@ sub installCert {
     	CertNanny::Logging->error("installCert(): failed to unbind https certificate.");
     	#return undef;
   	}
+  	
+  my @certutilpulse  = ('certutil','-pulse');
+  my $certutilpulse    = join(" ", @certutilpulse);
+  CertNanny::Logging->debug("certutil cmd: $certutilpulse");
+     
+    if (CertNanny::Util->runCommand(\@certutilpulse)) {
+      CertNanny::Logging->error("installCert(): failed to unbind https certificate.");
+      #return undef;
+    }
+    	
+  	
+  	
+	my @wincerthash = split(':', $certinfo->{CertificateFingerprint});
+	my $hash = join('', @wincerthash);
+	$hash = lc($hash);
 	
-	
-	my @netsh      = ('netsh','http', 'add','sslcert', 'ipport='.$entry->{iis}->{ipport},'certhash='. $certinfo->{CertificateFingerprint} ,'appid='.$entry->{iis}->{appid} ); 
+	my @netsh      = ('netsh','http', 'add','sslcert', 'ipport='.$entry->{iis}->{ipport},'certhash="'. $hash. '"','appid="{' . $entry->{iis}->{appid} . '}"'); 
     my $netsh      = join(" ", @netsh);
     CertNanny::Logging->debug("netsh cmd: $netsh");
      
