@@ -202,8 +202,9 @@ sub getCert {
       my @cmd = $self->_buildKeytoolCmd($args{CERTFILE}, '-export', '-rfc', -alias => qq{"$entry->{alias}"});
       # CertNanny::Logging->debug("Execute: " . join(' ', hidepin(@cmd)));
       # Todo pgk: Testen hidePin
-      CertNanny::Logging->debug("Execute: " . CertNanny::Util->hidePin(join(' ', @cmd)));
-      $certData = `@cmd`;
+      #CertNanny::Logging->debug("Execute: " . CertNanny::Util->hidePin(join(' ', @cmd)));
+      #$certData = `@cmd`;
+      $certData = CertNanny::Util->runCommand(\@cmd, WANTOUT => 1, HIDEPWD => 1);
       if ($? || !defined $certData) {
         chomp($certData);
         CertNanny::Logging->error("getCert(): keytool -export failed ($certData)");
@@ -901,7 +902,9 @@ sub installRoots {
         foreach my $certSHA1 (keys ($installedRootCAs)) {
           if (!exists($availableRootCAs->{$certSHA1})) {
             CertNanny::Logging->debug("Deleting root cert " . $installedRootCAs->{$certSHA1}->{CERTINFO}->{SubjectName});
-            @cmd = $self->_buildKeytoolCmd($locName, '-delete', '-alias', $installedRootCAs->{$certSHA1}->{CERTALIAS});
+            @cmd =  (qq("$options->{keytool}"), -noprompt, -storepass => qq("$entry->{store}->{pin}"), '-keystore' ,qq("$locName"), '-delete', '-alias', $installedRootCAs->{$certSHA1}->{CERTALIAS});
+ 
+            #@cmd = $self->_buildKeytoolCmd($locName, '-delete', '-alias', $installedRootCAs->{$certSHA1}->{CERTALIAS});
             if (CertNanny::Util->runCommand(\@cmd, HIDEPWD => 1)) {
               CertNanny::Logging->error("Error deleting root cert " . $installedRootCAs->{$certSHA1}->{CERTINFO}->{SubjectName});
             }
@@ -919,7 +922,8 @@ sub installRoots {
             if ($availableRootCAs->{$certSHA1}->{CERTINFO}->{SubjectName} =~ /CN=([^,]+).*/) {
               ($alias = $1) =~ s/\s/_/g;
             }
-            @cmd = $self->_buildKeytoolCmd($locName, '-importcert', '-file', $tmpFile, '-trustcacerts', '-alias' , $alias );
+            @cmd =  (qq("$options->{keytool}"), -noprompt, -storepass => qq("$entry->{store}->{pin}"),'-keystore' ,'"'.$locName.'"', '-importcert', '-file', '"'.$tmpFile.'"', '-trustcacerts', '-alias' , $alias);
+            #@cmd = $self->_buildKeytoolCmd($locName, '-importcert', '-file', $tmpFile, '-trustcacerts', '-alias' , $alias );
             if (CertNanny::Util->runCommand(\@cmd, HIDEPWD => 1)) {
               CertNanny::Logging->error("Error importing root cert " . $availableRootCAs->{$certSHA1}->{CERTINFO}->{SubjectName});
             }
