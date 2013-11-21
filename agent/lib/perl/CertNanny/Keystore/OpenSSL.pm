@@ -157,6 +157,7 @@ sub new {
         }
       }
     } ## end if ($entry->{hsm}->{type})
+    #$self->{CERT} = $self->{INSTANCE}->getCert();
 
     my $chainfile = $config->get("keystore.$entryname.CAChain.GENERATED.File",      'FILE');
     unless (-e $chainfile){
