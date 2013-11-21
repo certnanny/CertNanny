@@ -637,9 +637,9 @@ sub installRoots {
             my $tmpP12 = CertNanny::Util->getTmpFile();
             if (!$rc) {
               my @cmd = $self->_buildOpenSSLPKCS12Cmd('-export' => '-export', 
-                                                      '-in'     => $tmpCert,     
-                                                      '-out'    => $tmpP12,
-                                                      '-inkey'  => $tmpKey,
+                                                      '-in'     => '"'.$tmpCert.'"',     
+                                                      '-out'    => '"'.$tmpP12.'"',
+                                                      '-inkey'  => '"'.$tmpKey.'"',
                                                       '-name'   => $config->get("keystore.$entryname.label") || 'cert1',
                                                       'ARGS'    => \@CAList);
               $rc = CertNanny::Util->runCommand(\@cmd);
@@ -780,7 +780,7 @@ sub _buildOpenSSLPKCS12Cmd {
   my $rc = 0;
   
   my $openssl    = $config->get('cmd.openssl', 'FILE');
-  $args{-in}       ||= $config->get("keystore.$entryname.location", 'FILE');
+  $args{-in}       ||= '"'.$config->get("keystore.$entryname.location", 'FILE').'"';
   $ENV{PASSWORD} = $args{-password} || $self->_getPin();
   $ENV{PASSOUT}  = $args{-passout}  || $self->_getPin();
   $ENV{PASSIN}   = $args{-passin}   || $self->_getPin();
