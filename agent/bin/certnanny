@@ -61,7 +61,10 @@ GetOptions(
     ))
   or pod2usage(-msg => $msg, -verbose => 0);   # strip all command line parameters off @ARGV what remains is the commands to be executed
 
-pod2usage(-exitstatus => 0, -verbose => 2) if $cmdLineParam{man};
+if ($cmdLineParam{man}){
+ pod2usage(-exitstatus => 0, -verbose => 2);
+ return 0;
+}
 pod2usage(-msg => $msg, -verbose => 1)     if ($cmdLineParam{help} or (!exists $cmdLineParam{cfg}));
       
 die "Could not read config file $cmdLineParam{cfg}. Stopped" unless (-r $cmdLineParam{cfg});
@@ -475,8 +478,6 @@ request with the existing certificate data, enrolls the request with the
 configured CA and polls the CA for the issued certificate. Once the
 certificate is ready, a new keystore with the new certificate is composed
 and replaces the old keystore.
-
-
 
 =head1 Distribution Overview
 
@@ -927,37 +928,43 @@ configured.
 
 Location of the OpenSSL binary (required)
 
-Example: /usr/bin/openssl
+Example: cmd.openssl = /usr/bin/openssl
+
+=item cmd.opensslconf
+
+Location of the OpenSSL standard config  (optional)
+
+Example: cmd.opensslconf = /usr/bin/openssl.conf
 
 =item cmd.sscep
 
 Location of the SSCEP binary (required)
 
-Example: /usr/local/bin/sscep
+Example: cmd.sscep = /usr/local/bin/sscep
 
 =item cmd.gsk6cmd
 
 Location of the gsk6cmd binary (optional, used for IBM GSK Keystores only)
 
-Example: /usr/bin/gsk6cmd
+Example: cmd.gsk6cmd = /usr/bin/gsk6cmd
 
 =item cmd.gskcmd
 
 Location of the gskcmd binary for GSKit 7 or newer (optional, used for IBM GSK Keystores only)
 
-Example: /usr/bin/gsk7cmd
+Example: cmd.gskcmd = /usr/bin/gsk7cmd
 
 =item cmd.java
 
 Location of the java binary (optional, used for Java keystores only)
 
-Example: /opt/bin/java
+Example: cmd.java = /opt/bin/java
 
 =item cmd.keytool
 
 Location of the java keytool binary (optional, used for Java keystores only)
 
-Example: /opt/bin/keytool
+Example: cmd.keytool = /opt/bin/keytool
 
 =back 
 
