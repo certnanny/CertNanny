@@ -32,7 +32,7 @@ use POSIX;
 
 use IPC::Open3;
 
-$VERSION = 0.90;
+$VERSION = 0.91;
 
 my $INSTANCE;
 
@@ -68,6 +68,11 @@ sub new {
     if (!$self->{CONFIG}->get("path.libjava", "FILE")) {
       $self->{CONFIG}->set("path.libjava", File::Spec->catdir($self->{CONFIG}->get("path.lib", "FILE"), 'java'));
       CertNanny::Logging->debug("set java path lib to:" . $self->{CONFIG}->get("path.libjava", "FILE"));
+    }
+
+
+    if($self->{CONFIG}->get("cmd.opensslconf", "FILE")){
+     $ENV{OPENSSL_CONF} = $self->{CONFIG}->get("cmd.opensslconf", "FILE");
     }
 
     $self->{ITEMS} = ${$self->{CONFIG}->getRef("keystore", 'ref')};
