@@ -70,6 +70,11 @@ sub new {
       CertNanny::Logging->debug("set java path lib to:" . $self->{CONFIG}->get("path.libjava", "FILE"));
     }
 
+
+    if($self->{CONFIG}->get("cmd.opensslconf", "FILE")){
+     $ENV{OPENSSL_CONF} = $self->{CONFIG}->get("cmd.opensslconf", "FILE");
+    }
+
     $self->{ITEMS} = ${$self->{CONFIG}->getRef("keystore", 'ref')};
 
     if (!defined $self->{ITEMS}) {
