@@ -460,6 +460,8 @@ sub callOpenSSL {
   }
   my $outfile = CertNanny::Util->getTmpFile();
   push(@cmd, ('>', qq("$outfile")));
+  
+  
 
   # export certificate to tempfile
   CertNanny::Logging->debug("Execute: " . join(" ", @cmd));

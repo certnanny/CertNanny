@@ -917,6 +917,10 @@ sub k_renew {
 
   $self->_renewalState("initial") unless defined $self->_renewalState();
   my $laststate = "n/a";
+  
+  CertNanny::Logging->info("Certificate Information:\n\tSubjectName: " . $self->{CERT}->{CERTINFO}->{SubjectName}  . "\n\t" .
+                                                              "Serial: "      . $self->{CERT}->{CERTINFO}->{SerialNumber} . "\n\t" . 
+                                                              "Issuer: "      . $self->{CERT}->{CERTINFO}->{IssuerName});
 
   while ($laststate ne $self->_renewalState()) {
     $laststate = $self->_renewalState();
