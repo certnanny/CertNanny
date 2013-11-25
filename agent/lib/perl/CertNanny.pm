@@ -52,7 +52,6 @@ sub new {
     my $self = {};
     bless $self, $class;
     $INSTANCE = $self;
-
     # Store singleton objects in CertNanny
     $self->{CONFIG}  = CertNanny::Config->getInstance(%args); return undef unless defined $self->{CONFIG};
     $self->{UTIL}    = CertNanny::Util->getInstance(CONFIG => $self->{CONFIG});
@@ -125,7 +124,7 @@ sub _iterate_entries {
    ## print "\n\n";
   } ## end foreach my $entryName (keys %{$self...})
 
-  return 1;
+  return 0;
 } ## end sub _iterate_entries
 
 
@@ -133,10 +132,12 @@ sub AUTOLOAD {
   my $self = (shift)->getInstance();
   my $attr = $AUTOLOAD;
   $attr =~ s/.*:://;
+  #print "atrt: " .  $attr ; 
   return undef if $attr eq 'DESTROY';
 
   # automagically call
   if ($attr =~ /(?:info|check|renew|enroll|sync|test)/) {
+  #   print "atrt: " .  $attr ; 
     return $self->_iterate_entries("do_$attr");
   }
 } ## end sub AUTOLOAD
