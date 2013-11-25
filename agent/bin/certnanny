@@ -44,7 +44,7 @@ if ($OSNAME eq "MSWin32") {
 
 ###########################################################################
 # main
-
+my $SERVICE_SLEEP_TIME = 300;    # 0.3 second
 my %cmdLineParam;
 
 my $msg = "CertNanny, version $CertNanny::VERSION";
@@ -76,20 +76,24 @@ CertNanny::Logging->getInstance(CONFIG => CertNanny::Config->getInstance(CONFIG 
 CertNanny::Logging->log2File();
 #CertNanny::Logging->log2Console();
 
-
+#print "before foreach args";
 
 foreach my $cmd (@ARGV) {   # command line parameters are already stripped off. @ARGV now only contains commands to be executed
   if ($OSNAME eq 'MSWin32') {
 
     # Windows Service related commands
-     my $servicename = CertNanny::Config->getInstance()->get("platform.windows.servicename") || "CertNanny";
+
 #    my $servicename = $monitor->getConfigValue("platform.windows.servicename") || "CertNanny";
-      
+       my $servicename ;
     if ($cmd eq "install") {
+     $servicename = CertNanny::Config->getInstance()->get("platform.windows.servicename") || "CertNanny";
+     print "Installing CertNanny Service.\n";
       my $cfgpath         = $cmdLineParam{cfg};
-      my $sleep = $cmdLineParam{cfg} || 300;
+      my $sleep = $cmdLineParam{sleep} || 300;
       my $servicepath     = File::Spec->catfile($FindBin::Bin, $FindBin::Script);
       my $executable_name = $EXECUTABLE_NAME;
+      print "Executable name:".  $EXECUTABLE_NAME ."\n" ;
+      print "serivcepath:" . $servicepath."\n" ;
       if ($servicepath =~ /\w+\.exe/) {
         $executable_name = $servicepath;
       }
@@ -97,7 +101,9 @@ foreach my $cmd (@ARGV) {   # command line parameters are already stripped off. 
       if ($executable_name ne $servicepath) {
         $params_str = qq{"$servicepath"};
       }
+    
       $params_str = qq{$params_str --cfg "$cfgpath" --sleep $sleep};
+        print "param str: " .$params_str ."\n" ;
       my $ret = Win32::Daemon::CreateService({machine     => '',
                                               name        => $servicename,
                                               display     => $servicename,
@@ -108,13 +114,31 @@ foreach my $cmd (@ARGV) {   # command line parameters are already stripped off. 
                                               parameters  => $params_str,});
 
       if ($ret) {
-        print "Service successfully added.\n";
+        print "Service successfully added.\n";       
         exit 0;
       } else {
         print "Failed to add service: " . Win32::FormatMessage(Win32::Daemon::GetLastError()) . "\n";
         exit 1;
       }
     } elsif ($cmd eq "uninstall") {
+     $servicename = CertNanny::Config->getInstance()->get("platform.windows.servicename") || "CertNanny";
+     
+          
+#          if (Win32::Daemon::StopService()) {
+#               print "Successfully stopped.\n";
+#          } else {
+#               print "Failed to stop service: " . Win32::FormatMessage(Win32::Daemon::GetLastError()) . "\n";
+#          }  
+#          my $State;
+#           while (SERVICE_STOPPED() != ($State = Win32::Daemon::State())) {
+#             print " $State stop pending";
+#            if (SERVICE_START_PENDING() == $State) {
+#               print " $State stop pending";
+#               Win32::Sleep($SERVICE_SLEEP_TIME);
+#             }
+#             
+#           }
+     
       if (Win32::Daemon::DeleteService('', $servicename)) {
         print "Service successfully uninstalled.\n";
         exit 0;
@@ -123,7 +147,8 @@ foreach my $cmd (@ARGV) {   # command line parameters are already stripped off. 
         exit 1;
       }
     }elsif ( ($cmd eq "renew") or ($cmd eq "check" )) {
-     
+     $servicename = CertNanny::Config->getInstance()->get("platform.windows.servicename") || "CertNanny";
+      print "Win32 start $cmd\n";
        # Instantiate CertNanny
        my $monitor = CertNanny->getInstance(CONFIG => $cmdLineParam{cfg});
        
@@ -137,6 +162,7 @@ foreach my $cmd (@ARGV) {   # command line parameters are already stripped off. 
     }
   }else{
      # Instantiate CertNanny
+    print "non Win32 start $cmd\n";
      my $monitor = CertNanny->getInstance(CONFIG => $cmdLineParam{cfg});
      
      $cmdLineParam{sleep} = 300 if !defined $cmdLineParam{sleep};
@@ -168,18 +194,16 @@ if ($OSNAME eq 'MSWin32') {
 
   #start service
   if (Win32::Daemon::StartService()) {
-#    print "Successfully started.\n";
+    print "Successfully started CertNanny service.\n";
   } else {
-#    print "Failed to start service: " . Win32::FormatMessage(Win32::Daemon::GetLastError()) . "\n";
+    print "Failed to start service: " . Win32::FormatMessage(Win32::Daemon::GetLastError()) . "\n";
     exit;
   }
 
   my $starttime = 0;
 
-  my $SERVICE_SLEEP_TIME = 1000;    # 1 second
-
   while (SERVICE_STOPPED() != ($State = Win32::Daemon::State())) {
-#    print $LOG "state: " . $State . "\n";
+   # print "state: " . $State . "\n";
 
     # if ($State == 0 ) {
     #	    Win32::Daemon::State( SERVICE_RUNNING() );
@@ -188,40 +212,43 @@ if ($OSNAME eq 'MSWin32') {
 
     if (SERVICE_START_PENDING() == $State) {
 
-      # Initialization code
+      print "Initialization code";
       Win32::Daemon::State(SERVICE_RUNNING());
       $PrevState = SERVICE_RUNNING();
       next;
     } elsif (SERVICE_STOP_PENDING() == $State) {
+      print "service stop pending";
       Win32::Daemon::State(SERVICE_STOPPED());
       next;
     } elsif (SERVICE_PAUSE_PENDING() == $State) {
 
-      # "Pausing...";
+      print "Pausing...";
       Win32::Daemon::State(SERVICE_PAUSED());
       $PrevState = SERVICE_PAUSED();
       next;
     } elsif (SERVICE_CONTINUE_PENDING() == $State) {
 
-      # "Resuming...";
+      print  "Resuming...";
       Win32::Daemon::State(SERVICE_RUNNING());
       $PrevState = SERVICE_RUNNING();
       next;
     } elsif (SERVICE_STOP_PENDING() == $State) {
-
+      print "service stop pending";
       # "Stopping...";
       Win32::Daemon::State(SERVICE_STOPPED());
       $PrevState = SERVICE_STOPPED();
       next;
     } elsif (SERVICE_RUNNING() == $State) {
       my $currtime = time;
-#      print $LOG "currtime: " . $currtime . "\n";
+     #print "currtime: " . $currtime . "\n";
+     #print "starttime: " . $starttime . "\n";
 
       if ($currtime >= $starttime) {
-#        print $LOG "currtime > starttime\n";
+        #print "currtime > starttime\n";
 
         # reinstantiate CertNanny object (make sure that destructor gets called)
         my $monitor = undef;
+        #print "get CertNanny instance\n";
         $monitor = CertNanny->getInstance(CONFIG => $cmdLineParam{cfg});
 #        print $LOG "new monitor object\n";
 
@@ -231,25 +258,30 @@ if ($OSNAME eq 'MSWin32') {
 #        print $LOG "stdout/stderr redirect\n";
 
         my $rc;
-#        print $LOG "Starting renewal...";
-        eval {$rc = $monitor->k_renew();};
+        my $servicecmd = "renew" ;
+        #print "Starting renewal...";
+        eval {$rc = $monitor->$servicecmd($servicecmd);};
+        #print "rc...".$rc ;
         if ($rc != 0) {
-#          print $LOG "There was an error executing CertNanny monitor object\n";
-#          print $LOG $@;
+          print "There was an error executing CertNanny monitor object\n";
+          print  $@;
+        }else{
+        #  print "Renewal finished...";
         }
-#        print $LOG "Renewal finished...";
+ 
 
         #if the renewal was successful the starttime will be increased by one day (86400 seconds -> 24hours -> 3600 seconds per hour)
         my $timeframe = $monitor->getConfigValue("platform.windows.serviceinterval", "FILE")
           || 86400;
         $starttime = $currtime + $timeframe;
+        #print "starttime $starttime , timeframe $timeframe\n";
       } ## end if ($currtime >= $starttime)
-#      print $LOG "before sleep ...\n";
+      #print  "before sleep ...\n";
       Win32::Sleep($SERVICE_SLEEP_TIME);
-#      print $LOG "calling next ...\n";
+      #print  "calling next ...\n";
       next;
     } else {
-
+      #print  "PrevState $PrevState , unhandeled controll msg: $State\n";
       # Got an unhandled control message. Set the state to
       # whatever the previous state was.
       Win32::Daemon::State($PrevState);
@@ -261,11 +293,11 @@ if ($OSNAME eq 'MSWin32') {
     # Check for any outstanding commands. Pass in a non zero value
     # and it resets the Last Message to SERVICE_CONTROL_NONE.
     eval {my $Message = Win32::Daemon::QueryLastMessage(1);};
-#    print $LOG "EVAL_ERROR? " . $EVAL_ERROR;
+    print $EVAL_ERROR;
 
     if (SERVICE_CONTROL_NONE() != (my $Message = Win32::Daemon::QueryLastMessage(1))) {
 
-#      print $LOG "Message: $Message ...\n";
+      print "Message: $Message ...\n";
       if (SERVICE_CONTROL_INTERROGATE() == $Message) {
 
         # Got here if the Service Control Manager is requesting
@@ -283,9 +315,9 @@ if ($OSNAME eq 'MSWin32') {
     } ## end if (SERVICE_CONTROL_NONE...)
 
     # Snooze for awhile so we don't suck up cpu time...
-#    print $LOG "before sleep ...\n";
+    #print "before sleep ...\n";
     Win32::Sleep($SERVICE_SLEEP_TIME);
-#    print $LOG "calling next ...\n";
+    #print "calling next ...\n";
     next;
   } ## end while (SERVICE_STOPPED() ...)
 
