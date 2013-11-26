@@ -212,28 +212,28 @@ if ($OSNAME eq 'MSWin32') {
 
     if (SERVICE_START_PENDING() == $State) {
 
-      print "Initialization code";
+      print "Initialization code\n";
       Win32::Daemon::State(SERVICE_RUNNING());
       $PrevState = SERVICE_RUNNING();
       next;
     } elsif (SERVICE_STOP_PENDING() == $State) {
-      print "service stop pending";
+      print "service stop pending\n";
       Win32::Daemon::State(SERVICE_STOPPED());
       next;
     } elsif (SERVICE_PAUSE_PENDING() == $State) {
 
-      print "Pausing...";
+      print "Pausing...\n";
       Win32::Daemon::State(SERVICE_PAUSED());
       $PrevState = SERVICE_PAUSED();
       next;
     } elsif (SERVICE_CONTINUE_PENDING() == $State) {
 
-      print  "Resuming...";
+      print  "Resuming...\n";
       Win32::Daemon::State(SERVICE_RUNNING());
       $PrevState = SERVICE_RUNNING();
       next;
     } elsif (SERVICE_STOP_PENDING() == $State) {
-      print "service stop pending";
+      print "service stop pending\n";
       # "Stopping...";
       Win32::Daemon::State(SERVICE_STOPPED());
       $PrevState = SERVICE_STOPPED();
@@ -262,7 +262,7 @@ if ($OSNAME eq 'MSWin32') {
         #print "Starting renewal...";
         eval {$rc = $monitor->$servicecmd($servicecmd);};
         #print "rc...".$rc ;
-        if ($rc != 0) {
+        if ($rc != 1) {
           print "There was an error executing CertNanny monitor object\n";
           print  $@;
         }else{
@@ -297,7 +297,7 @@ if ($OSNAME eq 'MSWin32') {
 
     if (SERVICE_CONTROL_NONE() != (my $Message = Win32::Daemon::QueryLastMessage(1))) {
 
-      print "Message: $Message ...\n";
+      #print "Message: $Message ...\n";
       if (SERVICE_CONTROL_INTERROGATE() == $Message) {
 
         # Got here if the Service Control Manager is requesting
