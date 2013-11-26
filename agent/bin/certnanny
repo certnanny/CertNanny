@@ -262,7 +262,7 @@ if ($OSNAME eq 'MSWin32') {
         #print "Starting renewal...";
         eval {$rc = $monitor->$servicecmd($servicecmd);};
         #print "rc...".$rc ;
-        if ($rc != 0) {
+        if ($rc != 1) {
           print "There was an error executing CertNanny monitor object\n";
           print  $@;
         }else{
