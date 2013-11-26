@@ -124,7 +124,7 @@ sub _iterate_entries {
    ## print "\n\n";
   } ## end foreach my $entryName (keys %{$self...})
 
-  return 0;
+  return 1;
 } ## end sub _iterate_entries
 
 
