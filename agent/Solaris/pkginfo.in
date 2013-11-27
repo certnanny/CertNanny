@@ -1,0 +1,12 @@
+PKG="CertNanny-base"
+NAME="CertNanny base vVERSIONINFO"
+VERSION="VERSIONINFO"
+PSTAMP="DATETIMESTAMP"
+ARCH="UNAME-P-ARCHITECTURE"
+CLASSES="none"
+CATEGORY="utility"
+VENDOR="http://www.cynops.de/oss/CertNanny/"
+ISTATES="S s 1 2 3"
+RSTATES="S s 1 2 3"
+BASEDIR="/"
+

@@ -1,0 +1,61 @@
+Package Name: CertNanny.rte
+Package VRMF: VERSIONINFO
+Update: N
+Fileset
+  Fileset Name: CertNanny.rte
+  Fileset VRMF: VERSIONINFO
+  Fileset Description: CertNanny automatic renewal of certificates using the SCEP protocol
+  Bosboot required: N
+  License agreement acceptance required: N
+  Include license files in this package: N
+  Requisites:
+  USRFiles
+    /opt/CertNanny
+    /opt/CertNanny/bin
+    /opt/CertNanny/lib
+    /opt/CertNanny/FAQ
+    /opt/CertNanny/LICENSE.CertNanny
+    /opt/CertNanny/QUICKSTART
+    /opt/CertNanny/bin/certnanny
+    /var/CertNanny/etc/certnanny.cfg
+    /var/CertNanny/etc/Keystore-DEFAULT.cfg
+    /var/CertNanny/etc/Keystore-Java.cfg
+    /var/CertNanny/etc/Keystore-MQ.cfg
+    /var/CertNanny/etc/Keystore-OpenSSL-PKCS8.cfg
+    /var/CertNanny/etc/Keystore-OpenSSL.cfg
+    /var/CertNanny/etc/Keystore-PKCS12.cfg
+    /var/CertNanny/etc/Keystore-Windows.cfg
+    /var/CertNanny/etc/certnanny-Master.cfg
+    /var/CertNanny/etc/certreq.inf
+    /opt/CertNanny/lib
+    /opt/CertNanny/lib/java
+    /opt/CertNanny/lib/java/ExtractKey.jar
+    /opt/CertNanny/lib/perl
+    /opt/CertNanny/lib/perl/CertNanny.pm
+    /opt/CertNanny/lib/perl/CertNanny
+    /opt/CertNanny/lib/perl/CertNanny/Config.pm
+    /opt/CertNanny/lib/perl/CertNanny/Keystore.pm
+    /opt/CertNanny/lib/perl/CertNanny/Keystore
+    /opt/CertNanny/lib/perl/CertNanny/Keystore/Java.pm
+    /opt/CertNanny/lib/perl/CertNanny/Keystore/MQ.pm
+    /opt/CertNanny/lib/perl/CertNanny/Keystore/OpenSSL.pm
+    /opt/CertNanny/lib/perl/CertNanny/Keystore/PKCS12.pm
+    /opt/CertNanny/lib/perl/CertNanny/Keystore/Skeleton.pm
+    /opt/CertNanny/lib/perl/CertNanny/Keystore/Windows.pm
+    /opt/CertNanny/lib/perl/CertNanny/Keystore/WindowsIIS.pm
+    /opt/CertNanny/lib/perl/CertNanny/Keystore/SAP.pm
+    /opt/CertNanny/lib/perl/CertNanny/Util.pm
+    /opt/CertNanny/lib/perl/CertNanny/Enroll.pm
+    /opt/CertNanny/lib/perl/CertNanny/Enroll
+    /opt/CertNanny/lib/perl/CertNanny/Enroll/Sscep.pm
+    /opt/CertNanny/lib/perl/CertNanny/HSM.pm
+    /opt/CertNanny/lib/perl/CertNanny/HSM
+    /opt/CertNanny/lib/perl/CertNanny/HSM/Chil.pm
+    /opt/CertNanny/lib/perl/CertNanny/HSM/Utimaco.pm
+    /opt/CertNanny/lib/perl/CertNanny/Logging.pm
+  EOUSRFiles
+  ROOT Part: N
+  ROOTFiles
+  EOROOTFiles
+EOFileset
+
