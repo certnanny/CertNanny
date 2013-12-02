@@ -230,6 +230,11 @@ sub getCert {
   if (defined $args{CERTFILE} && defined $args{CERTDATA}) {
     $rc = CertNanny::Logging->error("getCert(): Either CERTFILE or CERTDATA may be defined.");
   }
+  
+  if ($entry->{location} eq 'rootonly') {
+    $rc = CertNanny::Logging->info("getCert(): rootonly keystore with no EE no certificate ");
+  }
+  
 
   if (!$rc) {
     my ($certData, $certFormat, $certRest) = ('', '', '');
