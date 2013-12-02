@@ -32,7 +32,7 @@ use POSIX;
 
 use IPC::Open3;
 
-$VERSION = 0.92;
+$VERSION = 0.94.0;
 
 my $INSTANCE;
 
@@ -488,6 +488,12 @@ sub do_check {
   my $entryname = $options->{ENTRYNAME};
   my $config    = $options->{CONFIG};
 
+  
+  if($options->{ENTRY}->{'location'} eq 'rootonly'){ 
+     CertNanny::Logging->debug("rootonly keystore no EE Certificate to parse"); 
+     return 1;
+  }  
+    
   $keystore->{CERT} = $instance->getCert();
   
   if (defined($keystore->{CERT})) {

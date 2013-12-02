@@ -19,6 +19,7 @@ use Data::Dumper;
 use IO::File;
 use File::Spec;
 use File::Copy;
+use POSIX;
 # use File::Basename;
 # use Data::Dumper;
 
@@ -282,41 +283,65 @@ sub installCert {
     return 0;
   }
    
-  if(defined $entry->{iis} && defined $entry->{iis}->{ipport}){
-  	CertNanny::Logging->debug("found app configuration $entry->{iis}->{appid} try to bind  certificate to port ". $entry->{iis}->{ipport});
-	my @netshdel 	= ('netsh','http', 'delete','sslcert', 'ipport='.$entry->{iis}->{ipport});
-	my $netshdel    = join(" ", @netshdel);
-	CertNanny::Logging->debug("netsh cmd: $netshdel");
-     
-  	if (CertNanny::Util->runCommand(\@netshdel)) {
-    	CertNanny::Logging->error("installCert(): failed to unbind https certificate.");
-    	#return undef;
-  	}
-  	
-  my @certutilpulse  = ('certutil','-pulse');
-  my $certutilpulse    = join(" ", @certutilpulse);
-  CertNanny::Logging->debug("certutil cmd: $certutilpulse");
-     
-    if (CertNanny::Util->runCommand(\@certutilpulse)) {
-      CertNanny::Logging->error("installCert(): failed to unbind https certificate.");
+  if((POSIX::uname())[2] ne "5.2"){
+    if(defined $entry->{iis} && defined $entry->{iis}->{ipport}){
+    CertNanny::Logging->debug("found app configuration for IIS 7 $entry->{iis}->{appid} try to bind  certificate to port ". $entry->{iis}->{ipport});
+  	my @netshdel 	= ('netsh','http', 'delete','sslcert', 'ipport='.$entry->{iis}->{ipport});
+  	my $netshdel    = join(" ", @netshdel);
+  	CertNanny::Logging->debug("netsh cmd: $netshdel");
+       
+    if (CertNanny::Util->runCommand(\@netshdel)) {
+      CertNanny::Logging->error("installCert(): failed to unbind https certificate for IIS7.");
       #return undef;
     }
-    	
+
+  	my @wincerthash = split(':', $certinfo->{CertificateFingerprint});
+  	my $hash = join('', @wincerthash);
+  	$hash = lc($hash);
   	
-  	
-	my @wincerthash = split(':', $certinfo->{CertificateFingerprint});
-	my $hash = join('', @wincerthash);
-	$hash = lc($hash);
-	
-	my @netsh      = ('netsh','http', 'add','sslcert', 'ipport='.$entry->{iis}->{ipport},'certhash="'. $hash. '"','appid="{' . $entry->{iis}->{appid} . '}"'); 
-    my $netsh      = join(" ", @netsh);
-    CertNanny::Logging->debug("netsh cmd: $netsh");
+  	my @netsh      = ('netsh','http', 'add','sslcert', 'ipport='.$entry->{iis}->{ipport},'certhash="'. $hash. '"','appid="{' . $entry->{iis}->{appid} . '}"'); 
+      my $netsh      = join(" ", @netsh);
+      CertNanny::Logging->debug("netsh cmd: $netsh");
+       
+    	if (CertNanny::Util->runCommand(\@netsh)) {
+      	CertNanny::Logging->error("installCert(): failed to register https certificate for IIS 7.");
+      	#return undef;
+    	}
+    } 
+    }else{
+      if(defined $entry->{iis} && defined $entry->{iis}->{ipport}){
+      CertNanny::Logging->debug("found app configuration for IIS6  $entry->{iis}->{appid} try to bind  certificate to port ". $entry->{iis}->{ipport});
+      #my @netshdel  = ('netsh','http', 'delete','sslcert', 'ipport='.$entry->{iis}->{ipport});
+      # httpcfg delete ssl -i 0.0.0.0:443     
+      my @netshdel  = ('httpcfg','delete','ssl', '-i' , '"'.$entry->{iis}->{ipport}.'"');
+      
+      my $netshdel    = join(" ", @netshdel);
+      CertNanny::Logging->debug("httpcfg cmd: $netshdel");
+         
+      if (CertNanny::Util->runCommand(\@netshdel)) {
+        CertNanny::Logging->error("installCert(): failed to unbind https certificate on IIS 6.");
+        #return undef;
+      }
+  
+      my @wincerthash = split(':', $certinfo->{CertificateFingerprint});
+      my $hash = join('', @wincerthash);
+      $hash = lc($hash);
+      
+      #my @netsh      = ('netsh','http', 'add','sslcert', 'ipport='.$entry->{iis}->{ipport},'certhash="'. $hash. '"','appid="{' . $entry->{iis}->{appid} . '}"'); 
+      my @netsh  = ('httpcfg','set', 'ssl','-i', '"'.$entry->{iis}->{ipport}.'"' ,'-h', '"'. $hash.'"','-g',  '"{'. $entry->{iis}->{appid}. '}"'); 
+    
+        my $netsh      = join(" ", @netsh);
+        CertNanny::Logging->debug("httpcfg cmd: $netsh");
+         
+        if (CertNanny::Util->runCommand(\@netsh)) {
+          CertNanny::Logging->error("installCert(): failed to register https certificate on IIS 6.");
+          #return undef;
+        }
+    } 
      
-  	if (CertNanny::Util->runCommand(\@netsh)) {
-    	CertNanny::Logging->error("installCert(): failed to register https certificate.");
-    	#return undef;
-  	}
-  }
+     
+     
+    }
 
   return $ret;
 } ## end sub installCert
