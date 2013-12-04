@@ -384,7 +384,7 @@ sub defaultOptions {
     }
     $macaddresses = substr($macaddresses, 0, -1);    #remove last ","
 
-    $monitor = lc($macaddresses) . '&cnversion=' . $CertNanny::VERSION;
+    $monitor = lc($macaddresses) . '&cnversion=' . "$CertNanny::VERSION";
     $monitor .= '&sysfqdn=' . Net::Domain::hostfqdn();
     $monitor .= '&sysname=' . (POSIX::uname())[0];
     $monitor .= '&sysrelease=' . (POSIX::uname())[2];
