@@ -1326,6 +1326,15 @@ is replaced with the new state. The following states are defined:
 
 =over
 
+=back
+
+=item keystore.LABEL.hook.notify.warnexpired 
+
+  Specifies an executable that is called when the certificate is expired and no
+  automatic renewal can be performed. 
+
+=over
+
 =item __NOTBEFORE__
 
 =item __NOTAFTER__ 
