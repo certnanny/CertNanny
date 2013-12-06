@@ -500,9 +500,10 @@ sub do_check {
     $keystore->{CERT}->{CERTINFO} = CertNanny::Util->getCertInfoHash(%{$keystore->{CERT}});
 
     if (!$instance->k_checkValidity(0)) {
-      CertNanny::Logging->error("Certificate has expired. No automatic renewal can be performed.");
+      CertNanny::Logging->error("Certificate has expired. No automatic renewal can be performed.");  
       CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "Check");
-      return 1;
+      return $instance->k_executeHook($config->get("keystore.$entryname.hook.warnexpired"));
+      #return 1;
     }
 
     if (!$instance->k_checkValidity($self->{ITEMS}->{$args{ENTRYNAME}}->{autorenew_days})) {
@@ -560,7 +561,7 @@ sub do_renew {
     if (!$instance->k_checkValidity(0)) {
       CertNanny::Logging->error("Certificate has expired. No automatic renewal can be performed.");
       CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "Renew");
-      return 1;
+      return $instance->k_executeHook($config->get("keystore.$entryname.hook.warnexpired"));
     }
   
     if (!$instance->k_checkValidity($self->{ITEMS}->{$entryname}->{autorenew_days})) {
