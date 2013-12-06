@@ -1400,7 +1400,7 @@ sub installRoots {
               # delete EE
               #pop(@$chainArrRef);
               # all others add to chainfile
-              while (my $cert = shift($chainArrRef)) {
+              while (my $cert = shift(@$chainArrRef)) {
                 CertNanny::Util->writeFile(DSTFILE => $tmpFile,
                                            SRCFILE => $cert->{CERTFILE}, 
                                            APPEND  => 1);
