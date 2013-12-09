@@ -32,7 +32,7 @@ use POSIX;
 
 use IPC::Open3;
 
-$VERSION = "0.94.2";
+$VERSION = "0.95.0";
 
 my $INSTANCE;
 
