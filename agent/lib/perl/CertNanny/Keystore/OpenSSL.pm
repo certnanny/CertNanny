@@ -160,12 +160,13 @@ sub new {
     #$self->{CERT} = $self->{INSTANCE}->getCert();
 
     my $chainfile = $config->get("keystore.$entryname.CAChain.GENERATED.File",      'FILE');
-    unless (-e $chainfile){
-     CertNanny::Logging->debug("Cert chain file defined but doesn not exist $chainfile , force generation");
+    if($chainfile ne ''){
+      unless (-e $chainfile){
+      CertNanny::Logging->debug("Cert chain file defined but doesn not exist $chainfile , force generation");
       $self->k_getCaCerts();
       $self->installCertChain();
+      }   
     }
-    
 
     # RETRIEVE AND STORE STATE
     # get previous renewal status
