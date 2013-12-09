@@ -25,21 +25,6 @@ use Time::Local;
 
 use MIME::Base64;
 
-eval "require Digest::SHA";
-if ($@) {
-  eval "require Digest::SHA1";
-  if ($@) {
-    print STDERR $@;
-    print STDERR "ERROR: Could not load Digest::SHA modul.\n";
-    return undef;
-  } else {
-    Digest::SHA1->import(qw(sha1_base64));
-  }
-} else {
-  Digest::SHA->import(qw(sha1_base64));
-}
-
-
 use Data::Dumper;
 
 use vars qw(@ISA @EXPORT @EXPORT_OK %EXPORT_TAGS $VERSION);
@@ -146,11 +131,9 @@ sub runCommand {
     
     if (($output =~ m/\A [[:ascii:]]* \Z/xms)) {
      	#CertNanny::Logging->debug("$output") if ($output);
-	}
-	else {
-	    #CertNanny::Logging->debug("---Binary Data---") if ($output);
-	}
-    
+    } else {
+      #CertNanny::Logging->debug("---Binary Data---") if ($output);
+    }
   }
     
   if ($args{WANTOUT}) {
@@ -528,6 +511,29 @@ sub _sanityCheckIn {
 }
 
 
+sub _sha1_base64 {
+  my $self = (shift)->getInstance();
+  my $data = shift;
+
+  my $sha;
+  my $tmpfile = CertNanny::Util->getTmpFile();
+  if (CertNanny::Util->writeFile(DSTFILE    => $tmpfile,
+                                 SRCCONTENT => $data)) {
+    my $openssl =$self->{CONFIG}->get('cmd.openssl', 'FILE');
+    if (defined($openssl)) {
+      my @cmd = (qq("$openssl"), 'dgst', '-sha', qq("$tmpfile"));
+      chomp($sha = CertNanny::Util->runCommand(\@cmd, WANTOUT => 1));
+      if ($sha =~ /^.*\)= (.*)$/) {
+        $sha = $1;
+      }
+    }
+    unlink($tmpfile);
+  }
+
+  return $sha;
+}
+
+
 sub getCertSHA1 {
   ###########################################################################
   #
@@ -561,15 +567,15 @@ sub getCertSHA1 {
     if (defined($self->{getCertSHA1}->{$args{$certType}})) {
       $rc = {CERTSHA1 => $self->{getCertSHA1}->{$args{$certType}}};
     } else {
-      if($cert = CertNanny::Util->convertCert(%args)) {
-        if ($sha = sha1_base64($$cert{CERTDATA})) {
+      if ($cert = CertNanny::Util->convertCert(%args)) {
+        if ($sha = $self->_sha1_base64($$cert{CERTDATA})) {
           $rc = {CERTSHA1 => $sha};
           $self->{getCertSHA1}->{$args{$certType}} = $sha;
         }
       }
     }
   }
-  
+
   return $rc;
 } ## end sub getCertSHA1
 

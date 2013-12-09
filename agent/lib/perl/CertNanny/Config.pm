@@ -41,22 +41,6 @@ use IO::File;
 use File::Basename;
 use File::Glob qw(:globally :case);
 
-
-eval "require Digest::SHA";
-if ($@) {
-  eval "require Digest::SHA1";
-  if ($@) {
-    print STDERR $@;
-    print STDERR "ERROR: Could not load Digest::SHA modul.\n";
-    return undef;
-  } else {
-    Digest::SHA1->import(qw(sha1_hex));
-  }
-} else {
-  Digest::SHA->import(qw(sha1_hex));
-}
-
-
 use Data::Dumper;
 
 use CertNanny::Util;
@@ -381,7 +365,6 @@ sub setFlag {
 #} ## end sub popConf
 
 
-
 sub _deepCopy {
   # recursively deep-copy a hash tree, NOT overwriting already existing
   # values in destination tree
@@ -409,6 +392,7 @@ sub _deepCopy {
   1;
 } ## end sub _deepCopy
 
+
 sub _deepForceCopy {
   # recursively deep-copy a hash tree, NOT overwriting already existing
   # values in destination tree
@@ -428,9 +412,6 @@ sub _deepForceCopy {
 
   1;
 } ## end sub _deepForceCopy
-
-
-
 
 
 sub _inheritConfig {
@@ -458,6 +439,7 @@ sub _inheritConfig {
 sub _parse {
   my $self = (shift)->getInstance();
 
+  my $rc = 1;
   # $self->{LOGBUFFER} = \my @dummy;
   $self->_parseFile();
 
@@ -472,9 +454,40 @@ sub _parse {
       $self->_inheritConfig($self->{CONFIG}->{$toplevel}, $entry);
     }
   }
+  
+  my $openssl = $self->get('cmd.openssl', 'FILE');
+  if (!defined $openssl) {
+    CertNanny::Logging->error("No openssl shell specified");
+    $rc = undef;
+  }
+  
+  if ($rc) {
+    foreach (keys %{$self->{CONFIGFILES}}) {
+      CertNanny::Logging->info("$_ SHA1: $self->{CONFIGFILES}{$_}");
+    }
+  }
 
-  1;
+  return $rc;
 } ## end sub _parse
+
+
+sub _sha1_hex {
+  my $self = (shift)->getInstance();
+  my $file = shift;
+  
+  return $self->{CONFIGFILES}{$file} if ($self->{CONFIGFILES}{$file});
+  
+  my $sha;
+  my $openssl = $self->get('cmd.openssl', 'FILE');
+  if (defined($openssl)) {
+    my @cmd = (qq("$openssl"), 'dgst', '-sha', qq("$file"));
+    chomp($sha = CertNanny::Util->runCommand(\@cmd, WANTOUT => 1));
+    if ($sha =~ /^.*\)= (.*)$/) {
+      $sha = $1;
+    }
+  }
+  return $sha;
+}
 
 
 sub _parseFile {
@@ -491,20 +504,11 @@ sub _parseFile {
 
   return undef if (!defined $handle);
 
-  # calculate SHA1
-  my $configFileSha = sha1_hex(<$handle>);
+  my ($configFileSha, $openssl);
 
-  # avoid double parsing
-  if (exists($self->{CONFIGFILES})) {
-    foreach (keys(%{$self->{CONFIGFILES}})) {
-      if ($configFile eq $_ || $configFileSha eq $self->{CONFIGFILES}{$_}) {
-        CertNanny::Logging->error("double configfile: $configFile SHA1: $configFileSha <> $_ SHA1: $self->{CONFIGFILES}{$_}");
-        return undef;
-      }
-    }
-  } else {
+  # Initialize Hash
+  if (!exists($self->{CONFIGFILES})) {
     $self->{CONFIGFILES} = \my %dummy;
-
     $self->{CFGMTIME} = (stat($configFile))[9];
 
     # set implicit defaults
@@ -516,10 +520,21 @@ sub _parseFile {
 
     # backward compatibility
     $self->{CONFIG}->{certmonitor} = $self->{CONFIG}->{keystore};
-  } ## end else [ if (exists($self->{CONFIGFILES...}))]
+  } ## end if (!exists($self->{CONFIGFILES...}))
 
+  CertNanny::Logging->debug("reading $configFile");
+
+  # avoid double parsing
+  $configFileSha = $self->_sha1_hex($configFile);
+  if (exists($self->{CONFIGFILES})) {
+    foreach (keys(%{$self->{CONFIGFILES}})) {
+      if ($configFile eq $_ || ($configFileSha && ($configFileSha eq $self->{CONFIGFILES}{$_}))) {
+        CertNanny::Logging->error("double configfile: $configFile SHA1: $configFileSha <> $_ SHA1: $self->{CONFIGFILES}{$_}");
+        return undef;
+      }
+    }
+  } ## end else [ if (exists($self->{CONFIGFILES...}))]
   $self->{CONFIGFILES}{$configFile} = $configFileSha;
-  CertNanny::Logging->info("reading $configFile SHA1: $self->{CONFIGFILES}{$configFile}");
 
   my $lnr = 0;
   seek $handle,0,0;
@@ -541,9 +556,11 @@ sub _parseFile {
         @configFileList = @{CertNanny::Util->fetchFileList($configFileGlob)};
       }
       foreach (@configFileList) {
+        # in case we did not define openssl up to now
+        $self->{CONFIGFILES}{$configFile} = $self->_sha1_hex($configFile);
         $self->_parseFile((fileparse($_))[1], $_);
       }
-   } elsif (/^\s*(.+?)\s*=\s*(\S.*?)\s*(\s#\s.*)?$/ || /^\s*(\S.*?)\s*=?\s*(\s#\s.*)?$/) {
+    } elsif (/^\s*(.+?)\s*=\s*(\S.*?)\s*(\s#\s.*)?$/ || /^\s*(\S.*?)\s*=?\s*(\s#\s.*)?$/) {
       my @path = split(/\./, $1);
       my ($val, $var);
       if (defined($2) && $2 !~ /^\s*#\s.*$/) {
@@ -578,6 +595,9 @@ sub _parseFile {
     }
   } ## end while (<$handle>)
   $handle->close();
+  
+  # in case we did not defien openssl up to now
+  $self->{CONFIGFILES}{$configFile} = $self->_sha1_hex($configFile);
 
   1;
 } ## end sub _parseFile
