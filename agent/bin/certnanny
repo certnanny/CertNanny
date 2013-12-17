@@ -20,7 +20,7 @@ use Data::Dumper;
 
 use FindBin;
 
-use lib "$FindBin::Bin/../lib/perl";
+use lib "$FindBin::RealBin/../lib/perl";
 
 use CertNanny;
 use CertNanny::Util;
