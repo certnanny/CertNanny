@@ -1155,7 +1155,7 @@ sub fetchFileList {
           closedir(DIR);
         }
       } else {
-        CertNanny::Logging->debug("What the fuck is that: $item");
+        CertNanny::Logging->debug("Item is empty, does not exist or is binary (possible misconfiguration): $item");
       }
     }
   } ## end foreach my $item (@myList)
