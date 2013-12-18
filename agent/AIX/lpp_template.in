@@ -17,7 +17,6 @@ Fileset
     /opt/CertNanny/LICENSE.CertNanny
     /opt/CertNanny/QUICKSTART
     /opt/CertNanny/bin/certnanny
-    /var/CertNanny/etc/certnanny.cfg
     /var/CertNanny/etc/Keystore-DEFAULT.cfg
     /var/CertNanny/etc/Keystore-Java.cfg
     /var/CertNanny/etc/Keystore-MQ.cfg
