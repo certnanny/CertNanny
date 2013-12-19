@@ -33,9 +33,8 @@ make
 
 %install
 mkdir -p $RPM_BUILD_ROOT
-mkdir -p $RPM_BUILD_ROOT/usr/lib/perl5/site_perl/
-#tar -C lib/perl -c -f - . | tar -C $RPM_BUILD_ROOT/usr/lib/perl5/site_perl/ -x -v -f -
-tar -C lib/perl -c -f - --exclude=DAEMON.PM --exclude=daemon.DLL . | tar -C $RPM_BUILD_ROOT/usr/lib/perl5/site_perl/ -x -v -f -
+mkdir -p $RPM_BUILD_ROOT/opt/CertNanny/lib/perl/
+tar -C lib/perl -c -f - --exclude=DAEMON.PM --exclude=daemon.DLL . | tar -C $RPM_BUILD_ROOT/opt/CertNanny/lib/perl/ -x -v -f -
 mkdir -p $RPM_BUILD_ROOT/var/CertNanny/state
 mkdir -p $RPM_BUILD_ROOT/var/CertNanny/AuthoritativeRootcerts
 mkdir -p $RPM_BUILD_ROOT/var/CertNanny/etc
@@ -44,7 +43,7 @@ mkdir -p $RPM_BUILD_ROOT/var/CertNanny/quarantine
 mkdir -p $RPM_BUILD_ROOT/var/CertNanny/tmp
 install -D -m 755 bin/certnanny $RPM_BUILD_ROOT/opt/CertNanny/bin/certnanny
 install -D -m 644 certnanny.1.gz $RPM_BUILD_ROOT/usr/share/man/man1/certnanny.1.gz
-install -D -m 644 lib/java/ExtractKey.jar $RPM_BUILD_ROOT/opt/CertNanny/lib/certnanny/java/ExtractKey.jar
+install -D -m 644 lib/java/ExtractKey.jar $RPM_BUILD_ROOT/opt/CertNanny/lib/java/ExtractKey.jar
 install -D -m 644 etc/Keystore-Java.cfg $RPM_BUILD_ROOT/var/CertNanny/etc/Keystore-Java.cfg
 install -D -m 644 etc/Keystore-PKCS12.cfg $RPM_BUILD_ROOT/var/CertNanny/etc/Keystore-PKCS12.cfg
 install -D -m 644 etc/certreq.inf $RPM_BUILD_ROOT/var/CertNanny/etc/certreq.inf
@@ -64,9 +63,9 @@ rm -rf $RPM_BUILD_ROOT
 
 /opt/CertNanny/bin/certnanny
 /usr/share/man/man1/certnanny.1.gz
-/opt/CertNanny/lib/certnanny/java/ExtractKey.jar
-/usr/lib/perl5/site_perl/CertNanny.pm
-/usr/lib/perl5/site_perl/CertNanny
+/opt/CertNanny/lib/java/ExtractKey.jar
+/opt/CertNanny/lib/perl/CertNanny.pm
+/opt/CertNanny/lib/perl/CertNanny
 /var/CertNanny/etc/Keystore-Java.cfg
 /var/CertNanny/etc/Keystore-PKCS12.cfg
 /var/CertNanny/etc/certreq.inf
