@@ -33,7 +33,6 @@ f none /opt/CertNanny/lib/perl/CertNanny/HSM/Utimaco.pm 0644 root root
 f none /opt/CertNanny/lib/perl/CertNanny/Logging.pm 0644 root root
 d none /var/CertNanny 0755 root root
 d none /var/CertNanny/etc 0755 root root
-f none /var/CertNanny/etc/certnanny.cfg 0644 root root
 f none /var/CertNanny/etc/Keystore-DEFAULT.cfg 0644 root root
 f none /var/CertNanny/etc/Keystore-Java.cfg 0644 root root
 f none /var/CertNanny/etc/Keystore-MQ.cfg 0644 root root
