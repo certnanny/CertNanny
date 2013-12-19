@@ -15,6 +15,6 @@ tar cf - lib | (cd opt/CertNanny; tar xf -)
 #ts=$(date +'%Y%m%d%H%M%S')
 version=$(head -n 1 VERSION)
 version="$version.0"
-sed "s/VERSIONINFO/$version/" < AIX/lpp_template.in > AIX/lpp_template
+sed "s/VERSIONINFO/$version/" < AIX/lpp_template.in | sed "s#__PACKAGINGDIR__#$PWD#" > AIX/lpp_template
 mkinstallp -d . -T AIX/lpp_template
 
