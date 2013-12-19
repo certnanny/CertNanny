@@ -5,6 +5,7 @@ d none /opt/CertNanny/bin 0755 root root
 f none /opt/CertNanny/COPYRIGHT.CertNanny 0644 root root
 f none /opt/CertNanny/QUICKSTART 0644 root root
 f none /opt/CertNanny/bin/certnanny 0755 root root
+s none /usr/bin/certnanny=/opt/CertNanny/bin/certnanny
 d none /opt/CertNanny/lib 0755 root root
 d none /opt/CertNanny/lib/java 0755 root root
 f none /opt/CertNanny/lib/java/ExtractKey.jar 0644 root root
