@@ -53,6 +53,8 @@ install -D -m 644 etc/Keystore-DEFAULT.cfg $RPM_BUILD_ROOT/var/CertNanny/etc/Key
 install -D -m 644 etc/Keystore-Windows.cfg $RPM_BUILD_ROOT/var/CertNanny/etc/Keystore-Windows.cfg
 install -D -m 644 etc/Keystore-OpenSSL-PKCS8.cfg $RPM_BUILD_ROOT/var/CertNanny/etc/Keystore-OpenSSL-PKCS8.cfg
 install -D -m 644 etc/certnanny-Master.cfg $RPM_BUILD_ROOT/var/CertNanny/etc/certnanny-Master.cfg
+mkdir -p $RPM_BUILD_ROOT/usr/bin
+/bin/ln -fs ../../opt/CertNanny/bin/certnanny $RPM_BUILD_ROOT/usr/bin/certnanny
 
 %clean
 rm -rf $RPM_BUILD_ROOT
@@ -61,6 +63,7 @@ rm -rf $RPM_BUILD_ROOT
 %defattr(-,root,root)
 %doc README INSTALL QUICKSTART FAQ LICENSE ChangeLog
 
+/usr/bin/certnanny
 /opt/CertNanny/bin/certnanny
 /usr/share/man/man1/certnanny.1.gz
 /opt/CertNanny/lib/java/ExtractKey.jar

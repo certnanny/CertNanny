@@ -9,6 +9,10 @@ Fileset
   License agreement acceptance required: N
   Include license files in this package: N
   Requisites:
+  USRLIBLPPFiles
+    Post-installation Script: __PACKAGINGDIR__/AIX/certnanny.post-install.sh
+    Pre-deinstall Script: __PACKAGINGDIR__/AIX/certnanny.pre-deinstall.sh
+  EOUSRLIBLPPFiles
   USRFiles
     /opt/CertNanny
     /opt/CertNanny/bin
