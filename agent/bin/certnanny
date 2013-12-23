@@ -92,8 +92,8 @@ foreach my $cmd (@ARGV) {   # command line parameters are already stripped off. 
       my $sleep = $cmdLineParam{sleep} || 300;
       my $servicepath     = File::Spec->catfile($FindBin::Bin, $FindBin::Script);
       my $executable_name = $EXECUTABLE_NAME;
-      print "Executable name:".  $EXECUTABLE_NAME ."\n" ;
-      print "serivcepath:" . $servicepath."\n" ;
+      print "Executable name:" .  $EXECUTABLE_NAME . "\n" ;
+      print "Service path:" . $servicepath . "\n" ;
       if ($servicepath =~ /\w+\.exe/) {
         $executable_name = $servicepath;
       }
@@ -103,7 +103,7 @@ foreach my $cmd (@ARGV) {   # command line parameters are already stripped off. 
       }
     
       $params_str = qq{$params_str --cfg "$cfgpath" --sleep $sleep};
-        print "param str: " .$params_str ."\n" ;
+        print "Param str: " . $params_str . "\n" ;
       my $ret = Win32::Daemon::CreateService({machine     => '',
                                               name        => $servicename,
                                               display     => $servicename,
@@ -217,7 +217,7 @@ if ($OSNAME eq 'MSWin32') {
       $PrevState = SERVICE_RUNNING();
       next;
     } elsif (SERVICE_STOP_PENDING() == $State) {
-      print "service stop pending\n";
+      print "Service stop pending\n";
       Win32::Daemon::State(SERVICE_STOPPED());
       next;
     } elsif (SERVICE_PAUSE_PENDING() == $State) {
@@ -233,7 +233,7 @@ if ($OSNAME eq 'MSWin32') {
       $PrevState = SERVICE_RUNNING();
       next;
     } elsif (SERVICE_STOP_PENDING() == $State) {
-      print "service stop pending\n";
+      print "Service stop pending\n";
       # "Stopping...";
       Win32::Daemon::State(SERVICE_STOPPED());
       $PrevState = SERVICE_STOPPED();
@@ -339,22 +339,27 @@ certnanny --cfg=<configfile> [options] <action>
     
 Options:
 
-  --help            brief help message
-  --man             full documentation
+  --help               brief help message
+  --man                full documentation
 
-  --cfg             specify config file to use
-  --challengepassword   specify a challenge password to use for a initial enrollment (all keystores)
-  --win_user        specify alternative Windows username to run the Windows Service
-  --win_password    specify password corresponding to win_user
+  --cfg                specify config file to use
+  --challengepassword  specify a challenge password to use for an
+                       initial enrollment (all keystores)
+  --win_user           specify alternative Windows username to run the 
+                       Windows Service
+  --win_password       specify password corresponding to win_user
 
 Actions:
 
-  check             Check all configured keystores
-  renew             Run automatic renewal on all configured keystores
-  enroll            Run inital enrollment for configured keystores that do NOT have a certificate installed.
-  updateRootCA      Run trusted root CA certificate update via SCEP 
-  install           Install CertNanny as a Windows Service (applicable only on Windows platforms)
-  uninstall         Uninstall CertNanny service (applicable only on Windows platforms)
+  check                Check all configured keystores
+  renew                Run automatic renewal on all configured keystores
+  enroll               Run inital enrollment for configured keystores 
+                       that do NOT have a certificate installed.
+  updateRootCA         Run trusted root CA certificate update via SCEP 
+  install              Install CertNanny as a Windows Service (applicable
+                       only on Windows platforms)
+  uninstall            Uninstall CertNanny service (applicable only on 
+                       Windows platforms)
     
 =head1 OPTIONS
 
@@ -388,8 +393,8 @@ is within the configured warning interval.
 Obtain new Root CA certifcates and install into the configured 
 keystore.DEFAULT.TrustedRootCA.AUTHORITATIVE.Directory . 
 Synchronize keystores configured 
-with all RootCA Certificates in a given keystore. If 
-s.th. is missing it is added. If Keystore contains root CAs not found in 
+with all Root CA Certificates in a given keystore. If 
+anything is missing it is added. If the keystore contains Root CAs not found in 
 keystore.DEFAULT.TrustedRootCA.AUTHORITATIVE.Directory they will be deleted. 
 
 =item B<renew>
@@ -404,74 +409,97 @@ If a initial enrollment configuration is found, certnanny will try to request a 
  
 Check the configured keystores for inital enrollment configuration.
 If no certificate is found, run inital enrollment via the configured method. 
-If a initialenroll configuration is found it will also be run with the renew command.
+If an initialenroll configuration is found it will also be run with the renew command.
 
-The mendatory configuration is: 
-keystore.(keystorename).initialenroll.auth.mode =  [anonymous|password|certificate]
-keystore.(keystorename).initialenroll.profile = e.g. TLS Client and TLS Server 
-keystore.(keystorename).initialenroll.subject = CN=test.domain.com,OU=Nanny, O=NannyLand, C=DE
+The mandatory configuration is: 
+
+  keystore.(keystorename).initialenroll.auth.mode =  [anonymous|password|certificate]
+  keystore.(keystorename).initialenroll.profile = e.g. TLS Client and TLS Server 
+  keystore.(keystorename).initialenroll.subject = CN=test.domain.com, OU=Nanny, O=NannyLand, C=DE
 
 you may specify additional subject alternative names to be added to the CSR data:
-keystore.(keystorename).initialenroll.san.1 = DNS:test.domain.com:Cert1
-keystore.(keystorename).initialenroll.san.2 = DNS:test2.domain.com:Cert1
+
+  keystore.(keystorename).initialenroll.san.1 = DNS:test.domain.com:Cert1
+  keystore.(keystorename).initialenroll.san.2 = DNS:test2.domain.com:Cert1
 
 There are 3 possible initial enrollemnt methods that are configured with 
-keystore.(keystorename).initialenroll.auth.mode =  [anonymous|password|certificate]
+
+  keystore.(keystorename).initialenroll.auth.mode =  [anonymous|password|certificate]
 
 1. Authmode [certificate]
 
-Enrollment on behalf with a SCEP client certificate (currently only implemented):
+Enrollment on behalf with a SCEP client certificate (currently only implemented method):
  
-keystore.(keystorename).initialenroll.auth.mode = certificate
-keystore.(keystorename).initialenroll.auth.cert = $(prefixcfg)/enrollSCEP.pem
-keystore.(keystorename).initialenroll.auth.key = $(prefixcfg)/com_scepclient_key.pem
-keystore.(keystorename).initialenroll.auth.pin = PIN
+  keystore.(keystorename).initialenroll.auth.mode = certificate
+  keystore.(keystorename).initialenroll.auth.cert = $(prefixcfg)/enrollSCEP.pem
+  keystore.(keystorename).initialenroll.auth.key = $(prefixcfg)/com_scepclient_key.pem
+  keystore.(keystorename).initialenroll.auth.pin = PIN
 
 2. Authmode [anonymous]
-Enrollment with a selfsigned certificate (annonymus enrollment)
+Enrollment with a selfsigned certificate (anonymous enrollment):
 
-keystore.(keystorename).initialenroll.auth.mode =  anonymous
-keystore.(keystorename).initialenroll.profile = e.g. TLS Client and TLS Server 
-keystore.(keystorename).initialenroll.subject = CN=test.domain.com,OU=Nanny, O=NannyLand, C=DE
+  keystore.(keystorename).initialenroll.auth.mode =  anonymous
+  keystore.(keystorename).initialenroll.profile = e.g. TLS Client and TLS Server 
+  keystore.(keystorename).initialenroll.subject = CN=test.domain.com, OU=Nanny, O=NannyLand, C=DE
 
-you may specify additional subject alternative names to be added to the CSR data:
-keystore.(keystorename).initialenroll.san.1 = DNS:test.domain.com:Cert1
-keystore.(keystorename).initialenroll.san.2 = DNS:test2.domain.com:Cert1
+You may specify additional subject alternative names to be added to the CSR data:
+
+  keystore.(keystorename).initialenroll.san.1 = DNS:test.domain.com:Cert1
+  keystore.(keystorename).initialenroll.san.2 = DNS:test2.domain.com:Cert1
 
 3. Authmode [password]
-The challenge password can be placed in the config: 
-keystore.(keystorename).initialenroll.auth.challengepassword = CHALLANGE
-or as a comand line parameter: 
 
---challengepassword CHALLANGE 
-Will set the CHALLANGE globaly for every configured initial enroll keystore.
-Will be overwirtten by a config value. 
-keystore.(keystorename).initialenroll.auth.challengepassword = CHALLANGE
+The challenge password can be placed in the config: 
+
+  keystore.(keystorename).initialenroll.auth.challengepassword = CHALLENGE
+
+or as a command line parameter: 
+
+  --challengepassword CHALLENGE 
+
+Will set the CHALLENGE globally for every configured initial enroll keystore.
+Will be overwritten by a config value. 
+
+  keystore.(keystorename).initialenroll.auth.challengepassword = CHALLENGE
 
 =item B<updateRootCA>
-If the SCEP server supports the SCEPs getnextcacert operation this feature allows to automatically que next Root CA certificates. 
-In order to use this feature a root CA certificate dir must be configured ! instead of explicit root CA files. 
-If rootcaupdate is enabled it will be envoked before each renew, or for root only keystores with the updateRootCA command. 
+
+If the SCEP server supports the SCEP GetNextCACert operation this feature allows to 
+automatically obtain the next Root CA certificate and queue it for installation. 
+In order to use this feature a Root CA certificate B<directory> must be configured 
+instead of explicit Root CA B<files>.
+
+If rootcaupdate is enabled it will be implicitly invoked before each renew. Root 
+only keystores can be explicitly updated with the updateRootCA command. 
 
 Required configuration:
-keystore.DEFAULT.TrustedRootCA.AUTHORITATIVE.Directory 
-#Enable Automatic root CA update via SCEP  (required)
-keystore.DEFAULT.rootcaupdate.enable = true
 
-#Directory to quarantine new root CA certificates (required)
-keystore.DEFAULT.rootcaupdate.quarantinedir = .../quarantineRootCerts
+  keystore.DEFAULT.TrustedRootCA.AUTHORITATIVE.Directory 
+  # Enable Automatic root CA update via SCEP  (required)
+  keystore.DEFAULT.rootcaupdate.enable = true
 
-#Quarantinetime in days (required)
-keystore.DEFAULT.rootcaupdate.quarantinetime = 90 
+  # Directory to quarantine new root CA certificates (required)
+  keystore.DEFAULT.rootcaupdate.quarantinedir = .../quarantineRootCerts
 
-# Accepted Signer certificate Regex (required)
-# In order to prevent spoofing attacks it is required to supply a regular expersian that will be matched against the signer certificates subject and issuerName. 
-keystore.DEFAULT.rootcaupdate.signerSubjectRegex =  .*:scep$
-keystore.DEFAULT.rootcaupdate.signerIssuerSubjectRegex =  .* Issuer CA.*
+  # Quarantinetime in days (required)
+  keystore.DEFAULT.rootcaupdate.quarantinetime = 90 
+
+  # Accepted Signer certificate Regex (required)
+  # In order to prevent spoofing attacks it is required to supply a regular 
+  # expression that will be matched against the signer certificates subject 
+  # and issuerName. 
+  keystore.DEFAULT.rootcaupdate.signerSubjectRegex =  .*:scep$
+  keystore.DEFAULT.rootcaupdate.signerIssuerSubjectRegex =  .* Issuer CA.*
+
 
 =item B<install>
 
-Install CertNanny as a Win32 Service. CertNanny will appear on the Windows Services list and can now be started, restarted or stopped. After installing, CertNanny Service has to be started manually or gets started automatically after reboot. As a windows service, CertNanny runs only in renew mode.
+Installs CertNanny as a Win32 Service. CertNanny will appear on the Windows Services 
+list and can now be started, restarted or stopped. 
+The CertNanny Service is not automatically started immediately after installation, it
+needs to be started manually. However, the service gets started automatically after a reboot. 
+
+As a windows service, CertNanny runs in renew mode only.
 
 =item B<uninstall>
 
@@ -492,7 +520,7 @@ CertNanny
 
 Automatic renewal for X509v3 certificates using SCEP
 
-Copyright (c) 2005, 2006 Martin Bartosch <m.bartosch@cynops.de>
+Copyright (c) 2005 - 2013 Martin Bartosch <m.bartosch@cynops.de>
 
 CertNanny implements a framework for certificate renewal automation.
 
@@ -941,7 +969,10 @@ any)
 
 =item *
 
-IMPORTANT: define at least one Root Certificate to use in your setup:
+IMPORTANT: define at least one Root Certificate to use in your setup.
+
+=item *
+
 IMPORTANT: if you plan to automatically update root CAs via SCEP make this a directory! 
 keystore.DEFAULT.TrustedRootCA.AUTHORITATIVE.Directory = ...
 
@@ -1044,25 +1075,31 @@ Default: CertNanny
 
 =item platform.windows.serviceinterval
 
-Sets the time frame for starting the renewal process in seconds (optional). Should be set to at least one day (86400 seconds).
+Sets the time frame for starting the renewal process in seconds (optional). 
+Should be set to at least one day (86400 seconds).
 
 Default: 86400 
 
 =item randomWait (optional)
 
 Sets a random backoff time before starting the renewal. If defined conditionalwait will be prioritized and evaluated first. 
-Example: 
-	 randomwait =  90  will force a random backoff time of N between 0 and 90 seconds. 
 
-=item conditionalwait
+Example: 
+
+  randomwait =  90  will force a random backoff time of N between 0 and 90 seconds. 
+
+=item conditionalwait.time, conditionalwait.start, conditionalwait.end (optional)
 
 Sets a conditional random backoff time before starting the renewal between HHMMSS  - HHMMSS. 
-It is posible to define a longer backofftime to be used at night as example. Outside the defined period randomwait will be used if defined. 
+For example this makes it possible to define a longer backoff time to be used during night hours.
+
+Outside the defined period randomwait will be used if defined. 
 
 Example: 
-conditionalwait.time = 50
-conditionalwait.start =  080000   #this would be 8 am 
-conditionalwait.end  =   140000		#this is 2 pm
+
+  conditionalwait.time  = 50
+  conditionalwait.start = 080000   # this would be 8 am 
+  conditionalwait.end   = 140000   # this is 2 pm
 
 =back
 
@@ -1161,19 +1198,49 @@ URL of the SCEP Server to use
 
 Example: http://scep.ca.example.com/cgi-bin/scep
 
+=item keystore.LABEL.enroll.sscep.monitorSysInfo
 
-=item keystore.LABEL.enroll.sscep.monitorSysInfo 
-Per default this informastion will be send via a get parameter to the SCEP server:
+Send system information to the SCEP server as additional GET parameters.
+This is not part of the SCEP standard, but should not affect standard compliant
+SCEP servers which do not support this extension.
 
-All found macaddresses in macaddress=[,seperated list]
-CertNanny Version in cnversion=string
-System FQDN from Net::Domain::hostfqdn in sysfqdn
-System name from POSIX:uname()[0]in sysname
+To disable this feature set 
+
+  keystore.LABEL.enroll.sscep.monitorSysInfo = no
+
+Default: yes
+
+The following information will be sent via a GET parameter to the SCEP server:
+
+=over 4
+
+=item macaddress=MAC[,MAC...]
+
+All found MAC addresses of the host (returned as a comma separated list of lower case
+hex bytes, separated by colons). 
+
+=item cnversion=VERSION
+
+CertNanny Version
+
+=item sysfqdn=FQDN
+
+System Fully Qualified Domain Name from Net::Domain::hostfqdn
+
+=item sysname=NAME
+
+System name from POSIX:uname()[0]
+
+=item sysrelease=RELEASE
+
 System release from POSIX:uname()[2] in sysrelease
-System architecture from POSIX:uname()[4] in sysarch
 
-to disable this feature set 
-keystore.LABEL.enroll.sscep.monitorSysInfo = no ; (yes is default)
+=item sysarch=ARCH
+
+System architecture from POSIX:uname()[4]
+
+=back
+
 
 =item keystore.LABEL.scepcertdir
 
@@ -1458,8 +1525,8 @@ Example:
 =item keystore.LABEL.TrustedRootCA.AUTHORITATIVE.Directory 
 
 This is a directory for Root CA certificates that are evaluated when 
-renewing a certificate. This is also the directory where new root CA will be installed 
-if root CA update is enabled.      
+renewing a certificate. This is also the directory where new Root CA will be installed 
+if Root CA update is enabled.
 
 =item keystore.LABEL.cacertformat
 
@@ -1477,16 +1544,19 @@ Example:
 
 =item keystore.LABEL.TrustedRootCA.GENERATED.Directory
 
-This setting is optinal to generate a OpenSSL style root CA directory. 
-CertNanny will either copy root CAs found in 
- keystore.LABEL.TrustedRootCA.AUTHORITATIVE.Directory 
- or on UNIX systems set links to the found certificates. 
- For each certificate 2 links (or copys) are created as expected by openSSL
- subject hash folowed by a incremented number if more then one is found. (e.g. 9fb3cb0b.0)
- One link is using a md5 due to compatibility with oder OpenSSL version, 
- the 2nd link is based on a sha1 hash of the cert subject.  
+This setting is optional to generate a OpenSSL style Root CA directory. 
+CertNanny will either copy Root CAs found in 
+
+  keystore.LABEL.TrustedRootCA.AUTHORITATIVE.Directory 
+
+or create links (only available on Unix systems) to the found certificates. 
+
+For each certificate 2 links (or copies) are created as expected by OpenSSL
+subject hash followed by a incremented number if more then one is found. (e. g. 9fb3cb0b.0)
+One link is using a MD5 due to compatibility with oder OpenSSL version, 
+the 2nd link is based on a SHA1 hash of the cert subject.  
  
-Certs or links in this directory will be syncronised with AUTHORITATIVE.Directory certificates. 
+Certificates or links in this directory will be synchronised with AUTHORITATIVE.Directory certificates. 
 
 Default: none
 
@@ -1495,36 +1565,44 @@ Example:
 
 =item keystore.LABEL.TrustedRootCA.GENERATED.File
 
-This setting is only optional to generate a concatenated root CA file containing
-alls root CA certificates found in 
-keystore.LABEL.TrustedRootCA.AUTHORITATIVE.Directory . 
+This optional setting allows to generate a concatenated Root CA file containing
+all Root CA certificates found in 
 
-Certs in this file will be syncronised with AUTHORITATIVE.Directory certificates. 
+  keystore.LABEL.TrustedRootCA.AUTHORITATIVE.Directory
+
+Certificates in this file will be synchronised with AUTHORITATIVE.Directory certificates. 
 
 Example: 
-    keystore.LABEL.TrustedRootCA.GENERATED.File = /etc/apache/ssl.crt/rootCAs.pem
+
+  keystore.LABEL.TrustedRootCA.GENERATED.File = /etc/apache/ssl.crt/rootCAs.pem
 
 =item keystore.LABEL.TrustedRootCA.GENERATED.ChainFile  
 
-This setting is only optional to generate a concatenated root CA file containing
-alls root CA certificates found in 
-keystore.LABEL.TrustedRootCA.AUTHORITATIVE.Directory and additonal certificate chain CAs 
+This optional setting instructs CertNanny to generate a concatenated Root CA file containing
+alls Root CA certificates found in 
 
-Certs in this file will be syncronised with AUTHORITATIVE.Directory certificates. 
+  keystore.LABEL.TrustedRootCA.AUTHORITATIVE.Directory
+
+and additonal certificate chain CAs. 
+
+Certificates in this file will be synchronised with AUTHORITATIVE.Directory certificates. 
 
 Example: 
-    keystore.LABEL.TrustedRootCA.GENERATED.ChainFile = /etc/apache/ssl.crt/rootCAs.pem
+
+  keystore.LABEL.TrustedRootCA.GENERATED.ChainFile = /etc/apache/ssl.crt/rootCAs.pem
 
 =item keystore.LABEL.CAChain.GENERATED.File   
 
-This setting is only optional to generate a concatenated ca chain file containing
-the certificates issuing CA up to the root CA cert which has to be trusted in: 
-keystore.LABEL.TrustedRootCA.AUTHORITATIVE.Directory
+This optional setting is used to generate a concatenated CA chain file containing
+the certificates of the issuing CA up to the Root CA cert which has to be trusted in: 
 
-This chain file is generated if it does not exists or when the certificate is renewed. 
+  keystore.LABEL.TrustedRootCA.AUTHORITATIVE.Directory
+
+This chain file is generated if it does not exists or when the certificate is renewed.
 
 Example: 
-    keystore.LABEL.CAChain.GENERATED.File    = /etc/apache/ssl.crt/mychainfile.pem
+
+  keystore.LABEL.CAChain.GENERATED.File    = /etc/apache/ssl.crt/mychainfile.pem
 
 
 =back
@@ -1681,11 +1759,14 @@ Windows keystore description
 
 =item keystore.LABEL.location
 
-Mandatory, specifies the Distinguished Name of a certificate in the Windows keystore, which shall be monitored/renewed. Only one certificate with the specified DN may be present in the store.
+Mandatory, specifies the Distinguished Name of a certificate in the Windows keystore
+which shall be monitored/renewed. Only one certificate with the specified DN may be 
+present in the store.
 
 Example: 
-    CN=www.example.com,O=Example Ltd.,DC=example,DC=com
-    keystore.LABEL.location = www.example.com
+
+  CN=www.example.com,O=Example Ltd.,DC=example,DC=com
+  keystore.LABEL.location = www.example.com
 
 =item keystore.LABEL.type
 
@@ -1712,17 +1793,18 @@ Limitations:
 If there are two or more identical certificates in the certificate store, the renewal process
 will not work and one of the certificates has to be removed manually. 
 
-Multiple certificates are supported but the CN part of the certificates have to differ so a substring of the CN gives a unique result. 
+Multiple certificates are supported but the CN part of the certificates have to differ so a 
+substring of the CN gives a unique result. 
 
 OK: 
-	CN=www.example.com:cert1,O=Example Ltd.,DC=example,DC=com
-	
-	CN=www.example.com:cert2,O=Example Ltd.,DC=example,DC=com
+
+  CN=www.example.com:cert1,O=Example Ltd.,DC=example,DC=com
+  CN=www.example.com:cert2,O=Example Ltd.,DC=example,DC=com
 	
 Buggy:
-	CN=www.example.com:cert,O=Example Ltd.,DC=example,DC=com
-	
-	CN=www.example.com:cert2,O=Example Ltd.,DC=example,DC=com
+
+  CN=www.example.com:cert,O=Example Ltd.,DC=example,DC=com
+  CN=www.example.com:cert2,O=Example Ltd.,DC=example,DC=com
 	
 =back
 
@@ -1766,6 +1848,7 @@ identifier listed in 'Web Sites' in your IIS Manager. If you want to install the
 multiple instances, please provide a comma separated list.
 
 Example:
+
     1,2,12440
 
 Default: 1
@@ -1778,7 +1861,7 @@ Limitations:
 
 =item
 
-The key must be exportable and strong private key protection may not be enabled.
+The key must be exportable and strong private key protection must not be enabled.
 
 =item 
 
@@ -1918,73 +2001,5 @@ New certificate chain inserted into the keystore is currently not
 cryptographically verified
 
 =back
-
-=head1 B Ideas for enhancement
-
-=head2 B.1 Automatic approval (already implemented)
-
-=head2 B.2 Implicit load balancing on PKI and LDAP
-
-Postpone each request scheduled by cron by a random amount of time
-(e. g. 0 - 6 hours) to reduce load on the PKI and LDAP systems.
-
-
-=head2 B.3 Automatic root certificate deployment
-
-Use CertNanny to retrieve PKI root certificates e. g. via LDAP.
-This process is optional, completely asynchronous and independent
-from certificate renewal.
-
-=over
-
-=item
-
-On each invocation poll LDAP directory for new root certificates
-
-=item
-
-If a new root cert is found, download it and store it in a
-temporary directory. Record the timestamp of the first occurrance
-of this certificate
-
-=item
-
-After a configurable amount of "quarantine" time (e. g. 10 days)
-the process is repeated. If the same root certificate is still
-persistent in the directory, the new root certificate is accepted as
-valid and installed to the client system. Otherwise the rogue
-certificate is discarded and an error is raised.
-
-=back
-
-This assumes that a fake root certificate in the LDAP directory is
-noticed within a few hours or days by the PKI group and removed from
-the directory. If a certificate has been in the directory for e. g.
-10 days, the observing clients can be sure that it is a correct and
-valid certificate.
-
-A central monitoring script in the PKI should do the following:
-
-=over
-
-=item
-
-On each invocation poll each LDAP directory server (all replicas
-available in the network) for all root certificates.
-
-=item
-
-Verify every root certificate found against the own list of
-trusted root certificates
-
-=item
-
-Raise a monitoring alarm if a rogue certificate was found
-
-=back
-
-PKI and LDAP operating staff are expected to remove the rogue
-certificate within a period less than the minimum "quarantine" time
-configured on the end entity systems.
 
 =cut
