@@ -227,7 +227,7 @@ sub getCA {
       CertNanny::Logging->debug("Unlinking $file");
       unlink $file;
       if (-e $file) {
-        CertNanny::Logging->error("could not delete CA certificate file $file, cannot proceed");
+        CertNanny::Logging->error("Could not delete CA certificate file $file, cannot proceed");
         return undef;
       }
       $ii++;
@@ -310,7 +310,7 @@ sub getNextCA {
   $self->writeConfigFile();
 
   if ($self->execute("getnextca") != 0) {
-    CertNanny::Logging->debug("error executing CertNanny::Enroll::Scep::getNextCA - may no be available at this time or not supported by target SCEP server");
+    CertNanny::Logging->debug("error executing CertNanny::Enroll::Scep::getNextCA - may be unavailable currently or not supported by target SCEP server");
     return undef;
   }
 

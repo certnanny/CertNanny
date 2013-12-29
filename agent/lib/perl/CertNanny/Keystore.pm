@@ -1038,9 +1038,9 @@ sub k_getNextTrustAnchor {
       # character if it is not escaped with a \ (negative look-behind)
       my @RDN = split(/(?<!\\),\s*/, $signerCertificate->{SubjectName});
       if ($RDN[0] =~ $entry->{rootcaupdate}->{signerSubjectRegex}) {
-        CertNanny::Logging->debug("Subject signer check successful " . $RDN[0]);
+        CertNanny::Logging->debug("Subject signer check successful: " . $RDN[0]);
       } else {
-        $rc = CertNanny::Logging->error("Subject signer check failed new root CA cert WILL NOT BE ACCEPTED" . $RDN[0]);
+        $rc = CertNanny::Logging->error("Subject signer check failed, new root CA cert WILL NOT BE ACCEPTED: " . $RDN[0]);
       }
 
       if (!$rc) {
@@ -1049,16 +1049,16 @@ sub k_getNextTrustAnchor {
         # character if it is not escaped with a \ (negative look-behind)
         my @IRDN = split(/(?<!\\),\s*/, $signerCertificate->{IssuerName});
         if ($IRDN[0] =~ $entry->{rootcaupdate}->{signerIssuerSubjectRegex}) {
-          CertNanny::Logging->debug("signer certificate issuer subject check successful " . $IRDN[0]);
+          CertNanny::Logging->debug("signer certificate issuer subject check successful: " . $IRDN[0]);
         } else {
-          $rc = CertNanny::Logging->error("signer certificate issuer subject check failed rootcerts WILL NOT BE ACCEPTED" . $RDN[0]);
+          $rc = CertNanny::Logging->error("Signer certificate issuer subject check failed rootcerts WILL NOT BE ACCEPTED: " . $IRDN[0]);
         }
       }
       
       if (!$rc) {
         my $signerCertInfo->{CERTINFO} = $signerCertificate;
         if (!$self->k_buildCertificateChain($signerCertInfo)) {
-          $rc = CertNanny::Logging->error("signer certificate NOT trusted against lokal root CA certs, rootcerts WILL NOT BE ACCEPTED" . $RDN[0]);
+          $rc = CertNanny::Logging->error("Signer certificate NOT trusted against lokal root CA certs, rootcerts WILL NOT BE ACCEPTED: " . $RDN[0]);
         }
       }
 
@@ -1080,8 +1080,8 @@ sub k_getNextTrustAnchor {
               my $fileage  = $filestat->ctime;
 
               #CertNanny::Logging->debug("qfile age :" . $filestat->ctime . Dumper (stat($newRootCertFile) ) );
-              CertNanny::Logging->debug("now :" . $now);
-              CertNanny::Logging->debug("sub age minus now:" . ($now - $fileage));
+              CertNanny::Logging->debug("now: " . $now);
+              CertNanny::Logging->debug("sub age minus now: " . ($now - $fileage));
 
               my $quarantineTimeInSec = $entry->{rootcaupdate}->{quarantinetime} * 86400;
 
@@ -1355,7 +1355,7 @@ sub k_buildCertificateChain {
   foreach my $entry (@trustedroots) {
     my $fingerprint = $entry->{CERTINFO}->{CertificateFingerprint};
     $rootcertfingerprint{$fingerprint}++;
-    CertNanny::Logging->debug("Authoritife Root CA found:".$entry->{CERTINFO}->{SubjectName}." - ".$entry->{CERTINFO}->{CertificateFingerprint} );
+    CertNanny::Logging->debug("Authoritative Root CA found:".$entry->{CERTINFO}->{SubjectName}." - ".$entry->{CERTINFO}->{CertificateFingerprint} );
   }
 
   # remove root certs from certificate list
@@ -1904,7 +1904,7 @@ sub _sendRequest {
     if (exists $entry->{INITIALENROLLEMNT}
         and $entry->{INITIALENROLLEMNT} eq 'yes') {
 
-      CertNanny::Logging->debug("Install cert in initial entrollment build p12 first to import into the final location. ");
+      CertNanny::Logging->debug("Install cert in initial enrollment, first build p12 to import into the final location.");
 
       my $importp12 = $entryname . "-import.p12";
       my $outp12 = File::Spec->catfile($entry->{statedir}, $importp12);
@@ -1942,11 +1942,11 @@ sub _sendRequest {
 # Todo Testen createPKCS12: Passt das noch? Die Methode war im Keystore als Dummy implementiert und nur in den Keys ausprogrammiert, wird aber über $self aufgerufen?!?
 # Todo Testen createPKCS12: Was passiert hier? keine Zuweisung des Ergebnisses ....
       my $exportp12 = $self->createPKCS12(%args);
-      CertNanny::Logging->debug("Created importp12 file :" . $importp12);
+      CertNanny::Logging->debug("Created importp12 file: " . $importp12);
       my $target = $entry->{initialenroll}->{targetType};
-      CertNanny::Logging->debug("Target keystore:" . $target);
+      CertNanny::Logging->debug("Target keystore: " . $target);
       if (!$exportp12) {
-      	CertNanny::Logging->error("Failed to create importP12 abort initial" . $target);
+      	CertNanny::Logging->error("Failed to create initial PKCS12 " . $target);
       	return 0;
       }
 
