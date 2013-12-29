@@ -115,7 +115,7 @@ sub _iterate_entries {
       if ($action eq 'do_renew' or $action eq 'do_enroll') {
         CertNanny::Logging->info("Check for initial enrollment configuration.");
         if ($self->{ITEMS}->{$entryName}->{initialenroll}->{auth}) {
-          CertNanny::Logging->info("Fund initial enrollment configuration for " . $self->{ITEMS}->{$entryName}->{initialenroll}->{subject});
+          CertNanny::Logging->info("Found initial enrollment configuration for " . $self->{ITEMS}->{$entryName}->{initialenroll}->{subject});
           $self->do_enroll(ENTRY     => $self->{ITEMS}->{$entryName},
                            ENTRYNAME => $entryName);
         }
