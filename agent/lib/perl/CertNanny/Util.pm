@@ -693,7 +693,7 @@ sub getCSRInfoHash {
   # sanity checks
   foreach my $var (qw(Version SubjectName Modulus)) {
     if (!exists $info->{$var}) {
-      CertNanny::Logging->error("getCSRInfoHash(): Could not determine field '$var' from certificate signing request.	");
+      CertNanny::Logging->error("getCSRInfoHash(): Could not determine field '$var' from certificate signing request.");
       return undef;
     }
   }
@@ -1023,10 +1023,10 @@ sub backoffTime {
   my $self   = (shift)->getInstance();
   my $config = shift;
 
-  CertNanny::Logging->debug("CertNanny::Util::backofftime");
+  CertNanny::Logging->debug("CertNanny::Util::backoffTime");
 
   if (exists $config->{CONFIG}->{conditionalwait}->{time}) {
-    CertNanny::Logging->debug("wait extendedt time in seconds between 0 and " . $config->{CONFIG}->{conditionalwait}->{time});
+    CertNanny::Logging->debug("Conditional delay between 0 and " . $config->{CONFIG}->{conditionalwait}->{time} . " seconds");
 
     my $date = $self->epochToIsoDate(time(), 1);
     my $currentDate = substr($date, 0, 8);
@@ -1048,22 +1048,22 @@ sub backoffTime {
     if ($now > $startTime and $now < $endTime) {
       my $rndwaittime =
         int(rand($config->{CONFIG}->{conditionalwait}->{time}));
-      CertNanny::Logging->debug("Inside the conditinal time start extended backoff time of $rndwaittime seconds");
+      CertNanny::Logging->debug("Inside the conditional time frame, start extended backoff time of $rndwaittime seconds");
       sleep $rndwaittime;
     } else {
-      CertNanny::Logging->debug("outside the conditinal time no backoff");
+      CertNanny::Logging->debug("Outside the conditional time, no backoff");
       if (exists $config->{CONFIG}->{randomwait}) {
-        CertNanny::Logging->debug("wait rnd time between 0 and " . $config->{CONFIG}->{randomwait});
+        CertNanny::Logging->debug("Random delay between 0 and " . $config->{CONFIG}->{randomwait} . " seconds");
         my $rndwaittime = int(rand($config->{CONFIG}->{randomwait}));
-        CertNanny::Logging->info("Scheduling renewal but randomly waiting $rndwaittime seconds to ease stress on the PKI");
+        CertNanny::Logging->info("Scheduling renewal but randomly waiting $rndwaittime seconds to reduce load on the PKI");
         sleep $rndwaittime;
       }
     }
   } else {
     if (exists $config->{CONFIG}->{randomwait}) {
-      CertNanny::Logging->debug("wait rnd time between 0 and " . $config->{CONFIG}->{randomwait});
+      CertNanny::Logging->debug("Random delay between 0 and " . $config->{CONFIG}->{randomwait} . " seconds");
       my $rndwaittime = int(rand($config->{CONFIG}->{randomwait}));
-      CertNanny::Logging->info("Scheduling renewal but randomly waiting $rndwaittime seconds to ease stress on the PKI");
+      CertNanny::Logging->info("Scheduling renewal but randomly waiting $rndwaittime seconds to reduce load on the PKI");
       sleep $rndwaittime;
     }
   }
