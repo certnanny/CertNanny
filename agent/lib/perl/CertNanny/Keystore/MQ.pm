@@ -1151,7 +1151,7 @@ sub installRoots {
       $rc = 1 if (!$dest);
       if (!$rc) {
         # delete every root CA, that does not exist in $availableRootCAs from keystore
-        foreach my $certSHA1 (keys ($installedRootCAs)) {
+        foreach my $certSHA1 (keys %{$installedRootCAs}) {
           if (!exists($availableRootCAs->{$certSHA1})) {
             CertNanny::Logging->debug("Deleting root cert " . $installedRootCAs->{$certSHA1}->{CERTINFO}->{SubjectName});
              
@@ -1165,7 +1165,7 @@ sub installRoots {
 
 #        # copy every root CA, that does not exist in $installedRootCAs to keystore
 
-        foreach my $certSHA1 (keys ($availableRootCAs)) {
+        foreach my $certSHA1 (keys  %{$availableRootCAs}) {
           if (!exists($installedRootCAs->{$certSHA1})) {
             CertNanny::Logging->debug("Importing root cert " . $availableRootCAs->{$certSHA1}->{CERTINFO}->{SubjectName});
             my $tmpFile = CertNanny::Util->getTmpFile();
