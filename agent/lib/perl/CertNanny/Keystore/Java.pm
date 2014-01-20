@@ -270,7 +270,7 @@ sub installCert {
   # ... plus all certificates from the ca key chain minus its root cert
   push(@trustedcerts, @{$self->{STATE}->{DATA}->{CERTCHAIN}}[1 .. $#{$self->{STATE}->{DATA}->{CERTCHAIN}}]);
   my $olddir = getcwd();
-# Todo Arkadius Frage: installCert: Hash Element TARGETDIR existiert nur bei diesem Key!!
+
   chdir($args{TARGETDIR} || $entry->{statedir});
   foreach my $caentry (@trustedcerts) {
     my @rdn = split(/(?<!\\),\s*/, $caentry->{CERTINFO}->{SubjectName});
@@ -297,7 +297,7 @@ sub installCert {
       return undef;
     }
 
-    if (!$self->_importCert($cacertfile, $cn)) {
+    if (!$self->_importCert($cacertfile, $cn, $location)) {
       CertNanny::Logging->info("Could not install certificate '$cn', probably already present. Not critical");
     }
   } ## end foreach my $caentry (@trustedcerts)
@@ -899,7 +899,7 @@ sub installRoots {
       $rc = 1 if (!$locName);
       if (!$rc) {
         # delete every root CA, that does not exist in $availableRootCAs from keystore
-        foreach my $certSHA1 (keys ($installedRootCAs)) {
+        foreach my $certSHA1 (keys %{$installedRootCAs}) {
           if (!exists($availableRootCAs->{$certSHA1})) {
             CertNanny::Logging->debug("Deleting root cert " . $installedRootCAs->{$certSHA1}->{CERTINFO}->{SubjectName});
             @cmd =  (qq("$options->{keytool}"), -noprompt, -storepass => qq("$entry->{store}->{pin}"), '-keystore' ,qq("$locName"), '-delete', '-alias', $installedRootCAs->{$certSHA1}->{CERTALIAS});
@@ -912,7 +912,7 @@ sub installRoots {
         }
 
         # copy every root CA, that does not exist in $installedRootCAs to keystore
-        foreach my $certSHA1 (keys ($availableRootCAs)) {
+        foreach my $certSHA1 (keys %{$availableRootCAs}) {
           if (!exists($installedRootCAs->{$certSHA1})) {
             CertNanny::Logging->debug("Importing root cert " . $availableRootCAs->{$certSHA1}->{CERTINFO}->{SubjectName});
             my $tmpFile = CertNanny::Util->getTmpFile();
