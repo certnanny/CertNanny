@@ -1136,7 +1136,7 @@ sub fetchFileList {
     $item =~ s/^["']*|["']*$//g;
     $item = File::Spec->canonpath($item);
     CertNanny::Logging->debug("cannonpath file: $item");
-    if (-T $item) {
+    if (-f $item) {
       CertNanny::Logging->debug("Found file: $item");
       push(@tmpList, $item);
     } else {
@@ -1145,7 +1145,7 @@ sub fetchFileList {
         if (opendir(DIR, $item)) {
           while (defined(my $file = readdir(DIR))) {
             my $osFileName = File::Spec->catfile($item, $file);
-            if (-T $osFileName) {
+            if (-f $osFileName) {
               CertNanny::Logging->debug("Found file: $osFileName");
               push(@tmpList, $osFileName);
             } else {
