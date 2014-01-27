@@ -643,6 +643,7 @@ sub generateKey {
   my $newalias = "${alias}-new";
   my $location = $self->_generateKeystore() || return undef;
   my @cmd;
+  my $bits       = $self->{SIZE}       || $entry->{size}       || '2048';
 
   #first check if key  already exists
   push(@cmd, '-alias');
@@ -654,7 +655,7 @@ sub generateKey {
   # Todo pgk: Testen hidePin
   if (CertNanny::Util->runCommand(\@cmd, HIDEPWD => 1) != 0) {
     # we need to generate a new one since we don't already have one
-    CertNanny::Logging->info("generateKey(): Creating new key with alias $newalias");
+    CertNanny::Logging->info("generateKey(): Creating new key with alias $newalias and keysize $bits");
     @cmd = ('-genkeypair',);
     push(@cmd, '-alias');
     push(@cmd, qq{"$newalias"});
@@ -665,6 +666,9 @@ sub generateKey {
     push(@cmd, "$entry->{keyalg}");
     push(@cmd, '-sigalg');
     push(@cmd, "$entry->{sigalg}");
+    push(@cmd, "-keysize");
+    push(@cmd, "$bits");
+     
 
     @cmd = $self->_buildKeytoolCmd($location, @cmd);
     # CertNanny::Logging->debug("Execute: " . join(' ', hidepin(@cmd)));
