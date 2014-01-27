@@ -72,6 +72,7 @@ sub new {
 
     if($self->{CONFIG}->get("cmd.opensslconf", "FILE")){
      $ENV{OPENSSL_CONF} = $self->{CONFIG}->get("cmd.opensslconf", "FILE");
+     CertNanny::Logging->debug("set OPENSSL_CONF enviroment var to  to:" . $self->{CONFIG}->get("cmd.opensslconf", "FILE"));
     }
 
     $self->{ITEMS} = ${$self->{CONFIG}->getRef("keystore", 'ref')};
