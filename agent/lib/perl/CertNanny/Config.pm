@@ -40,6 +40,7 @@ use base qw(Exporter);
 use IO::File;
 use File::Basename;
 use File::Glob qw(:globally :case);
+use Net::Domain;
 
 use Data::Dumper;
 
@@ -201,6 +202,22 @@ sub _get {
     return $self->{$where};
   } else {
     my $value = $self->_getRef($arg, '', $where);
+    
+    if ($value =~ m{ \A \s* sub \s* \{ }xms) {
+      eval {
+        $value = eval $value;
+        $value = &$value();
+      };
+    } elsif ($value =~ m{ \A \s* `(.*)` \s* \z }xms) {
+      $value = `$1`;
+      chomp $value;
+    } elsif ($value =~ m{__SYS_FQDN__}xms) {
+      my $hostname = Net::Domain::hostfqdn();
+      while ($value =~ m{__SYS_FQDN__}xms) {
+       $value =~ s{__SYS_FQDN__}{$hostname}xms;
+      }
+     
+    }
 
     return $value unless defined $mangle and ($where eq 'CONFIG');
 

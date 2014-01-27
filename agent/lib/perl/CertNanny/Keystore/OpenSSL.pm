@@ -656,7 +656,8 @@ sub createRequest {
     my $DN;
     #for inital enrollment we override the DN to use the configured desiered DN rather then the preset enrollment certificates DN
     if ($entry->{INITIALENROLLEMNT} eq 'yes') {
-      $DN = $entry->{initialenroll}->{subject};
+     # $DN = $entry->{initialenroll}->{subject};
+       $DN = $config->get("keystore.$entryname.initialenroll.subject");
     } else {
       $DN = $self->{CERT}->{CERTINFO}->{SubjectName};
     }
@@ -691,7 +692,8 @@ sub createRequest {
         foreach my $key (keys %{$entry->{initialenroll}->{san}}) {
           next SANS if ($key eq 'INHERIT');
           $newsans .=
-            $entry->{initialenroll}->{san}->{$key} . ',';
+          $config->get("keystore.$entryname.initialenroll.san.$key"). ',';
+            #$entry->{initialenroll}->{san}->{$key} . ',';
         }
         ##write inittal enrollment SANs into the cert information without last ','
         $self->{CERT}->{CERTINFO}->{SubjectAlternativeName} = substr($newsans, 0, -1);
