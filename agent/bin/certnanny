@@ -148,7 +148,7 @@ foreach my $cmd (@ARGV) {   # command line parameters are already stripped off. 
       }
     }elsif ( ($cmd eq "renew") or ($cmd eq "check" )) {
      $servicename = CertNanny::Config->getInstance()->get("platform.windows.servicename") || "CertNanny";
-      print "Win32 start $cmd\n";
+      #print "Win32 start $cmd\n";
        # Instantiate CertNanny
        my $monitor = CertNanny->getInstance(CONFIG => $cmdLineParam{cfg});
        
@@ -162,7 +162,7 @@ foreach my $cmd (@ARGV) {   # command line parameters are already stripped off. 
     }
   }else{
      # Instantiate CertNanny
-    print "non Win32 start $cmd\n";
+    #print "non Win32 start $cmd\n";
      my $monitor = CertNanny->getInstance(CONFIG => $cmdLineParam{cfg});
      
      $cmdLineParam{sleep} = 300 if !defined $cmdLineParam{sleep};
@@ -421,6 +421,12 @@ you may specify additional subject alternative names to be added to the CSR data
 
   keystore.(keystorename).initialenroll.san.1 = DNS:test.domain.com:Cert1
   keystore.(keystorename).initialenroll.san.2 = DNS:test2.domain.com:Cert1
+  
+It is also possible to use the parameter __SYS_FQDN__ for the initial enrollmen subject and SAN configuration:
+
+  keystore.(keystorename).initialenroll.subject = CN=__SYS_FQDN__:Cert1, OU=Nanny, O=NannyLand, C=DE
+  keystore.(keystorename).initialenroll.san.1 = DNS:__SYS_FQDN__
+   
 
 There are 3 possible initial enrollemnt methods that are configured with 
 
