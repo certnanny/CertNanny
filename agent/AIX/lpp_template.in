@@ -21,14 +21,14 @@ Fileset
     /opt/CertNanny/LICENSE.CertNanny
     /opt/CertNanny/QUICKSTART
     /opt/CertNanny/bin/certnanny
-    /var/CertNanny/etc/Keystore-DEFAULT.cfg
-    /var/CertNanny/etc/Keystore-Java.cfg
-    /var/CertNanny/etc/Keystore-MQ.cfg
-    /var/CertNanny/etc/Keystore-OpenSSL-PKCS8.cfg
-    /var/CertNanny/etc/Keystore-OpenSSL.cfg
-    /var/CertNanny/etc/Keystore-PKCS12.cfg
-    /var/CertNanny/etc/Keystore-Windows.cfg
-    /var/CertNanny/etc/certnanny-Master.cfg
+    /var/CertNanny/etc/Keystore-DEFAULT.cfg.template
+    /var/CertNanny/etc/Keystore-Java.cfg.template
+    /var/CertNanny/etc/Keystore-MQ.cfg.template
+    /var/CertNanny/etc/Keystore-OpenSSL-PKCS8.cfg.template
+    /var/CertNanny/etc/Keystore-OpenSSL.cfg.template
+    /var/CertNanny/etc/Keystore-PKCS12.cfg.template
+    /var/CertNanny/etc/Keystore-Windows.cfg.template
+    /var/CertNanny/etc/certnanny-Master.cfg.template
     /var/CertNanny/etc/certreq.inf
     /opt/CertNanny/lib
     /opt/CertNanny/lib/java

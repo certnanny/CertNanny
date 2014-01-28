@@ -34,13 +34,13 @@ f none /opt/CertNanny/lib/perl/CertNanny/HSM/Utimaco.pm 0644 root root
 f none /opt/CertNanny/lib/perl/CertNanny/Logging.pm 0644 root root
 d none /var/CertNanny 0755 root root
 d none /var/CertNanny/etc 0755 root root
-f none /var/CertNanny/etc/Keystore-DEFAULT.cfg 0644 root root
-f none /var/CertNanny/etc/Keystore-Java.cfg 0644 root root
-f none /var/CertNanny/etc/Keystore-MQ.cfg 0644 root root
-f none /var/CertNanny/etc/Keystore-OpenSSL-PKCS8.cfg 0644 root root
-f none /var/CertNanny/etc/Keystore-OpenSSL.cfg 0644 root root
-f none /var/CertNanny/etc/Keystore-PKCS12.cfg 0644 root root
-f none /var/CertNanny/etc/Keystore-Windows.cfg 0644 root root
-f none /var/CertNanny/etc/certnanny-Master.cfg 0644 root root
+f none /var/CertNanny/etc/Keystore-DEFAULT.cfg.template 0644 root root
+f none /var/CertNanny/etc/Keystore-Java.cfg.template 0644 root root
+f none /var/CertNanny/etc/Keystore-MQ.cfg.template 0644 root root
+f none /var/CertNanny/etc/Keystore-OpenSSL-PKCS8.cfg.template 0644 root root
+f none /var/CertNanny/etc/Keystore-OpenSSL.cfg.template 0644 root root
+f none /var/CertNanny/etc/Keystore-PKCS12.cfg.template 0644 root root
+f none /var/CertNanny/etc/Keystore-Windows.cfg.template 0644 root root
+f none /var/CertNanny/etc/certnanny-Master.cfg.template 0644 root root
 f none /var/CertNanny/etc/certreq.inf 0644 root root
 
