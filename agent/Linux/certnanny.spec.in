@@ -44,15 +44,15 @@ mkdir -p $RPM_BUILD_ROOT/var/CertNanny/tmp
 install -D -m 755 bin/certnanny $RPM_BUILD_ROOT/opt/CertNanny/bin/certnanny
 install -D -m 644 certnanny.1.gz $RPM_BUILD_ROOT/usr/share/man/man1/certnanny.1.gz
 install -D -m 644 lib/java/ExtractKey.jar $RPM_BUILD_ROOT/opt/CertNanny/lib/java/ExtractKey.jar
-install -D -m 644 etc/Keystore-Java.cfg $RPM_BUILD_ROOT/var/CertNanny/etc/Keystore-Java.cfg
-install -D -m 644 etc/Keystore-PKCS12.cfg $RPM_BUILD_ROOT/var/CertNanny/etc/Keystore-PKCS12.cfg
+install -D -m 644 etc/Keystore-Java.cfg.template $RPM_BUILD_ROOT/var/CertNanny/etc/Keystore-Java.cfg.template
+install -D -m 644 etc/Keystore-PKCS12.cfg.template $RPM_BUILD_ROOT/var/CertNanny/etc/Keystore-PKCS12.cfg.template
 install -D -m 644 etc/certreq.inf $RPM_BUILD_ROOT/var/CertNanny/etc/certreq.inf
-install -D -m 644 etc/Keystore-MQ.cfg $RPM_BUILD_ROOT/var/CertNanny/etc/Keystore-MQ.cfg
-install -D -m 644 etc/Keystore-OpenSSL.cfg $RPM_BUILD_ROOT/var/CertNanny/etc/Keystore-OpenSSL.cfg
-install -D -m 644 etc/Keystore-DEFAULT.cfg $RPM_BUILD_ROOT/var/CertNanny/etc/Keystore-DEFAULT.cfg
-install -D -m 644 etc/Keystore-Windows.cfg $RPM_BUILD_ROOT/var/CertNanny/etc/Keystore-Windows.cfg
-install -D -m 644 etc/Keystore-OpenSSL-PKCS8.cfg $RPM_BUILD_ROOT/var/CertNanny/etc/Keystore-OpenSSL-PKCS8.cfg
-install -D -m 644 etc/certnanny-Master.cfg $RPM_BUILD_ROOT/var/CertNanny/etc/certnanny-Master.cfg
+install -D -m 644 etc/Keystore-MQ.cfg.template $RPM_BUILD_ROOT/var/CertNanny/etc/Keystore-MQ.cfg.template
+install -D -m 644 etc/Keystore-OpenSSL.cfg.template $RPM_BUILD_ROOT/var/CertNanny/etc/Keystore-OpenSSL.cfg.template
+install -D -m 644 etc/Keystore-DEFAULT.cfg.template $RPM_BUILD_ROOT/var/CertNanny/etc/Keystore-DEFAULT.cfg.template
+install -D -m 644 etc/Keystore-Windows.cfg.template $RPM_BUILD_ROOT/var/CertNanny/etc/Keystore-Windows.cfg.template
+install -D -m 644 etc/Keystore-OpenSSL-PKCS8.cfg.template $RPM_BUILD_ROOT/var/CertNanny/etc/Keystore-OpenSSL-PKCS8.cfg.template
+install -D -m 644 etc/certnanny-Master.cfg.template $RPM_BUILD_ROOT/var/CertNanny/etc/certnanny-Master.cfg.template
 mkdir -p $RPM_BUILD_ROOT/usr/bin
 /bin/ln -fs ../../opt/CertNanny/bin/certnanny $RPM_BUILD_ROOT/usr/bin/certnanny
 
@@ -69,15 +69,15 @@ rm -rf $RPM_BUILD_ROOT
 /opt/CertNanny/lib/java/ExtractKey.jar
 /opt/CertNanny/lib/perl/CertNanny.pm
 /opt/CertNanny/lib/perl/CertNanny
-/var/CertNanny/etc/Keystore-Java.cfg
-/var/CertNanny/etc/Keystore-PKCS12.cfg
+/var/CertNanny/etc/Keystore-Java.cfg.template
+/var/CertNanny/etc/Keystore-PKCS12.cfg.template
 /var/CertNanny/etc/certreq.inf
-/var/CertNanny/etc/Keystore-MQ.cfg
-/var/CertNanny/etc/Keystore-OpenSSL.cfg
-/var/CertNanny/etc/Keystore-DEFAULT.cfg
-/var/CertNanny/etc/Keystore-Windows.cfg
-/var/CertNanny/etc/Keystore-OpenSSL-PKCS8.cfg
-/var/CertNanny/etc/certnanny-Master.cfg
+/var/CertNanny/etc/Keystore-MQ.cfg.template
+/var/CertNanny/etc/Keystore-OpenSSL.cfg.template
+/var/CertNanny/etc/Keystore-DEFAULT.cfg.template
+/var/CertNanny/etc/Keystore-Windows.cfg.template
+/var/CertNanny/etc/Keystore-OpenSSL-PKCS8.cfg.template
+/var/CertNanny/etc/certnanny-Master.cfg.template
 %dir /var/CertNanny/AuthoritativeRootcerts 
 %dir /var/CertNanny/etc
 %dir /var/CertNanny/logs 
