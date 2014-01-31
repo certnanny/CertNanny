@@ -47,15 +47,60 @@ You will also find the [issue tracker](https://github.com/certnanny/CertNanny/is
 
 ## Roadmap/History
 
-Last update: 2014-01-29
+[Official milestones/releases are tracked on GitHub.](https://github.com/certnanny/CertNanny/issues/milestones)
 
-Version  | Status              | Comments
-:--------|:--------------------|:----------
-v1.1     | ETA 2014-02-28      | Currently being prepared
-v0.10    | released 2007-06-19 | Latest stable release
-v0.9     | released 2006-08-09 |
-v0.8     | released 2006-06-12 |	
-v0.7     | released 2006-02-10 |	
-v0.6     | released 2005-12-23 |
+### Version 1.1
 
-Note: For administrative reasons there will be no 1.0 release.
+Release date: ETA 2014-02-28
+
+Currently under development.
+
+Key features:
+- improved configuration features
+- support of different key sizes in keystores
+- Root CA certificates now stored in directory
+- fully automatic Root CA update feature via SCEP GetNextCA
+- "Root Only" Keystores (for trust anchor configuration)
+- improved Windows keystore support (Machine Keystore)
+- updated GSKit 7.1 support
+- meta data submission in SCEP request
+- additional hook functions (expired, invocation)
+- improved logging
+- packaging for all major platforms
+
+*Note: For administrative reasons there will be no 1.0 release.*
+
+### Version 0.10
+
+Release date: 2007-06-19 **(Latest stable release)** 
+
+This version introduces PKCS#12 support and adds MQ/GSKit support for Windows platforms. When creating a new keystore the configured Root Certificates are now examined for their validity period. Expired (and if desired not-yet-valid) certificates are not imported into the new keystore. This behaviour is fully configurable per keystore.
+
+### Version 0.9
+
+Release date: 2006-08-09
+
+Fixes problems in certificate chain generation that occur if multiple CA certificate hierarchies are returned by the SCEP server. CertNanny now calculates the correct certificate chain based on the newly created certificate.
+
+### Version 0.8
+
+Release date: 2006-06-12
+
+Introduces Windows Certificate Store and Java Keystore support
+
+### Version 0.7
+
+Release date: 2006-02-10
+
+Introduces PKCS#8 support, improved OpenSSL keystore handling. New platforms: Windows, Tandem/NonStop (OSS)
+
+### Version 0.6
+
+Release date: 2005-12-23
+
+Initial public release of CertNanny
+
+--------------------
+
+
+Last update: 2014-01-31
