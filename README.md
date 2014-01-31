@@ -100,7 +100,10 @@ Release date: 2005-12-23
 
 Initial public release of CertNanny
 
+
+##### Guidelines for Version Numbers
+
+The version numbers for official releases shall be limited to two positions. This allows for local customization and repackaging sometimes needed for large-scale internal deployments without using up the available positions (AIX packages are effectively limited to three positions since the fourth is reserved for incremental updates).
+
 --------------------
-
-
 Last update: 2014-01-31
