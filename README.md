@@ -59,3 +59,11 @@ v0.7     | released 2006-02-10 |
 v0.6     | released 2005-12-23 |
 
 Note: For administrative reasons there will be no 1.0 release.
+
+## Guidelines for Version Numbers
+
+The version numbers for official releases shall be limited to two positions. This
+allows for local customization and repackaging sometimes needed for large-scale
+internal deployments without using up the available positions (AIX packages
+are effectively limited to three positions since the fourth is reserved for 
+incremental updates).
