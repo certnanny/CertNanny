@@ -936,7 +936,14 @@ files on the same system, each referencing a different set of certificate
 keystores to monitor.
 
 A CertNanny configuration file is a text file that contains key/value 
-pairs.
+pairs. 
+
+It is possible to use enviroment variables in your configuration e.g.:
+
+cmd.openssl  = __ENV__OPENSSLPATH__/openssl 
+
+CertNanny will expand the enviroment variable "OPENSSLPATH" and replace its value
+for the place holder __ENV__OPENSSLPATH__ when parsing the config file.
 
 Comment lines are indicated by a '#' symbol (only at the beginning of the 
 line, otherwise they are considered to be part of the value itself).
@@ -957,8 +964,8 @@ include Keystore
 Includes all configuation file in the directory Keystore relativ to the
 directory of the invoking configuration file. 
 
-A sample configuration file is included in etc/certnanny.cfg. New
-users should use this file and adapt the settings to their setup:
+A sample configuration file are included in the etc directory. New
+users should use these file and adapt the settings to their setup:
 
 =over
 
