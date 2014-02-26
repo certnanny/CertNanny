@@ -607,16 +607,15 @@ sub _parseFile {
         print STDERR "Config file error: duplicate value definition in line $lnr ($_)\n";
       }
       
-      if ($val =~ m{__ENV__(.*)__}xms) { 
-        while ($val =~ m{__ENV__(.*)__}xms){
-          my $myENVvar = $ENV{"$1"};
-          if(!exists  $ENV{"$1"}){
-            CertNanny::Logging->info(" configured enviroment variable $1 does no exists");
-          }
-          $val =~ s{__ENV_(.*)__}{$myENVvar}xms;
+      while ($val =~ m{__ENV__(.*?)__}xms) {
+        my $envvar = $1;
+        if (! exists $ENV{$envvar}) {
+          CertNanny::Logging->info("Environment variable $envvar referenced in line $lnr does not exist");
         }
+        my $myENVvar = $ENV{$envvar} || '';
+        $val =~ s{__ENV_(.*?)__}{$myENVvar}xms;
       }
-      
+
       $var->{$key} = $val;
     } else {
       print STDERR "Config file error: parse error in line $lnr ($_)\n";
