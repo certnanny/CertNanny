@@ -514,7 +514,7 @@ sub do_check {
     }
 
     if (!$instance->k_checkValidity($self->{ITEMS}->{$args{ENTRYNAME}}->{warnexpiry_days})) {
-      CertNanny::Logging->notice("Certificate is valid for less than $self->{ITEMS}->{$args{ENTRYNAME}}->{warnexpiry_days} days");
+      CertNanny::Logging->notice("WARNEXPIRY Certificate is valid for less than $self->{ITEMS}->{$args{ENTRYNAME}}->{warnexpiry_days} days");
       CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "Check");
       return $instance->k_executeHook($config->get("keystore.$entryname.hook.warnexpiry"));
 #      $keystore->{INSTANCE}->k_warnExpiryHook();
