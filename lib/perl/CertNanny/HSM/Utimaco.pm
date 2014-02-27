@@ -16,9 +16,6 @@ use vars qw( $VERSION );
 use Exporter;
 use Cwd;
 
-$VERSION = 0.10;
-
-
 sub new() {
   my $proto          = shift;
   my $class          = ref($proto) || $proto;

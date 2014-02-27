@@ -27,8 +27,6 @@ use CertNanny::Util;
 # keyspecific needed modules
 use Net::Domain;
 
-$VERSION = 0.10;
-
 ################################################################################
 
 

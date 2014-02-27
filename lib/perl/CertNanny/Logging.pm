@@ -22,8 +22,6 @@ use utf8;
 
 use vars qw(@ISA @EXPORT @EXPORT_OK %EXPORT_TAGS $VERSION);
 
-$VERSION = 0.10;
-
 @EXPORT = qw(logLevel log2File log2Console LogOff 
              log debug info notice error fatal);    # Symbols to autoexport (:DEFAULT tag)
 

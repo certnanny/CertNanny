@@ -10,8 +10,6 @@ package CertNanny::HSM;
 use vars qw( $VERSION );
 use Exporter;
 
-$VERSION = 0.10;
-
 
 sub new() {
 
