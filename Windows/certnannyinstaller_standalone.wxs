@@ -1,0 +1,262 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
+    <Product Id="FB28CE20-3C78-11E1-BA67-BEC04724019B" Language="1033" Manufacturer="Cynops" Name="CertNanny" UpgradeCode="05C67B16-3C79-11E1-87DB-C3C04724019B" Version="$(var.CNVERSION)">
+
+	<Package Id='*' Keywords='Installer' Description="certnanny Installer" Manufacturer='Cynops' InstallerVersion='300' Languages='1033' Compressed='yes' SummaryCodepage='1252' />
+      
+	<Media Id="1" Cabinet="product.cab" EmbedCab="yes" />
+      
+	 <!--Defining Main Directory Strucure for program files folder-->
+	<Directory Id='TARGETDIR' Name='SourceDir'>
+		<Directory Id='ProgramFilesFolder' Name='PFiles'>
+			<Directory Id='APPLICATIONROOTDIRECTORY' Name='CertNanny'>
+			
+				<Component Id='removecomponentAPPDIR' Guid='{75D5B7AF-595E-4927-81F7-AF9AF389D0AC}'>
+					<RemoveFolder Id="APPLICATIONROOTDIRECTORY" On="uninstall"/>
+					<RegistryValue Root='HKCU' Key='Software\[Manufacturer]\[ProductName]' Type='string' Value='' KeyPath='yes' />
+				</Component>
+						<Directory Id='certnannyDir' Name='CertNanny'>
+							<Component Id='removecertnannyDir' Guid='{9FDC08D2-EAC3-4718-9C49-A1D0B76B053F}'>
+								<RemoveFolder Id="certnannyDir" On="uninstall"/>
+							<RegistryValue Root='HKCU' Key='Software\[Manufacturer]\[ProductName]' Type='string' Value='' KeyPath='yes' />
+							</Component>
+							<Component Id='createcertnannyDir' Guid='{DC7C0E6E-A705-484a-BFC9-D86257B2A317}'>
+							<CreateFolder/>
+							<RegistryValue Root='HKCU' Key='Software\[Manufacturer]\[ProductName]' Type='string' Value='' KeyPath='yes' />   
+							</Component>
+						</Directory>
+						<Directory Id='opensslDir' Name='OpenSSL'>
+							<Component Id='removeOpenSSLDir' Guid='{F4417860-4709-42aa-B154-D06015E97505}'>
+								<RemoveFolder Id="opensslDir" On="uninstall"/>
+							<RegistryValue Root='HKCU' Key='Software\[Manufacturer]\[ProductName]' Type='string' Value='' KeyPath='yes' />
+							</Component>
+							<Component Id='createOpenSSLDir' Guid='{D248A8D2-E1CA-4d0d-8AD5-EBABFB5D6503}'>
+							<CreateFolder/>
+							<RegistryValue Root='HKCU' Key='Software\[Manufacturer]\[ProductName]' Type='string' Value='' KeyPath='yes' />   
+							</Component>
+						
+						</Directory>
+			</Directory>
+		</Directory>
+	 <!--Defining Main Directory Strucure for program data folder-->
+		<Directory Id='CommonAppDataFolder' Name='CommonAppDataFolder'>  
+	
+			<Directory Id='certnannyappdirectory' Name='CertNanny'>
+				<Component Id='removecomponent' Guid='37D7213C-3E09-11E1-9CE6-234A4824019B'>
+					<RemoveFolder Id="certnannyappdirectory" On="uninstall"/>
+					<RegistryValue Root='HKCU' Key='Software\[Manufacturer]\[ProductName]' Type='string' Value='' KeyPath='yes' />
+				</Component>
+					
+				<Component Id='createcertnannyapp' Guid='8AA16728-3E19-11E1-9947-8F5F4824019B'>
+					<CreateFolder/>
+					 <RegistryValue Root='HKCU' Key='Software\[Manufacturer]\[ProductName]'
+					Type='string' Value='' 
+					KeyPath='yes' />         
+				</Component>
+				
+				<Directory Id='statedirectory' Name='state'>
+					<Component Id='removestatecomponent' Guid='35A5B258-3E0D-11E1-942D-23504824019B'>
+					<RemoveFolder Id="statedirectory" On="uninstall"/>
+					<RegistryValue Root='HKCU' Key='Software\[Manufacturer]\[ProductName]' Type='string' Value='' KeyPath='yes' />
+					</Component>
+					<Component Id='createstate' Guid='56BA79AC-3E1B-11E1-B87F-95614824019B'>
+					<CreateFolder/>
+					<RegistryValue Root='HKCU' Key='Software\[Manufacturer]\[ProductName]' Type='string' Value='' KeyPath='yes' />   
+					</Component>
+				</Directory>
+					
+								
+				<Directory Id='trustedrootdirectory' Name='AuthoritativeRootcerts'>
+					<Component Id='removetrustedrootcomponent' Guid='9AB51F12-3E0D-11E1-839D-6E504824019B'>
+						<RemoveFolder Id="trustedrootdirectory" On="uninstall"/>
+						<RegistryValue Root='HKCU' Key='Software\[Manufacturer]\[ProductName]' Type='string' Value='' KeyPath='yes' />
+					</Component>
+					<Component Id='createtrustedroot' Guid='DE4C9E36-3E1B-11E1-BE11-2C624824019B'>
+						<CreateFolder/>
+						<RegistryValue Root='HKCU' Key='Software\[Manufacturer]\[ProductName]' Type='string' Value='' KeyPath='yes' />   
+					</Component>					
+				</Directory>
+							
+				<Directory Id='quarantinedirectory' Name='quarantine'>
+					<Component Id='removequarantinecomponent' Guid='C43DEF30-3E0D-11E1-BA57-B3504824019B'>
+						<RemoveFolder Id="quarantinedirectory" On="uninstall"/>
+						<RegistryValue Root='HKCU' Key='Software\[Manufacturer]\[ProductName]' Type='string' Value='' KeyPath='yes' />
+					</Component>
+					<Component Id='createquarantine' Guid='F0C27982-3E1B-11E1-9693-37624824019B'>
+						<CreateFolder/>
+						<RegistryValue Root='HKCU' Key='Software\[Manufacturer]\[ProductName]' Type='string' Value='' KeyPath='yes' />   
+					</Component>
+				</Directory>
+
+				<Directory Id='tmpdirectory' Name='tmp'>
+					<Component Id='removetmpcomponent' Guid='{39E91FEC-A0CB-4031-A088-FEB30C37381C}'>
+						<RemoveFolder Id="tmpdirectory" On="uninstall"/>
+						<RegistryValue Root='HKCU' Key='Software\[Manufacturer]\[ProductName]' Type='string' Value='' KeyPath='yes' />
+					</Component>
+					<Component Id='createtmpcomponent' Guid='{1607969B-6191-4f0e-B3FC-5C5D60ED37A3}'>
+						<CreateFolder/>
+						<RegistryValue Root='HKCU' Key='Software\[Manufacturer]\[ProductName]' Type='string' Value='' KeyPath='yes' />   
+					</Component>
+				</Directory>
+				<Directory Id='templatedirectory' Name='templates'>
+					<Component Id='removetemplatescomponent' Guid='{9CF602C7-9A57-4e4e-9027-EE6968FC7DEE}'>
+						<RemoveFolder Id="templatedirectory" On="uninstall"/>
+						<RegistryValue Root='HKCU' Key='Software\[Manufacturer]\[ProductName]' Type='string' Value='' KeyPath='yes' />
+					</Component>
+					<Component Id='createtemplatesdir' Guid='{030F171E-DEFE-4c9b-B5E7-DF06D6668138}'>
+						<CreateFolder/>
+						<RegistryValue Root='HKCU' Key='Software\[Manufacturer]\[ProductName]' Type='string' Value='' KeyPath='yes' />   
+					</Component>
+				</Directory>
+				<Directory Id='etcdirectory' Name='etc'>
+					<Component Id='removeetc' Guid='{1EC0A427-B1D0-4508-BDFB-CA090D616177}'>
+						<RemoveFolder Id="etcdirectory" On="uninstall"/>
+						<RegistryValue Root='HKCU' Key='Software\[Manufacturer]\[ProductName]' Type='string' Value='' KeyPath='yes' />
+					</Component>
+					<Component Id='createetc' Guid='{94911C45-D78D-45c3-9CD8-7D78F4319C12}'>
+						<CreateFolder/>
+						<RegistryValue Root='HKCU' Key='Software\[Manufacturer]\[ProductName]' Type='string' Value='' KeyPath='yes' />   
+					</Component>
+				<Directory Id='etcsystemdir' Name='system'>
+					<Component Id='removeetcsystemdir' Guid='{5E939EA0-E6EA-4672-B905-5F674052A5CF}'>
+						<RemoveFolder Id="etcsystemdir" On="uninstall"/>
+						<RegistryValue Root='HKCU' Key='Software\[Manufacturer]\[ProductName]' Type='string' Value='' KeyPath='yes' />
+					</Component>
+					<Component Id='createetcsystemdir' Guid='{C4185724-06DD-4ae2-9D0D-38545911281B}'>
+						<CreateFolder/>
+						<RegistryValue Root='HKCU' Key='Software\[Manufacturer]\[ProductName]' Type='string' Value='' KeyPath='yes' />   
+					</Component>
+				</Directory>
+				</Directory>
+
+				
+			</Directory>
+		</Directory>
+	</Directory> 
+	
+
+
+<DirectoryRef Id="certnannyDir">
+
+    <Component Id="certnanny.exe" Guid="{E2551697-CDB0-4a31-BBF3-735623CF23EC}">
+        <File Id="certnanny.exe" Source="SourceDir\certnanny.exe" KeyPath="yes" Checksum="yes"/>
+    </Component>
+	
+    <Component Id="LICENSE" Guid="{12BAEF65-8D37-4bec-BEA8-2D2E1760016F}">
+        <File Id="LICENSE" Source="SourceDir\..\LICENSE" KeyPath="yes" Checksum="yes"/>
+    </Component>
+	
+	<Component Id="FAQ" Guid="{34B1CBB0-A423-4e46-9E8F-DEDC9D20925F}">
+        <File Id="FAQ" Source="SourceDir\..\FAQ" KeyPath="yes" Checksum="yes"/>
+    </Component>
+	
+	<Component Id="QUICKSTART" Guid="{A0388E21-55C6-40fc-B7A8-0F44A69FE60D}">
+        <File Id="QUICKSTART" Source="SourceDir\..\QUICKSTART" KeyPath="yes" Checksum="yes"/>
+    </Component>
+	
+	<Component Id="ChangeLog" Guid="{FA86DEEE-07E0-4d8b-93F7-940EF0377EF9}">
+        <File Id="ChangeLog" Source="SourceDir\..\ChangeLog" KeyPath="yes" Checksum="yes"/>
+    </Component>
+	
+	<Component Id="README" Guid="{955502F4-7000-4df9-9DCE-5517F25B7D0A}">
+        <File Id="README" Source="SourceDir\..\README.md" KeyPath="yes" Checksum="yes"/>
+    </Component>
+	
+</DirectoryRef>
+
+<DirectoryRef Id="opensslDir">
+
+	<?ifdef env.CN_SSCEP ?>
+	<Component Id="SSCEPLICENSE" Guid="{4A8CA97C-89CA-4e80-965D-8FC41E769C50}">
+				<File Id="SSCEPLICENSEFILE" Source="$(env.CN_SSCEP)\..\COPYRIGHT" KeyPath="yes" Checksum="yes"/>
+    </Component>
+	<Component Id="SSCEPREADME" Guid="{BF24585F-F0A7-4f1a-B30F-DC2744A7E4CD}">
+				<File Id="SSCEPREADMEFILE" Source="$(env.CN_SSCEP)\..\README" KeyPath="yes" Checksum="yes"/>
+    </Component>
+	<?endif?>
+	
+	<?ifdef env.CN_OPENSSL ?>
+		<Component Id="OPENSSLLICENSE" Guid="{1848AC59-6091-4f84-B61A-740D43C3D681}">
+				<File Id="OPENSSLLICENSEFILE" Source="$(env.CN_OPENSSL)\..\LICENSE" KeyPath="yes" Checksum="yes"/>
+		</Component>
+		<Component Id="OPENSSLCONF" Guid="{30B8B1F0-83AE-4a92-A061-61D145DFF474}">
+				<File Id="OPENSSLCONFFILE" Source="$(env.CN_OPENSSL)\..\apps\openssl.cnf" KeyPath="yes" Checksum="yes"/>
+		</Component>
+	<?endif?>
+	
+<!--Include .Net framework into MSI-->	  
+<?ifdef env.CN_DOTNETFRAMEWORK ?>
+		<Merge Id="VCRedist" SourceFile="$(env.CN_DOTNETFRAMEWORK)" DiskId="1" Language="0"/>
+<?endif?>	
+
+</DirectoryRef>
+
+
+
+    <Feature Id="ProductFeature" Level="1" Title="CertNanny $(var.CNVERSION) for windows">
+      <ComponentRef Id="certnanny.exe" />
+	  <ComponentRef Id="LICENSE" />
+	  <ComponentRef Id="FAQ" />
+	  <ComponentRef Id="QUICKSTART" />
+      <ComponentRef Id="README" />
+	  <ComponentRef Id="ChangeLog" />
+	  <ComponentRef Id="removestatecomponent" />
+	  <ComponentRef Id="createstate" /> 
+	  <ComponentRef Id="createcertnannyapp" /> 
+	  <ComponentRef Id="removecomponent" /> 
+	  <ComponentRef Id="removetrustedrootcomponent" /> 
+	  <ComponentRef Id="createtrustedroot" /> 
+	  <ComponentRef Id="removequarantinecomponent" /> 
+	  <ComponentRef Id="createquarantine" /> 
+	  <ComponentRef Id="removetmpcomponent" /> 
+	  <ComponentRef Id="createtmpcomponent" /> 
+	  <ComponentRef Id="createetc" /> 
+	  <ComponentRef Id="removeetc" /> 
+	  <ComponentRef Id="removeetcsystemdir" /> 
+	  <ComponentRef Id="createetcsystemdir" /> 
+	  <ComponentRef Id="removecertnannyDir" /> 
+	  <ComponentRef Id="createcertnannyDir" /> 
+	  <ComponentRef Id="removeOpenSSLDir" /> 
+	  <ComponentRef Id="createOpenSSLDir" /> 
+	  <ComponentRef Id="removetemplatescomponent" /> 
+	  <ComponentRef Id="createtemplatesdir" />
+	  <ComponentRef Id="removecomponentAPPDIR" /> 	  
+
+	 <!--Include CN example configurationand place in CertNanny data folder 'etc'-->	  
+	  <?ifdef env.CN_TEMPLATES ?>
+		<ComponentGroupRef Id="templates" /> 
+	  <?endif?>
+	 <!--Include SSCEP in CertNannys openssl folder-->
+	  <?ifdef env.CN_SSCEP ?>
+		<ComponentGroupRef Id="sscep" /> 
+		<ComponentRef Id="SSCEPLICENSE" /> 
+		<ComponentRef Id="SSCEPREADME" /> 
+	  <?endif?>
+	 <!--Include OpenSSL in CertNannys openssl folder-->
+	  <?ifdef env.CN_OPENSSL ?>
+		<ComponentGroupRef Id="openssl" /> 
+		<ComponentRef Id="OPENSSLLICENSE" /> 
+		<ComponentRef Id="OPENSSLCONF" /> 
+	  <?endif?>
+	  <!--Include root certs to preinstall in CertNannys data folder 'AuthoritativeRootcerts' -->
+	  <?ifdef env.CN_ROOTCERTS ?>
+		<ComponentGroupRef Id="rootcerts" /> 
+	  <?endif?>
+	  <!--Include configuration to preinstall in CertNannys data folder 'etc\system' -->  
+	  <?ifdef env.CN_CONFIG_SYSTEM ?>
+		<ComponentGroupRef Id="systemconfig" /> 
+	  <?endif?>
+    </Feature>
+	
+<?ifdef env.CN_DOTNETFRAMEWORK ?>
+	<Feature Id="VCRedist" Title="Visual C++ Runtime" AllowAdvertise="no" Display="hidden" Level="1">
+		<MergeRef Id="VCRedist"/>
+	</Feature>
+<?endif?>	
+	  
+
+    </Product>
+    
+
+</Wix>
+

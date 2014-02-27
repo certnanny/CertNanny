@@ -20,8 +20,6 @@ use Win32::OLE;
 use Win32::OLE::Variant;
 use Win32::OLE::Const;
 
-$VERSION = 0.10;
-
 # This method is called once the new certificate has been received from
 # the SCEP server. Its responsibility is to create a new keystore containing
 # the new key, certificate, CA certificate keychain and collection of Root

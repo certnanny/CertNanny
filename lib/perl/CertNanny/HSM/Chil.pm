@@ -17,8 +17,6 @@ use Cwd;
 use CertNanny::Util;
 use Data::Dumper;
 
-$VERSION = 0.10;
-
 
 sub new() {
   my $proto          = shift;

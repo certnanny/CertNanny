@@ -30,8 +30,6 @@ use Data::Dumper;
 use vars qw(@ISA @EXPORT @EXPORT_OK %EXPORT_TAGS $VERSION);
 use Exporter;
 
-$VERSION = 0.10;
-
 @EXPORT = qw(runCommand timeStamp isoDateToEpoch epochToIsoDate 
              expandDate printableIsoDate readFile writeFile getCertSHA1
              getCertFormat getCertInfoHash getCSRInfoHash parseCertData 

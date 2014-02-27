@@ -28,8 +28,6 @@ use CertNanny::Util;
 # keyspecific needed modules
 use Cwd;
 
-$VERSION = 0.01;
-
 ################################################################################
 
 

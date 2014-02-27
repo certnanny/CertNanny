@@ -1,0 +1,151 @@
+<Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+
+        <PropertyGroup>
+                <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
+                <Platform Condition=" '$(Platform)' == '' ">x86</Platform>
+                <ProductVersion>3.0</ProductVersion>
+                <ProjectGuid>{5FCA88EE-C969-47fd-850A-A2B6CD61273D}</ProjectGuid>
+                <SchemaVersion>2.0</SchemaVersion>
+                <OutputName>CertNanny</OutputName>
+                <OutputType>Package</OutputType>
+                <WixTargetsPath Condition=" '$(WixTargetsPath)' == '' ">$(MSBuildExtensionsPath)\Microsoft\WiX\v3.x\Wix.targets</WixTargetsPath>
+        </PropertyGroup>
+        <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|x86' ">
+                <OutputPath>Windows\bin\$(Configuration)\</OutputPath>
+                <IntermediateOutputPath>Windows\obj\$(Configuration)\</IntermediateOutputPath>
+                <DefineConstants>Debug</DefineConstants>
+        </PropertyGroup>
+        <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|x86' ">
+                <OutputPath>bin\$(Configuration)\</OutputPath>
+                <IntermediateOutputPath>obj\$(Configuration)\</IntermediateOutputPath>
+        </PropertyGroup>
+		<PropertyGroup>
+			<DefineSolutionProperties>false</DefineSolutionProperties>
+			<BindInputPaths>./</BindInputPaths>
+		</PropertyGroup>
+		
+
+		  
+
+    <Import Project="$(WixTargetsPath)" />
+	
+	<ItemGroup>
+        <MyTextFile Include="./../VERSION"/>
+    </ItemGroup>
+
+
+		
+		<ItemGroup  Condition=" $(CN_TEMPLATES) != '' ">
+		
+			<HarvestDirectory Include="$(CN_TEMPLATES)">
+			  <ComponentGroupName>templates</ComponentGroupName>
+			  <DirectoryRefId>templatedirectory</DirectoryRefId>
+			  <AutogenerateGuids>true</AutogenerateGuids>
+			  <GenerateGuidsNow>false</GenerateGuidsNow>
+			  <SuppressUniqueIds>false</SuppressUniqueIds>
+			  <SuppressCom>true</SuppressCom>
+			  <SuppressRegistry>true</SuppressRegistry>
+			  <SuppressRootDirectory>true</SuppressRootDirectory>
+			  <PreprocessorVariable>env.CN_TEMPLATES</PreprocessorVariable>
+			</HarvestDirectory>
+        </ItemGroup>
+		
+		<ItemGroup  Condition=" $(CN_SSCEP) != '' ">
+		
+			<HarvestDirectory Include="$(CN_SSCEP)">
+			  <ComponentGroupName>sscep</ComponentGroupName>
+			  <DirectoryRefId>opensslDir</DirectoryRefId>
+			  <AutogenerateGuids>true</AutogenerateGuids>
+			  <GenerateGuidsNow>false</GenerateGuidsNow>
+			  <SuppressUniqueIds>false</SuppressUniqueIds>
+			  <SuppressCom>true</SuppressCom>
+			  <SuppressRegistry>true</SuppressRegistry>
+			  <SuppressRootDirectory>true</SuppressRootDirectory>
+			  <PreprocessorVariable>env.CN_SSCEP</PreprocessorVariable>
+			</HarvestDirectory>
+        </ItemGroup>
+		
+		<ItemGroup  Condition=" $(CN_OPENSSL) != '' ">
+		
+			<HarvestDirectory Include="$(CN_OPENSSL)">
+			  <ComponentGroupName>openssl</ComponentGroupName>
+			  <DirectoryRefId>opensslDir</DirectoryRefId>
+			  <AutogenerateGuids>true</AutogenerateGuids>
+			  <GenerateGuidsNow>false</GenerateGuidsNow>
+			  <SuppressUniqueIds>false</SuppressUniqueIds>
+			  <SuppressCom>true</SuppressCom>
+			  <SuppressRegistry>true</SuppressRegistry>
+			  <SuppressRootDirectory>true</SuppressRootDirectory>
+			  <PreprocessorVariable>env.CN_OPENSSL</PreprocessorVariable>
+			</HarvestDirectory>
+        </ItemGroup>
+		
+		<ItemGroup  Condition=" $(CN_ROOTCERTS) != '' ">
+		
+			<HarvestDirectory Include="$(CN_ROOTCERTS)">
+			  <ComponentGroupName>rootcerts</ComponentGroupName>
+			  <DirectoryRefId>trustedrootdirectory</DirectoryRefId>
+			  <AutogenerateGuids>true</AutogenerateGuids>
+			  <GenerateGuidsNow>false</GenerateGuidsNow>
+			  <SuppressUniqueIds>false</SuppressUniqueIds>
+			  <SuppressCom>true</SuppressCom>
+			  <SuppressRegistry>true</SuppressRegistry>
+			  <SuppressRootDirectory>true</SuppressRootDirectory>
+			  <PreprocessorVariable>env.CN_ROOTCERTS</PreprocessorVariable>
+			</HarvestDirectory>
+        </ItemGroup>
+		
+		<ItemGroup  Condition=" $(CN_CONFIG_SYSTEM) != '' ">
+		
+			<HarvestDirectory Include="$(CN_CONFIG_SYSTEM)">
+			  <ComponentGroupName>systemconfig</ComponentGroupName>
+			  <DirectoryRefId>etcsystemdir</DirectoryRefId>
+			  <AutogenerateGuids>true</AutogenerateGuids>
+			  <GenerateGuidsNow>false</GenerateGuidsNow>
+			  <SuppressUniqueIds>false</SuppressUniqueIds>
+			  <SuppressCom>true</SuppressCom>
+			  <SuppressRegistry>true</SuppressRegistry>
+			  <SuppressRootDirectory>true</SuppressRootDirectory>
+			  <PreprocessorVariable>env.CN_CONFIG_SYSTEM</PreprocessorVariable>
+			</HarvestDirectory>
+        </ItemGroup>
+		
+        <ItemGroup >          
+				<Compile Include="certnannyinstaller_standalone.wxs" />
+        </ItemGroup>
+
+		
+	<Target Name="BeforeBuild">
+        <ReadLinesFromFile
+            File="@(MyTextFile)" >
+            <Output
+                TaskParameter="Lines"
+                ItemName="certnannyversion"/>
+        </ReadLinesFromFile>
+		<Message  Text="Reading CertNanny Version : %(certnannyversion.Identity)" />
+		
+		<Exec Command="set CN_VERSION=%(certnannyversion.Identity)"/>
+		<PropertyGroup>  
+		
+
+		<DefineConstants>$(HeatDefinitions);CNVERSION=%(certnannyversion.Identity)</DefineConstants>
+
+		</PropertyGroup>
+    </Target>
+
+		
+
+<Target Name="AfterBuild" >
+			<Message  Text='Build CertNanny with Version  %(certnannyversion.Identity)' />
+			<Message Condition=" $(CN_TEMPLATES) == '' " Text='CN_TEMPLATES is not set skip configuration template files' />
+			<Message Condition=" $(CN_TEMPLATES) != '' " Text='CN_TEMPLATES is set to $(CN_TEMPLATES)' />
+			<Message Condition=" $(CN_OPENSSL) == '' " Text='CN_OPENSSL is not set skip openSSL inclusion' />
+			<Message Condition=" $(CN_OPENSSL) != '' " Text='CN_OPENSSL is set to $(CN_OPENSSL)' />
+			<Message Condition=" $(CN_SSCEP) == '' " Text='CN_SSCEP is not set skip sscep inclusion' />
+			<Message Condition=" $(CN_SSCEP) != '' " Text='CN_SSCEP is set to $(CN_SSCEP)' />
+			<Message Condition=" $(CN_CONFIG_SYSTEM) == '' " Text='CN_CONFIG_SYSTEM is not set skip sscep inclusion' />
+			<Message Condition=" $(CN_CONFIG_SYSTEM) != '' " Text='CN_CONFIG_SYSTEM is set to $(CN_CONFIG_SYSTEM)' />
+</Target>
+
+    
+ </Project>

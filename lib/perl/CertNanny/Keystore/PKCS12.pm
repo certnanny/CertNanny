@@ -26,7 +26,6 @@ use CertNanny::Util;
 # keyspecific needed modules
 use English;
 
-$VERSION = 0.10;
 
 ################################################################################
 

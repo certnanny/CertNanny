@@ -31,9 +31,6 @@ use strict;
 use vars qw($VERSION);
 use Exporter;
 
-$VERSION = 0.10;
-
-
 sub new {
   # constructor parameters:
   # location - base name of keystore (required)

@@ -30,7 +30,6 @@ use English;
 # use CertNanny::Keystore;
 # use CertNanny::Keystore::OpenSSL;
 
-$VERSION = 0.10;
 
 ################################################################################
 
