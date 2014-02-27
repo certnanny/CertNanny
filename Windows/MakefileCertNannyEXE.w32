@@ -1,0 +1,30 @@
+#Create a standalone CertNanny for windows 
+#
+#This is an example makefile for Win32 strawberry-perl 5.16.1.1
+#Active Perl could be used as alternative but the curren version has a proken PAR-Packer instalation, the module has to be compiled with the same compiler as ActivePerl witch is a old MS VC++ witch was not available. 
+#
+#WHY: CertNanny is a perl script with requires a perl enviroment in order to be executed to elimnate this requirement you can create a standalone CertNanny.exe
+#
+#HOW: PAR:Packer is a cpan module that will pack all dependecies of CertNanny including perl into a standalone .exe file 
+#
+#PREREQS: for Win32 strawberry-perl 5.16.1.1 use the cpan interface to install PAR::Packer and Win32::Deamon before runing this makefile to create a CertNanny.exe 
+#You will require a instalation of Vistual Studio (8 or higher) and enable its enviroment to use nmake.
+#
+OUTDIR=CertNannyWIN32
+SOURCES=.\..\bin\certnanny .\..\lib\perl\daemon.DLL .\..\lib\perl\CertNanny\Keystore\Java.pm .\..\lib\perl\CertNanny\Keystore\OpenSSL.pm .\..\lib\perl\CertNanny\Keystore\MQ.pm .\..\lib\perl\CertNanny\Keystore\PKCS12.pm .\..\lib\perl\CertNanny\Keystore\Skeleton.pm .\..\lib\perl\CertNanny\Keystore\WindowsIIS.pm .\..\lib\perl\CertNanny\Keystore\SAP.pm
+
+# all: .\..\bin\certnanny .\..\lib\perl\daemon.DLL .\..\lib\perl\CertNanny\Keystore\Java.pm .\..\lib\perl\CertNanny\Keystore\OpenSSL.pm .\..\lib\perl\CertNanny\Keystore\MQ.pm .\..\lib\perl\CertNanny\Keystore\PKCS12.pm .\..\lib\perl\CertNanny\Keystore\Skeleton.pm .\..\lib\perl\CertNanny\Keystore\WindowsIIS.pm .\..\lib\perl\CertNanny\Keystore\SAP.pm 
+all: certnanny.exe
+
+package: bin/release/certnanny.msi
+
+certnanny.exe: $(SOURCES)
+		pp -v=3 -I .\..\lib\perl -o certnanny.exe .\..\bin\certnanny -M Data::Dumper -M IPC::Open3 -M Win32::Daemon -M CertNanny -l ./../lib/perl/daemon.DLL -M ./../lib/perl/CertNanny/Keystore/Java.pm -M ./../lib/perl/CertNanny/Keystore/OpenSSL.pm -M ./../lib/perl/CertNanny/Keystore/MQ.pm -M ./../lib/perl/CertNanny/Keystore/PKCS12.pm -M ./../lib/perl/CertNanny/Keystore/Skeleton.pm -M ./../lib/perl/CertNanny/Keystore/Windows.pm -M ./../lib/perl/CertNanny/Keystore/WindowsIIS.pm -M ./../lib/perl/CertNanny/Keystore/SAP.pm
+
+bin/release/certnanny.msi: certnanny.exe
+		msbuild.exe certnanny.wixproj /v:d /t:rebuild /p:Configuration=Release
+
+clean:
+	-del certnanny.exe
+	@if exist .\bin rmdir /s /q  .\bin
+	@if exist .\obj rmdir /s /q  .\obj

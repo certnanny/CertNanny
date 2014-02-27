@@ -1,0 +1,64 @@
+#
+#
+# Sample configuration file for the CertNanny renewal script system
+#
+# 20013-11-15 Arkadius Litwinczuk  <arkadius.litwinczuk@db.com>
+#
+#Name of the CertNanny service
+platform.windows.servicename = CertNanny
+
+#platform.windows.servicename    = CertNanny
+#time frame for starting the renewal process (in seconds)
+platform.windows.serviceinterval =86400
+
+CNPATH                       = __ENV__ProgramFiles(x86)__\CertNanny
+CNDATA 			  = __ENV__ALLUSERSPROFILE__\CertNanny
+
+
+path.tmpdir                      = $(CNDATA)\tmp\
+
+# NOTE: Set the desired log level here. For common usage 2 or 3 should
+#       be OK.
+# 0: fatal, 1: error, 2: notice, 3: info, 4: debug, 5: scep verbose, 6: scep debug
+loglevel = 3
+#Name and destination of the certnanny logfile
+
+logfile                          = $(CNDATA)\certnanny.log
+
+#randomWait if this is set there will be a random backoff time while renewing a certificate to ease the stress on the PKI (e.g. 1000 servers run certanny with the same config for a cron job ) 
+randomWait =  300
+
+#Conditional wait time between HHMMSS  - HHMMSS here will be a random backoff time while renewing a certificate
+#conditionalwait.time = 5
+#conditionalwait.start =  100000
+#conditionalwait.end  =   120000
+
+
+# NOTE: These settings are necessary for CertNanny to work properly.
+#       Adjust the values to reflect your local setup. It is highly
+#       recommended to use absolute paths.
+#
+# OpenSSL location (required)
+cmd.openssl = $(CNPATH)\OpenSSL\openssl.exe
+cmd.opensslconf = $(CNPATH)\OpenSSL\openssl.cnf
+
+# sscep binary location (required)
+cmd.sscep   = $(CNPATH)\OpenSSL\sscep.exe
+
+# java an keytool location (optional)
+#cmd.java    = /usr/bin/java
+#cmd.keytool = /usr/bin/keytool
+#cmd.java    =C:\Program Files\Java\jdk1.6.0_27\bin\java.exe
+#cmd.keytool = C:\Program Files\Java\jdk1.6.0_27\bin\Keytool.exe
+
+#keystore config include directory all config files in this directory will  be added to the configuration, location realtive to Master .cfg file
+include Keystore-DEFAULT-w32.cfg
+#include Keystore-OpenSSL-PKCS8.cfg
+#include Keystore-PKCS12.cfg
+#include Keystore-OpenSSL-DER.cfg
+#include Keystore-OpenSSL.cfg
+#include Keystore-Java.cfg
+#include Keystore-Windows.cfg
+
+
+include /system
