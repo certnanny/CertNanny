@@ -49,11 +49,15 @@ You will also find the [issue tracker](https://github.com/certnanny/CertNanny/is
 
 [Official milestones/releases are tracked on GitHub.](https://github.com/certnanny/CertNanny/issues/milestones)
 
-### Version 1.1
+### Version 1.2
 
-Release date: ETA 2014-02-28
+Release date: ETA 2014-04-30
 
 Currently under development.
+
+### Version 1.1 **(Latest stable release)** 
+
+Release date: 2014-02-28
 
 Key features:
 - improved configuration features
@@ -72,7 +76,7 @@ Key features:
 
 ### Version 0.10
 
-Release date: 2007-06-19 **(Latest stable release)** 
+Release date: 2007-06-19
 
 This version introduces PKCS#12 support and adds MQ/GSKit support for Windows platforms. When creating a new keystore the configured Root Certificates are now examined for their validity period. Expired (and if desired not-yet-valid) certificates are not imported into the new keystore. This behaviour is fully configurable per keystore.
 

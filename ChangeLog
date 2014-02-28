@@ -1,3 +1,29 @@
+2014-02-28  Martin Bartosch  <m.bartosch@cynops.de>
+
+	* certnanny: release version 1.1
+
+	* improved configuration features
+
+	* support of different key sizes in keystores
+
+	* Root CA certificates now stored in directory
+
+	* fully automatic Root CA update feature via SCEP GetNextCA
+
+	* "Root Only" Keystores (for trust anchor configuration)
+
+	* improved Windows keystore support (Machine Keystore)
+
+	* updated GSKit 7.1 support
+
+	* meta data submission in SCEP request
+
+	* additional hook functions (expired, invocation)
+
+	* improved logging
+
+	* packaging for all major platforms
+
 2007-06-19  Martin Bartosch  <m.bartosch@cynops.de>
 
 	* certnanny: release version 0.10
