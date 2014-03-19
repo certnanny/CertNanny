@@ -1,7 +1,7 @@
 ; Create a new request with a new keypair
 [NewRequest]
 ;The following has no effect on the -new command and is thus not included
-;Exportable=TRUE
+Exportable=TRUE
 
 ;Choose your desired key length in bits. Common values are 1024, 2048 and 4096.
 ;Use 2048 if not otherwise required.
@@ -13,7 +13,7 @@ KeyLength=2048
 ;1 stands for encryption and signature (both)
 ;2 stands for signature only
 ;If you want encryption only, take a look at EncipherOnly
-KeySpec=2
+KeySpec=1
 
 ;The key usage can be used to more specifically determine the usage of the key.
 ;Default usage is 0xa0, if unsure, keep it (does not need to be enabled)
@@ -23,7 +23,7 @@ KeySpec=2
 
 ;enable this if you want to use machine storage and not user storage.
 ;May be useful when running a server that uses the machine storage
-;MachineKeySet=TRUE
+MachineKeySet=TRUE
 
 ;Do not enable the next one unless you know what you are doing
 ;This is for CMC only
@@ -58,7 +58,7 @@ RequestType=PKCS10
 ;This is a mandatory field you need to change! Set it to the desired CN including any other data needed
 ;for example set it to
 ;NOTE: If using the file with CertNanny, you do not set anything here, as CertNanyn will overwrite it!
-;Subject="CN=John Smith,CN=Users,DC=Contoso,DC=com"
+Subject="CN=mydomain.top.com:CertNanny"
 
 ;Enable this value if you wish to recieve a password prompt to protect your generated private key
 ;UserProtected=TRUE
