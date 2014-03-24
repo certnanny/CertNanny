@@ -55,7 +55,15 @@ Release date: ETA 2014-04-30
 
 Currently under development.
 
-### Version 1.1 **(Latest stable release)** 
+### Version 1.1.1 **(Latest stable release)** 
+
+Release date: 2014-03-24
+
+Bugfix release:
+- fix for GSKKit8  under windows
+- Windows certreq inf file update
+
+### Version 1.1
 
 Release date: 2014-02-28
 
