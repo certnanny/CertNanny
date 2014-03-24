@@ -644,7 +644,11 @@ if($options->{gsk6cmd})
     CertNanny::Logging->error("Could not get certificate label");
     return undef;
   }
-  my $exportp12 = CertNanny::Util->getTmpFile();
+  
+  my $tmpdir = $config->get('path.tmpdir', 'FILE');
+
+  #the export p12 file has to have the extension .p12 , due to the fact that gsk8capicmd.exe under windows ignores the target_type argument.
+  my $exportp12 = File::Spec->catfile($tmpdir, $entryname."export.p12");
     
   chmod 0600, $exportp12;
   
@@ -683,6 +687,7 @@ if($options->{gsk6cmd})
   delete $ENV{PASSIN};
   $keydata = CertNanny::Util->readFile($exportkey);
   unlink $exportkey;
+  unlink $exportp12;
   
   if ((!defined $keydata) or ($keydata eq "")) {
     CertNanny::Logging->error("getKey(): Could not convert private key via pkcs12 export");
