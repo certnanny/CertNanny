@@ -114,39 +114,39 @@ sub new {
       and $self->{INSTANCE}->{OPTIONS}->{ENTRY}->{INITIALENROLLEMNT} eq 'yes') {
     CertNanny::Logging->debug("Initialenrollment keystore that has no certificate to read yet.");
   } else {
-  	if ($self->{INSTANCE}->{OPTIONS}->{ENTRY}->{location} eq "rootonly") {
-	     CertNanny::Logging->debug("rootonly keystore that has no certificate to read.");
-	  } else {
-	    $self->{CERT} = $self->{INSTANCE}->getCert();
-	
-  	  if (defined $self->{CERT}) {
-	      $self->{CERT}->{CERTINFO} = CertNanny::Util->getCertInfoHash(%{$self->{CERT}});
-	      CertNanny::Logging->debug("Certificate Information:\n\tSubjectName: " . $self->{CERT}->{CERTINFO}->{SubjectName}  . "\n\t" .
-	                                                            "Serial: "      . $self->{CERT}->{CERTINFO}->{SerialNumber} . "\n\t" . 
-	                                                            "Issuer: "      . $self->{CERT}->{CERTINFO}->{IssuerName});
-	
-  	    my %convopts = %{$self->{CERT}};
-	       
-	      $convopts{OUTFORMAT}        = 'PEM';
-	      $self->{CERT}->{RAW}->{PEM} = CertNanny::Util->convertCert(%convopts)->{CERTDATA};
-	      # $self->k_convertCert(%convopts)->{CERTDATA};
-	      $convopts{OUTFORMAT}        = 'DER';
-	      $self->{CERT}->{RAW}->{DER} = CertNanny::Util->convertCert(%convopts)->{CERTDATA};
-	      # $self->k_convertCert(%convopts)->{CERTDATA};
-	    } else {
-	      CertNanny::Logging->error("Could not parse instance certificate");
-	      return undef;
-	    }
-	    $self->{INSTANCE}->k_setCert($self->{CERT});
-  	} ## end else [ if (defined $self->{INSTANCE...})]
-	
-	  # get previous renewal status
-	  $self->k_retrieveState() or return;
-	
-	  # check if we can write to the file
-	  $self->k_storeState() || croak "Could not write state file $self->{STATE}->{FILE}";
+    if ($self->{INSTANCE}->{OPTIONS}->{ENTRY}->{location} eq "rootonly") {
+       CertNanny::Logging->debug("rootonly keystore that has no certificate to read.");
+    } else {
+      $self->{CERT} = $self->{INSTANCE}->getCert();
+  
+      if (defined $self->{CERT}) {
+        $self->{CERT}->{CERTINFO} = CertNanny::Util->getCertInfoHash(%{$self->{CERT}});
+        CertNanny::Logging->debug("Certificate Information:\n\tSubjectName: " . $self->{CERT}->{CERTINFO}->{SubjectName}  . "\n\t" .
+                                                              "Serial: "      . $self->{CERT}->{CERTINFO}->{SerialNumber} . "\n\t" . 
+                                                              "Issuer: "      . $self->{CERT}->{CERTINFO}->{IssuerName});
+  
+        my %convopts = %{$self->{CERT}};
+         
+        $convopts{OUTFORMAT}        = 'PEM';
+        $self->{CERT}->{RAW}->{PEM} = CertNanny::Util->convertCert(%convopts)->{CERTDATA};
+        # $self->k_convertCert(%convopts)->{CERTDATA};
+        $convopts{OUTFORMAT}        = 'DER';
+        $self->{CERT}->{RAW}->{DER} = CertNanny::Util->convertCert(%convopts)->{CERTDATA};
+        # $self->k_convertCert(%convopts)->{CERTDATA};
+      } else {
+        CertNanny::Logging->error("Could not parse instance certificate");
+        return undef;
+      }
+      $self->{INSTANCE}->k_setCert($self->{CERT});
+    } ## end else [ if (defined $self->{INSTANCE...})]
+  
+    # get previous renewal status
+    $self->k_retrieveState() or return;
+  
+    # check if we can write to the file
+    $self->k_storeState() || croak "Could not write state file $self->{STATE}->{FILE}";
   }
-	
+  
   return $self;
 } ## end sub new
 
@@ -990,10 +990,10 @@ sub k_getNextTrustAnchor {
 
   CertNanny::Logging->debug("CertNanny::Keystore::k_getNextTrustAnchor ");
   if (!$self->k_getCaCerts()){
-  	
-  	CertNanny::Logging->error("Could not get CA certs - abort get next trust Anchor ");
-  	
-  	return 1;   	
+    
+    CertNanny::Logging->error("Could not get CA certs - abort get next trust Anchor ");
+    
+    return 1;     
   }
   
   #CertNanny::Logging->debug("getEnroller config: " . Dumper($self));
@@ -1053,7 +1053,8 @@ sub k_getNextTrustAnchor {
       }
       
       if (!$rc) {
-        my $signerCertInfo->{CERTINFO} = $signerCertificate;
+        my $signerCertInfo ;
+        $signerCertInfo->{CERTINFO} = $signerCertificate;
         if (!$self->k_buildCertificateChain($signerCertInfo)) {
           $rc = CertNanny::Logging->error("Signer certificate NOT trusted against lokal root CA certs, rootcerts WILL NOT BE ACCEPTED: " . $RDN[0]);
         }
@@ -1072,13 +1073,13 @@ sub k_getNextTrustAnchor {
 
             if (-e $newRootCertFile) {
               ##check quaratine days , install into configured roots dir
-              my $filestat = (stat($newRootCertFile));
+              my @filestat = (stat($newRootCertFile));
               my $now      = time();
-              my $fileage  = $filestat->ctime;
+              my $fileage  = $filestat[10];
 
-              #CertNanny::Logging->debug("qfile age :" . $filestat->ctime . Dumper (stat($newRootCertFile) ) );
+              #CertNanny::Logging->debug("file age :" .  $filestat[10] . Dumper (stat($newRootCertFile) ) );
               CertNanny::Logging->debug("now: " . $now);
-              CertNanny::Logging->debug("sub age minus now: " . ($now - $fileage));
+              CertNanny::Logging->debug("sub $fileage age minus now $now: " . ($now - $fileage));
 
               my $quarantineTimeInSec = $entry->{rootcaupdate}->{quarantinetime} * 86400;
 
@@ -1543,27 +1544,27 @@ sub k_syncRootCAs {
 
         if (!$rebuild) {
           # comparison $availableRootCAs to $installedRootCAs
-	        foreach my $certSHA1 (keys (%{$availableRootCAs})) {
-	          $rebuild ||= !exists($installedRootCAs->{$certSHA1});
+          foreach my $certSHA1 (keys (%{$availableRootCAs})) {
+            $rebuild ||= !exists($installedRootCAs->{$certSHA1});
             if ($rebuild) {
               CertNanny::Logging->info("Target: $target/$locSearch{lc($target)}: Available Root CA $availableRootCAs->{$certSHA1}->{CERTINFO}->{SubjectName} missing in installed root CAs.");
               last;
             }
-	        }
+          }
         }
 
-	      if ($rebuild) {
-	        CertNanny::Logging->debug("Target: $target/$locSearch{lc($target)}: Rebuilding.");
-	        if (!$doHook) {
+        if ($rebuild) {
+          CertNanny::Logging->debug("Target: $target/$locSearch{lc($target)}: Rebuilding.");
+          if (!$doHook) {
             $self->k_executeHook($entry->{hook}->{rootCA}->{install}->{pre},
                                  '__ENTRY__'       => $entryname);
             $doHook = 1;
-	        }
+          }
 
-		      $self->installRoots(TARGET    => $target,
-		                          INSTALLED => $installedRootCAs,
-		                          AVAILABLE => $availableRootCAs);
-		    }
+          $self->installRoots(TARGET    => $target,
+                              INSTALLED => $installedRootCAs,
+                              AVAILABLE => $availableRootCAs);
+        }
       }
     }
     if ($doHook && defined($self->{hook})) {
@@ -1752,9 +1753,9 @@ sub _sendRequest {
   my $scepracert       = $self->{STATE}->{DATA}->{SCEP}->{RACERT};
   my $scepchecksubjectname ; 
   if(defined $entry->{scepchecksubjectname}){
-  	$scepchecksubjectname = $entry->{scepchecksubjectname}; 
+    $scepchecksubjectname = $entry->{scepchecksubjectname}; 
   }else{
-  	$scepchecksubjectname = 'no';
+    $scepchecksubjectname = 'no';
   }
 
   if (!exists $self->{STATE}->{DATA}->{RENEWAL}->{REQUEST}->{CERTFILE}) {
@@ -1914,7 +1915,7 @@ sub _sendRequest {
       $entry->{location} = $conf->{CONFIG}->{certmonitor}->{$entryname}->{location};
       
       if (!$entry->{initialenroll}->{targetPIN}  or $entry->{initialenroll}->{targetPIN} eq "") {
-      	$entry->{initialenroll}->{targetPIN} = $conf->{CONFIG}->{certmonitor}->{$entryname}->{key}->{pin};
+        $entry->{initialenroll}->{targetPIN} = $conf->{CONFIG}->{certmonitor}->{$entryname}->{key}->{pin};
       }
       
       my @cachain;
@@ -1933,8 +1934,8 @@ sub _sendRequest {
                   PIN    => $conf->{CONFIG}->{certmonitor}->{$entryname}->{key}->{pin}
                   );
                   
-       #	CertNanny::Logging->debug("CertNanny::Keystore::_sendRequest ". Dumper(%args) );
-	
+       #  CertNanny::Logging->debug("CertNanny::Keystore::_sendRequest ". Dumper(%args) );
+  
 
 # Todo Testen createPKCS12: Passt das noch? Die Methode war im Keystore als Dummy implementiert und nur in den Keys ausprogrammiert, wird aber über $self aufgerufen?!?
 # Todo Testen createPKCS12: Was passiert hier? keine Zuweisung des Ergebnisses ....
@@ -1943,8 +1944,8 @@ sub _sendRequest {
       my $target = $entry->{initialenroll}->{targetType};
       CertNanny::Logging->debug("Target keystore: " . $target);
       if (!$exportp12) {
-      	CertNanny::Logging->error("Failed to create initial PKCS12 " . $target);
-      	return 0;
+        CertNanny::Logging->error("Failed to create initial PKCS12 " . $target);
+        return 0;
       }
 
       eval {
@@ -1969,9 +1970,9 @@ sub _sendRequest {
         # PIN => cert label to be used in pkcs#12 structure
         # ENTRYNAME => certificate location
         # CONF => keystore config to be implemented
-		
-		#CertNanny::Logging->debug("CertNanny::Keystore::${target}::importP12 ". Dumper(%p12args) );
-		
+    
+    #CertNanny::Logging->debug("CertNanny::Keystore::${target}::importP12 ". Dumper(%p12args) );
+    
         eval "CertNanny::Keystore::${target}::importP12( %p12args )";
         if ($@) {
           croak "Problem calling importP12 $@";
