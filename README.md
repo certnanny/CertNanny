@@ -55,7 +55,15 @@ Release date: ETA 2014-04-30
 
 Currently under development.
 
-### Version 1.1.1 **(Latest stable release)** 
+### Version 1.1.2 **(Latest stable release)** 
+
+Release date: 2014-04-16
+
+Bugfix release:
+- fix for getNextCA ctime issue
+- fix for IIS configuration issue
+
+### Version 1.1.1
 
 Release date: 2014-03-24
 
