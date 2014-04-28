@@ -16,10 +16,10 @@ cp bin/certnanny opt/CertNanny/bin/certnanny
 tar cf - etc | (cd var/CertNanny; tar xf -)
 tar cf - lib | (cd opt/CertNanny; tar xf -)
 # compute the version number (VRML)
-#arch=$(uname -p)
-#ts=$(date +'%Y%m%d%H%M%S')
 version=$(head -n 1 VERSION)
 version="$version.0"
+# provide the override inventory file to file ownership and permissions
+cp AIX/override_inventory /tmp
 # create the template and building the package
 sed "s/VERSIONINFO/$version/" < AIX/lpp_template.in | sed "s#__PACKAGINGDIR__#$PWD#" > AIX/lpp_template
 mkinstallp -d . -T AIX/lpp_template
