@@ -1,0 +1,379 @@
+/opt/CertNanny:
+	owner = root
+	group = system
+	mode = 755
+	type =
+	class =
+	size =
+	checksum =
+
+/opt/CertNanny/bin:
+	owner = root
+	group = system
+	mode = 755
+	type =
+	class =
+	size =
+	checksum =
+
+/opt/CertNanny/lib:
+	owner = root
+	group = system
+	mode = 755
+	type =
+	class =
+	size =
+	checksum =
+
+/opt/CertNanny/FAQ:
+	owner = root
+	group = system
+	mode = 644
+	type =
+	class =
+	size =
+	checksum =
+
+/opt/CertNanny/LICENSE.CertNanny:
+	owner = root
+	group = system
+	mode = 644
+	type =
+	class =
+	size =
+	checksum =
+
+/opt/CertNanny/QUICKSTART:
+	owner = root
+	group = system
+	mode = 644
+	type =
+	class =
+	size =
+	checksum =
+
+/opt/CertNanny/bin/certnanny:
+	owner = root
+	group = system
+	mode = 755
+	type =
+	class =
+	size =
+	checksum =
+
+/var/CertNanny/etc/Keystore-DEFAULT.cfg.template:
+	owner = root
+	group = system
+	mode = 644
+	type =
+	class =
+	size =
+	checksum =
+
+/var/CertNanny/etc/Keystore-Java.cfg.template:
+	owner = root
+	group = system
+	mode = 644
+	type =
+	class =
+	size =
+	checksum =
+
+/var/CertNanny/etc/Keystore-MQ.cfg.template:
+	owner = root
+	group = system
+	mode = 644
+	type =
+	class =
+	size =
+	checksum =
+
+/var/CertNanny/etc/Keystore-OpenSSL-PKCS8.cfg.template:
+	owner = root
+	group = system
+	mode = 644
+	type =
+	class =
+	size =
+	checksum =
+
+/var/CertNanny/etc/Keystore-OpenSSL.cfg.template:
+	owner = root
+	group = system
+	mode = 644
+	type =
+	class =
+	size =
+	checksum =
+
+/var/CertNanny/etc/Keystore-PKCS12.cfg.template:
+	owner = root
+	group = system
+	mode = 644
+	type =
+	class =
+	size =
+	checksum =
+
+/var/CertNanny/etc/Keystore-Windows.cfg.template:
+	owner = root
+	group = system
+	mode = 644
+	type =
+	class =
+	size =
+	checksum =
+
+/var/CertNanny/etc/certnanny-Master.cfg.template:
+	owner = root
+	group = system
+	mode = 644
+	type =
+	class =
+	size =
+	checksum =
+
+/var/CertNanny/etc/certreq.inf:
+	owner = root
+	group = system
+	mode = 644
+	type =
+	class =
+	size =
+	checksum =
+
+/opt/CertNanny/lib:
+	owner = root
+	group = system
+	mode = 755
+	type =
+	class =
+	size =
+	checksum =
+
+/opt/CertNanny/lib/java:
+	owner = root
+	group = system
+	mode = 755
+	type =
+	class =
+	size =
+	checksum =
+
+/opt/CertNanny/lib/java/ExtractKey.jar:
+	owner = root
+	group = system
+	mode = 644
+	type =
+	class =
+	size =
+	checksum =
+
+/opt/CertNanny/lib/perl:
+	owner = root
+	group = system
+	mode = 755
+	type =
+	class =
+	size =
+	checksum =
+
+/opt/CertNanny/lib/perl/CertNanny.pm:
+	owner = root
+	group = system
+	mode = 644
+	type =
+	class =
+	size =
+	checksum =
+
+/opt/CertNanny/lib/perl/CertNanny:
+	owner = root
+	group = system
+	mode = 755
+	type =
+	class =
+	size =
+	checksum =
+
+/opt/CertNanny/lib/perl/CertNanny/Config.pm:
+	owner = root
+	group = system
+	mode = 644
+	type =
+	class =
+	size =
+	checksum =
+
+/opt/CertNanny/lib/perl/CertNanny/Keystore.pm:
+	owner = root
+	group = system
+	mode = 644
+	type =
+	class =
+	size =
+	checksum =
+
+/opt/CertNanny/lib/perl/CertNanny/Keystore:
+	owner = root
+	group = system
+	mode = 755
+	type =
+	class =
+	size =
+	checksum =
+
+/opt/CertNanny/lib/perl/CertNanny/Keystore/Java.pm:
+	owner = root
+	group = system
+	mode = 644
+	type =
+	class =
+	size =
+	checksum =
+
+/opt/CertNanny/lib/perl/CertNanny/Keystore/MQ.pm:
+	owner = root
+	group = system
+	mode = 644
+	type =
+	class =
+	size =
+	checksum =
+
+/opt/CertNanny/lib/perl/CertNanny/Keystore/OpenSSL.pm:
+	owner = root
+	group = system
+	mode = 644
+	type =
+	class =
+	size =
+	checksum =
+
+/opt/CertNanny/lib/perl/CertNanny/Keystore/PKCS12.pm:
+	owner = root
+	group = system
+	mode = 644
+	type =
+	class =
+	size =
+	checksum =
+
+/opt/CertNanny/lib/perl/CertNanny/Keystore/Skeleton.pm:
+	owner = root
+	group = system
+	mode = 644
+	type =
+	class =
+	size =
+	checksum =
+
+/opt/CertNanny/lib/perl/CertNanny/Keystore/Windows.pm:
+	owner = root
+	group = system
+	mode = 644
+	type =
+	class =
+	size =
+	checksum =
+
+/opt/CertNanny/lib/perl/CertNanny/Keystore/WindowsIIS.pm:
+	owner = root
+	group = system
+	mode = 644
+	type =
+	class =
+	size =
+	checksum =
+
+/opt/CertNanny/lib/perl/CertNanny/Keystore/SAP.pm:
+	owner = root
+	group = system
+	mode = 644
+	type =
+	class =
+	size =
+	checksum =
+
+/opt/CertNanny/lib/perl/CertNanny/Util.pm:
+	owner = root
+	group = system
+	mode = 644
+	type =
+	class =
+	size =
+	checksum =
+
+/opt/CertNanny/lib/perl/CertNanny/Enroll.pm:
+	owner = root
+	group = system
+	mode = 644
+	type =
+	class =
+	size =
+	checksum =
+
+/opt/CertNanny/lib/perl/CertNanny/Enroll:
+	owner = root
+	group = system
+	mode = 644
+	type =
+	class =
+	size =
+	checksum =
+
+/opt/CertNanny/lib/perl/CertNanny/Enroll/Sscep.pm:
+	owner = root
+	group = system
+	mode = 644
+	type =
+	class =
+	size =
+	checksum =
+
+/opt/CertNanny/lib/perl/CertNanny/HSM.pm:
+	owner = root
+	group = system
+	mode = 644
+	type =
+	class =
+	size =
+	checksum =
+
+/opt/CertNanny/lib/perl/CertNanny/HSM:
+	owner = root
+	group = system
+	mode = 644
+	type =
+	class =
+	size =
+	checksum =
+
+/opt/CertNanny/lib/perl/CertNanny/HSM/Chil.pm:
+	owner = root
+	group = system
+	mode = 644
+	type =
+	class =
+	size =
+	checksum =
+
+/opt/CertNanny/lib/perl/CertNanny/HSM/Utimaco.pm:
+	owner = root
+	group = system
+	mode = 644
+	type =
+	class =
+	size =
+	checksum =
+
+/opt/CertNanny/lib/perl/CertNanny/Logging.pm:
+	owner = root
+	group = system
+	mode = 644
+	type =
+	class =
+	size =
+	checksum =
+
+

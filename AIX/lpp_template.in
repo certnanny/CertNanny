@@ -4,11 +4,11 @@ Update: N
 Fileset
   Fileset Name: CertNanny.rte
   Fileset VRMF: VERSIONINFO
-  Fileset Description: CertNanny automatic renewal of certificates using the SCEP protocol
+  Fileset Description: CertNanny automatic certificate renewal
   Bosboot required: N
   License agreement acceptance required: N
   Include license files in this package: N
-  Requisites:
+  Requisites: *coreq CertNanny.sscep 0.5.0.0
   USRLIBLPPFiles
     Post-installation Script: __PACKAGINGDIR__/AIX/certnanny.post-install.sh
     Pre-deinstall Script: __PACKAGINGDIR__/AIX/certnanny.pre-deinstall.sh
@@ -60,5 +60,6 @@ Fileset
   ROOT Part: N
   ROOTFiles
   EOROOTFiles
+  OVERRIDE_INVENTORY: /tmp/override_inventory
 EOFileset
 
