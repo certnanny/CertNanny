@@ -61,6 +61,60 @@
 	size =
 	checksum =
 
+/var/CertNanny/AuthoritativeRootcerts:
+	owner = root
+	group = system
+	mode = 755
+	type =
+	class =
+	size =
+	checksum =
+
+/var/CertNanny/logs:
+	owner = root
+	group = system
+	mode = 755
+	type =
+	class =
+	size =
+	checksum =
+
+/var/CertNanny/quarantine:
+	owner = root
+	group = system
+	mode = 755
+	type =
+	class =
+	size =
+	checksum =
+
+/var/CertNanny/state:
+	owner = root
+	group = system
+	mode = 755
+	type =
+	class =
+	size =
+	checksum =
+
+/var/CertNanny/tmp:
+	owner = root
+	group = system
+	mode = 755
+	type =
+	class =
+	size =
+	checksum =
+
+/var/CertNanny/etc:
+	owner = root
+	group = system
+	mode = 755
+	type =
+	class =
+	size =
+	checksum =
+
 /var/CertNanny/etc/Keystore-DEFAULT.cfg.template:
 	owner = root
 	group = system
@@ -316,7 +370,7 @@
 /opt/CertNanny/lib/perl/CertNanny/Enroll:
 	owner = root
 	group = system
-	mode = 644
+	mode = 755
 	type =
 	class =
 	size =
@@ -343,7 +397,7 @@
 /opt/CertNanny/lib/perl/CertNanny/HSM:
 	owner = root
 	group = system
-	mode = 644
+	mode = 755
 	type =
 	class =
 	size =

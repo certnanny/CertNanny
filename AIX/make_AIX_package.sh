@@ -8,6 +8,11 @@ rm -rf tmp
 mkdir -p opt/CertNanny/bin
 mkdir -p opt/CertNanny/lib
 mkdir -p var/CertNanny/etc
+mkdir -p var/CertNanny/AuthoritativeRootcerts
+mkdir -p var/CertNanny/logs
+mkdir -p var/CertNanny/quarantine
+mkdir -p var/CertNanny/state
+mkdir -p var/CertNanny/tmp
 mkdir -p var/CertNanny/log
 cp LICENSE opt/CertNanny/LICENSE.CertNanny
 cp FAQ opt/CertNanny/FAQ
