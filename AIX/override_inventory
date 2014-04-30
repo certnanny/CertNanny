@@ -16,15 +16,6 @@
 	size =
 	checksum =
 
-/opt/CertNanny/lib:
-	owner = root
-	group = system
-	mode = 755
-	type =
-	class =
-	size =
-	checksum =
-
 /opt/CertNanny/FAQ:
 	owner = root
 	group = system
