@@ -11,12 +11,11 @@ Fileset
   Requisites: *coreq CertNanny.sscep 0.5.0.0
   USRLIBLPPFiles
     Post-installation Script: __PACKAGINGDIR__/AIX/certnanny.post-install.sh
-    Pre-deinstall Script: __PACKAGINGDIR__/AIX/certnanny.pre-deinstall.sh
+    Unconfiguration Script: __PACKAGINGDIR__/AIX/certnanny.unconfiguration.sh
   EOUSRLIBLPPFiles
   USRFiles
     /opt/CertNanny
     /opt/CertNanny/bin
-    /opt/CertNanny/lib
     /opt/CertNanny/FAQ
     /opt/CertNanny/LICENSE.CertNanny
     /opt/CertNanny/QUICKSTART
