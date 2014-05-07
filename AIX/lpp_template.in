@@ -65,6 +65,6 @@ Fileset
   ROOT Part: N
   ROOTFiles
   EOROOTFiles
-  OVERRIDE_INVENTORY: /tmp/override_inventory
+  OVERRIDE_INVENTORY: __PACKAGINGDIR__/AIX/override_inventory
 EOFileset
 
