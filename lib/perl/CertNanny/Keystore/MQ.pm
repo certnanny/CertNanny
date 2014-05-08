@@ -1456,7 +1456,7 @@ sub _getCertLabel {
   foreach my $entry (@certList) {
    chomp $entry;
    # some gskit versions prefix the label with a dash and whitespace
-   $entry =~ s{ \A - \s* }{}xms;
+   $entry =~ s{ \A [\-!] \s* }{}xms;
    if ($entry =~ m/$match/) { 
     $label = $entry;
     CertNanny::Logging->debug("found label '$label'");
