@@ -49,13 +49,15 @@ You will also find the [issue tracker](https://github.com/certnanny/CertNanny/is
 
 [Official milestones/releases are tracked on GitHub.](https://github.com/certnanny/CertNanny/issues/milestones)
 
-### Version 1.2
+### Version 1.1.3  **(Latest stable release)** 
 
-Release date: ETA 2014-04-30
+Release date: 201-05-11
 
-Currently under development.
+Bugfixes release:
+- Solaris and AIX packing improvements
+- MQ keystore support: fix for detecting labels on Windows systems
 
-### Version 1.1.2 **(Latest stable release)** 
+### Version 1.1.2
 
 Release date: 2014-04-16
 
@@ -126,4 +128,4 @@ Initial public release of CertNanny
 The version numbers for official releases shall be limited to two positions. This allows for local customization and repackaging sometimes needed for large-scale internal deployments without using up the available positions (AIX packages are effectively limited to three positions since the fourth is reserved for incremental updates).
 
 --------------------
-Last update: 2014-01-31
+Last update: 2015-05-11
