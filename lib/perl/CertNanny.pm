@@ -510,7 +510,7 @@ sub do_check {
     if (!$instance->k_checkValidity($self->{ITEMS}->{$args{ENTRYNAME}}->{autorenew_days})) {
       CertNanny::Logging->info("Certificate is to be scheduled for automatic renewal ($self->{ITEMS}->{$args{ENTRYNAME}}->{autorenew_days}; days prior to expiry)");
     } else {
-      CertNanny::Logging->info("Certificate has not be scheduled for automatic renewal ($self->{ITEMS}->{$args{ENTRYNAME}}->{autorenew_days}; days prior to expiry)");    
+      CertNanny::Logging->info("Certificate has not been scheduled for automatic renewal ($self->{ITEMS}->{$args{ENTRYNAME}}->{autorenew_days}; days prior to expiry)");    
     }
 
     if (!$instance->k_checkValidity($self->{ITEMS}->{$args{ENTRYNAME}}->{warnexpiry_days})) {
