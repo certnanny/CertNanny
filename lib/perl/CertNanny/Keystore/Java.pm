@@ -811,7 +811,7 @@ sub getInstalledCAs {
         }
         if ($_ =~ m/^[^:]*\): ([0-9A-F:]*).*$/) {
           $certFingerprint = $1;
-          @cmd = $self->_buildKeytoolCmd($locName, '-list', '-rfc', '-alias', $certAlias);
+          @cmd = $self->_buildKeytoolCmd($locName, '-list', '-rfc', '-alias', '"'.$certAlias.'"');
 
           $certData = CertNanny::Util->runCommand(\@cmd, WANTOUT => 1, HIDEPWD => 1);
           $certRef  = $self->getCert(CERTDATA => $certData);
@@ -904,7 +904,7 @@ sub installRoots {
         foreach my $certSHA1 (keys %{$installedRootCAs}) {
           if (!exists($availableRootCAs->{$certSHA1})) {
             CertNanny::Logging->debug("Deleting root cert " . $installedRootCAs->{$certSHA1}->{CERTINFO}->{SubjectName});
-            @cmd =  (qq("$options->{keytool}"), -noprompt, -storepass => qq("$entry->{store}->{pin}"), '-keystore' ,qq("$locName"), '-delete', '-alias', $installedRootCAs->{$certSHA1}->{CERTALIAS});
+            @cmd =  (qq("$options->{keytool}"), -noprompt, -storepass => qq("$entry->{store}->{pin}"), '-keystore' ,qq("$locName"), '-delete', '-alias', '"'.$installedRootCAs->{$certSHA1}->{CERTALIAS}.'"' );
  
             #@cmd = $self->_buildKeytoolCmd($locName, '-delete', '-alias', $installedRootCAs->{$certSHA1}->{CERTALIAS});
             if (CertNanny::Util->runCommand(\@cmd, HIDEPWD => 1)) {
