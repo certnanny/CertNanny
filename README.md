@@ -49,9 +49,16 @@ You will also find the [issue tracker](https://github.com/certnanny/CertNanny/is
 
 [Official milestones/releases are tracked on GitHub.](https://github.com/certnanny/CertNanny/issues/milestones)
 
-### Version 1.1.3  **(Latest stable release)** 
+### Version 1.1.4  **(Latest stable release)** 
 
-Release date: 201-05-11
+Release date: 2014-07-09
+
+Bugfixes release:
+- Fix for MQ default certificate parsing error
+
+### Version 1.1.3
+
+Release date: 2014-05-11
 
 Bugfixes release:
 - Solaris and AIX packing improvements
