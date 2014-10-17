@@ -895,12 +895,10 @@ sub k_checkValidity {
   my $days = shift || 0;
 
   my $notAfter = CertNanny::Util->isoDateToEpoch($self->{CERT}->{CERTINFO}->{NotAfter});
-  CertNanny::Logging->debug("Parsed not After Date: $notAfter ");
+  my $cutoff = time + $days * 24 * 3600;
+  CertNanny::Logging->debug("Parsed not After Date: Timestamp: <$notAfter> ISO-Date: <$self->{CERT}->{CERTINFO}->{NotAfter}> CutOff: <$cutoff>");
 
   return unless defined $notAfter;
-
-  my $cutoff = time + $days * 24 * 3600;
-
   return ($cutoff < $notAfter);
 } ## end sub k_checkValidity
 
@@ -1209,7 +1207,9 @@ sub k_getAvailableRootCAs {
   } else {
     my $certRef;
     my $locRootCA = $config->get("keystore.$entryname.TrustedRootCA.AUTHORITATIVE.Directory", 'FILE');
+    CertNanny::Logging->debug("Searching at location <$locRootCA>");
     foreach (@{CertNanny::Util->fetchFileList($locRootCA)}) {
+      CertNanny::Logging->debug("Checking <$_>");
       if ($certRef = $self->_checkCert($_)) {
         my $certTyp = $self->k_getCertType(%{$certRef});
         if ($certTyp  eq 'installedRootCAs') {
@@ -1267,18 +1267,18 @@ sub _checkCert {
     my $notAfter  = CertNanny::Util->isoDateToEpoch($certinfo->{NotAfter});
     my $now       = time;
     if ($exclude_expired =~ m{ yes }xmsi && ($now > $notAfter)) {
-      CertNanny::Logging->debug("Skipping expired root certificate " . $certinfo->{SubjectName});
+      CertNanny::Logging->debug("Skipping expired certificate " . $certinfo->{SubjectName});
       $rc = 0;
     }
 
     if ($rc && $exclude_notyetvalid =~ m{ yes }xmsi && ($now < $notBefore)) {
-      CertNanny::Logging->debug("Skipping not yet valid root certificate " . $certinfo->{SubjectName});
+      CertNanny::Logging->debug("Skipping not yet valid certificate " . $certinfo->{SubjectName});
       $rc = 0;
     }
   }
 
   if ($rc) {
-    CertNanny::Logging->debug("Trusted root certificate: " . $certinfo->{SubjectName});
+    CertNanny::Logging->debug("Trusted certificate: " . $certinfo->{SubjectName});
     $rc = {CERTINFO   => $certinfo,
            CERTFILE   => $certfile,
            CERTFORMAT => $certformat};
@@ -1470,7 +1470,7 @@ sub k_syncRootCAs {
   # The installed root CAs are fetched via getInstalledCAs. The available
   # trusted root CAs are fetched via k_getRootCerts.
   # Alle available root CAs are installed in a new temp. keystore. The 
-  # installed root CAs are replaced with the new keytore. So all installed
+  # installed root CAs are replaced with the new keystore. So all installed
   # roots CAs that are no longer available are deleted 
   # after all the post-install-hook is executed.
   #
@@ -1508,13 +1508,7 @@ sub k_syncRootCAs {
   #  -<certSHA1> #3
   #   ...
 
-#  my %locSearch = ('directory' => $config->get("keystore.$entryname.TrustedRootCA.GENERATED.Directory", 'FILE'),
-#                   'file'      => $config->get("keystore.$entryname.TrustedRootCA.GENERATED.File",      'FILE'),
-#                   'chainfile' => $config->get("keystore.$entryname.TrustedRootCA.GENERATED.ChainFile", 'FILE'),
-#                   'location'  => $config->get("keystore.$entryname.location",                          'FILE'));
-
-
- my %locSearch =  %{$self->getCertLocation('TYPE' => 'TrustedRootCA')};
+  my %locSearch =  %{$self->getCertLocation('TYPE' => 'TrustedRootCA')};
  
   # First fetch available root certificates
   my $availableRootCAs = $self->k_getAvailableRootCAs();
@@ -1722,7 +1716,7 @@ sub k_getCertType {
     }
   }
  
-  CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "Determine the Cert Type (installedRootCAs|installedIntermediateCAs|installedEE)");
+  CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "Determine the Cert Type (installedRootCAs|installedIntermediateCAs|installedEE) as <$rc>");
   return $rc;
 } ## end sub k_getCertType
 
