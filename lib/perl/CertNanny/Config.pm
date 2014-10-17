@@ -80,6 +80,8 @@ sub new {
     $self->{CONFIGFILE} = $args{CONFIG} || 'certnanny.cfg';
     $self->{CONFIGPATH} = (fileparse($self->{CONFIGFILE}))[1];
 
+    CertNanny::Logging->info("CertNanny started with configfile <$self->{CONFIGFILE}>");
+
     $self->_parse() || return undef;
   }
   return $INSTANCE;
