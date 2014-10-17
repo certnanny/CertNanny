@@ -573,6 +573,12 @@ sub getCertSHA1 {
       }
     }
   }
+  if (defined($rc)) {
+    CertNanny::Logging->debug("SHA1 calculated as <$rc->{CERTSHA1}>\n");
+  } else {
+    CertNanny::Logging->debug("No SHA1 calculated\n");
+  } 
+  
 
   return $rc;
 } ## end sub getCertSHA1
