@@ -472,7 +472,7 @@ sub dummy () {
 #  #
 #  # this function synchronizes installed roots with local trusted root CAs.
 #  # The installed root CAs are fetched via getInstalledCAs. The available
-#  # trusted root CAs are fetched via k_getRootCerts.
+#  # trusted root CAs are fetched via k_getAvailableRootCerts.
 #  # Alle available root CAs are installed in a new temp. keystore. The 
 #  # installed root CAs are replaced with the new keytore. So all installed
 #  # roots CAs that are no longer available are deleted 
@@ -987,7 +987,7 @@ sub k_getNextTrustAnchor {
   my $certchainfile = CertNanny::Util->getTmpFile();
 
   CertNanny::Logging->debug("CertNanny::Keystore::k_getNextTrustAnchor ");
-  if (!$self->k_getCaCerts()){
+  if (!$self->k_getAvailableCaCerts()){
     
     CertNanny::Logging->error("Could not get CA certs - abort get next trust Anchor ");
     
@@ -1141,7 +1141,7 @@ sub k_getDefaultEngineSection {
 }
 
 
-sub k_getRootCerts {
+sub k_getAvailableRootCerts {
   ###########################################################################
   #
   # get all root certificates from the configuration that are currently
@@ -1161,20 +1161,24 @@ sub k_getRootCerts {
   my $entryname = $options->{ENTRYNAME};
   my $config    = $options->{CONFIG};
   
-  
-
   my @result = ();
-  my $res;
-  my $locRootCA = $config->get("keystore.$entryname.TrustedRootCA.AUTHORITATIVE.Directory", 'FILE');
-  CertNanny::Logging->debug("Authoritative Root CA Dir: $locRootCA");
-  foreach (@{CertNanny::Util->fetchFileList($locRootCA)}) {
-    push(@result, $res) if ($res = $self->_checkCert($_));
+  
+  if (defined($self->{INSTANCE}->{availableRootCerts})) {
+    @result = @{$self->{INSTANCE}->{availableRootCerts}};
+  } else {
+    my $res;
+    my $locRootCA = $config->get("keystore.$entryname.TrustedRootCA.AUTHORITATIVE.Directory", 'FILE');
+    CertNanny::Logging->debug("Authoritative Root CA Dir: $locRootCA");
+    foreach (@{CertNanny::Util->fetchFileList($locRootCA)}) {
+      push(@result, $res) if ($res = $self->_checkCert($_));
+    }
+    CertNanny::Logging->debug("get all available root certificates from ". $config->get("keystore.$entryname.TrustedRootCA.AUTHORITATIVE.Directory", 'FILE'));
+    $self->{INSTANCE}->{availableRootCerts} = \@result;
   }
-  CertNanny::Logging->debug("get all available root certificates from ". $config->get("keystore.$entryname.TrustedRootCA.AUTHORITATIVE.Directory", 'FILE'));
   
   CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "get all root certificates from the configuration that are currently valid");
   return \@result;
-} ## end sub k_getRootCerts
+} ## end sub k_getAvailableRootCerts
 
 
 sub k_getAvailableRootCAs {
@@ -1287,6 +1291,110 @@ sub _checkCert {
   CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "check whether cert is valid");
   return $rc;
 } ## end sub _checkCert
+
+
+sub k_getInstalledNonRootCerts {
+  ###########################################################################
+  #
+  # get all Certificates, that are not root certificates
+  #
+  # Input: ToDo
+  # 
+  # Output: ToDo
+  #
+  # this function gets all installed certificates, that are not root certificates.
+  CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "get all certificates, that are no root certificates");
+  my $self = shift;
+
+  my $options   = $self->{OPTIONS};
+  my $entry     = $options->{ENTRY};
+  my $entryname = $options->{ENTRYNAME};
+  my $config    = $options->{CONFIG};
+
+  my $rc = 0;
+
+  # Data structure $availableRootCAs and $installedRootCAs
+  #  -<certSHA1> #1
+  #     |- CERTDATA  
+  #     |- CERTINFO  
+  #     |- optional: CERTFILE  
+  #        ...
+  #  
+  #  -<certSHA1> #2
+  #     |- CERTDATA  
+  #     |- CERTINFO  
+  #     |- optional: CERTFILE  
+  #        ...
+  #  
+  #  -<certSHA1> #3
+  #   ...
+
+  my %locSearch =  %{$self->getCertLocation('TYPE' => 'TrustedRootCA')};
+ 
+  # First fetch available root certificates
+  my $availableRootCAs = $self->k_getAvailableRootCAs();
+  if (!defined($availableRootCAs)) {
+    $rc = CertNanny::Logging->error("No root certificates found in " . $config->get("keystore.$entryname.TrustedRootCA.AUTHORITATIVE.Directory", 'FILE'));
+  }
+
+  if (!$rc) {
+    # then compare against DIR, FILE and CHAINFILE in case of an 
+    # inconsistence rebuild DIR, FILE or CHAINIFLE
+    my $doHook =  0;
+    foreach my $target ('DIRECTORY', 'FILE', 'CHAINFILE', 'LOCATION') {
+      if (defined($locSearch{lc($target)})) {
+        next if ((($target eq 'CHAINFILE') || ($target eq 'LOCATION')) && defined($locSearch{'location'}) && ($locSearch{'location'} eq 'rootonly'));
+        CertNanny::Logging->debug((caller(0))[3], "Target: $target/$locSearch{lc($target)}");
+        # Fetch installed root certificates into
+        my $installedRootCAs = $self->getInstalledCAs(TARGET => $target);
+        my $rebuild = 0;
+        # comparison $installedRootCAs to $availableRootCAs
+        foreach my $certSHA1 (keys (%{$installedRootCAs})) {
+          $rebuild ||= !exists($availableRootCAs->{$certSHA1});
+          if ($rebuild) {
+            CertNanny::Logging->info("Target: $target/$locSearch{lc($target)}: Installed Root CA $installedRootCAs->{$certSHA1}->{CERTINFO}->{SubjectName} missing in available root CAs.");
+            last;
+          }
+        }  
+
+        if (!$rebuild) {
+          # comparison $availableRootCAs to $installedRootCAs
+          foreach my $certSHA1 (keys (%{$availableRootCAs})) {
+            $rebuild ||= !exists($installedRootCAs->{$certSHA1});
+            if ($rebuild) {
+              CertNanny::Logging->info("Target: $target/$locSearch{lc($target)}: Available Root CA $availableRootCAs->{$certSHA1}->{CERTINFO}->{SubjectName} missing in installed root CAs.");
+              last;
+            }
+          }
+        }
+
+        if ($rebuild) {
+          CertNanny::Logging->debug("Target: $target/$locSearch{lc($target)}: Rebuilding.");
+          if (!$doHook) {
+            $self->k_executeHook($entry->{hook}->{rootCA}->{install}->{pre},
+                                 '__ENTRY__'       => $entryname);
+            $doHook = 1;
+          }
+
+          $self->installRoots(TARGET    => $target,
+                              INSTALLED => $installedRootCAs,
+                              AVAILABLE => $availableRootCAs);
+        }
+      }
+    }
+    if ($doHook && defined($self->{hook})) {
+      $self->k_executeHook($entry->{hook}->{rootCA}->{install}->{post},
+                           '__TYPE__'        => $self->{hook}->{Type},
+                           '__CERTFILE__'    => $self->{hook}->{File},
+                           '__FINGERPRINT__' => $self->{hook}->{FP},
+                           '__TARGET__'      => $self->{hook}->{Target});
+    }
+    eval {delete($self->{hook});};
+  }
+
+  CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "get all certificates, that are no root certificates");
+  return $rc;
+} ## end sub k_getInstalledNonRootCerts
 
 
 sub k_buildCertificateChain {
@@ -1468,7 +1576,7 @@ sub k_syncRootCAs {
   #
   # this function synchronizes installed roots with local trusted root CAs.
   # The installed root CAs are fetched via getInstalledCAs. The available
-  # trusted root CAs are fetched via k_getRootCerts.
+  # trusted root CAs are fetched via k_getAvailableRootCerts.
   # Alle available root CAs are installed in a new temp. keystore. The 
   # installed root CAs are replaced with the new keystore. So all installed
   # roots CAs that are no longer available are deleted 
@@ -1651,7 +1759,7 @@ sub k_executeHook {
 } ## end sub k_executeHook
 
 
-sub k_getCaCerts {
+sub k_getAvailableCaCerts {
 
   # obtain CA certificates via SCEP
   # returns a hash containing the following information:
@@ -1662,7 +1770,7 @@ sub k_getCaCerts {
 
   # get root certificates
   # these certificates are configured to be trusted
-  $self->{STATE}->{DATA}->{ROOTCACERTS} = $self->k_getRootCerts();
+  $self->{STATE}->{DATA}->{ROOTCACERTS} = $self->k_getAvailableRootCerts();
 
   my $scepracert = $self->{STATE}->{DATA}->{SCEP}->{RACERT};
 
@@ -1674,7 +1782,7 @@ sub k_getCaCerts {
 
   return $certs{RACERT} if -r $certs{RACERT};
   return undef;
-} ## end sub k_getCaCerts
+} ## end sub k_getAvailableCaCerts
 
 
 sub k_getCertType {
@@ -1693,7 +1801,7 @@ sub k_getCertType {
   #
   # this function determines the certificate type
   #
-  CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "Determine the Cert Type (installedRootCAs|installedIntermediateCAs|installedEE)");
+  CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "Determine the Cert Type (installedRootCAs|installedIntermediateCAs|installedEE|selfsigned)");
   my $self = shift;
   my %args = (@_);
 
@@ -1705,18 +1813,23 @@ sub k_getCertType {
   if ($args{CERTINFO}{IssuerName} eq $args{CERTINFO}{SubjectName}) {
     if ($args{CERTINFO}{BasicConstraints} =~ /CA\:TRUE/) {
       $rc = 'installedRootCAs';
+    } else { 
+      $rc = 'selfsigned';
     }
   } else {
     if ($args{CERTINFO}{BasicConstraints}  =~ /CA\:TRUE/) {
       $rc = 'installedIntermediateCAs';
     } else {
-      if ($args{CERTINFO}{BasicConstraints}  =~ /CA\:TRUE/) {
-        $rc = 'installedEE';
-      }
+      $rc = 'installedEE';
+#      if ($args{CERTINFO}{BasicConstraints}  =~ /CA\:FALSE/) {
+#        $rc = 'installedEE';
+#      } else {
+#     	
+#      }
     }
   }
  
-  CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "Determine the Cert Type (installedRootCAs|installedIntermediateCAs|installedEE) as <$rc>");
+  CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "Determine the Cert Type (installedRootCAs|installedIntermediateCAs|installedEE|selfsigned) as <$rc>");
   return $rc;
 } ## end sub k_getCertType
 
@@ -1734,7 +1847,7 @@ sub _sendRequest {
   #return $enroller->enroll();
   #print Dumper $self->{STATE}->{DATA};
 
-  if (!$self->k_getCaCerts()) {
+  if (!$self->k_getAvailableCaCerts()) {
     CertNanny::Logging->error("Could not get CA certs");
     return undef;
   }
