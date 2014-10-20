@@ -695,7 +695,7 @@ sub syncRootCAs {
   #
   # this function synchronizes installed roots with local trusted root CAs.
   # The installed root CAs are fetched via getInstalledRoots. The available
-  # trusted root CAs are fetched via k_getRootCerts.
+  # trusted root CAs are fetched via k_getAvailableRootCerts.
   # Alle available root CAs are installed in a new temp. keystore. The 
   # installed root CAs are replaced with the new keytore. So all installed
   # roots CAs that are no longer available are deleted 

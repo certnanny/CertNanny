@@ -583,7 +583,7 @@ sub installRoots {
           
           # Chain Certs is only in the PKCS12 File if excludeCAChain is NOT set
           if (!$config->getFlag("keystore.$entryname.key.excludeCAChain")) {
-            $self->k_getCaCerts();
+            $self->k_getAvailableCaCerts();
             my $certChain = $self->k_buildCertificateChain($EECert);
             foreach (@{$certChain}) {
               $certHash{CertNanny::Util->getCertSHA1(%{$_})->{CERTSHA1}} = $_;
@@ -687,7 +687,7 @@ sub syncRootCAs {
   #
   # this function synchronizes installed roots with local trusted root CAs.
   # The installed root CAs are fetched via getInstalledCAs. The available
-  # trusted root CAs are fetched via k_getRootCerts.
+  # trusted root CAs are fetched via k_getAvailableRootCerts.
   # Alle available root CAs are installed in a new temp. keystore. The 
   # installed root CAs are replaced with the new keytore. So all installed
   # roots CAs that are no longer available are deleted 

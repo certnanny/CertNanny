@@ -168,7 +168,7 @@ sub getCert {
   my $certfile = CertNanny::Util->getTmpFile();
 
   # get label name for user certificate
-   CertNanny::Logging->debug("extract cert with label'$label'");
+  CertNanny::Logging->debug("extract cert with label'$label'");
    
   my @cmd;
    if ($OSNAME eq "MSWin32") {
@@ -178,8 +178,8 @@ sub getCert {
    }
  
   #if (system(join(' ', @cmd)) != 0) {
-if (CertNanny::Util->runCommand(\@cmd, HIDEPWD => 1) != 0) {  
-  unlink $certfile;
+  if (CertNanny::Util->runCommand(\@cmd, HIDEPWD => 1) != 0) {  
+    unlink $certfile;
     CertNanny::Logging->error("getCert(): could not extract certificate");
     CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "get main certificate from keystore");
     return undef;
@@ -1135,7 +1135,7 @@ sub installRoots {
     my $certData;
 
     if (!defined($availableRootCAs)) {
-      my $rootCertList = $self->k_getRootCerts();
+      my $rootCertList = $self->k_getAvailableRootCerts();
       if (!defined($rootCertList)) {
         $rc = CertNanny::Logging->error("No root certificates found in " . $config-get("keystore.$entryname.TrustedRootCA.AUTHORITATIVE.Directory", 'FILE'));
       }
