@@ -1814,7 +1814,7 @@ sub k_getCertType {
     if ($args{CERTINFO}{BasicConstraints} =~ /CA\:TRUE/) {
       $rc = 'installedRootCAs';
     } else { 
-      $rc = 'selfsigned';
+      $rc = 'installedSelfSigned';
     }
   } else {
     if ($args{CERTINFO}{BasicConstraints}  =~ /CA\:TRUE/) {
@@ -2044,7 +2044,7 @@ sub _sendRequest {
        #  CertNanny::Logging->debug("CertNanny::Keystore::_sendRequest ". Dumper(%args) );
   
 
-# Todo Testen createPKCS12: Passt das noch? Die Methode war im Keystore als Dummy implementiert und nur in den Keys ausprogrammiert, wird aber über $self aufgerufen?!?
+# Todo Testen createPKCS12: Passt das noch? Die Methode war im Keystore als Dummy implementiert und nur in den Keys ausprogrammiert, wird aber ï¿½ber $self aufgerufen?!?
 # Todo Testen createPKCS12: Was passiert hier? keine Zuweisung des Ergebnisses ....
       my $exportp12 = $self->createPKCS12(%args);
       CertNanny::Logging->debug("Created importp12 file: " . $importp12);
