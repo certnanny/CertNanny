@@ -403,7 +403,7 @@ sub checkKeySanity() {
     return undef;
   }
   $current_key_number = int($current_key_number);
-  foreach my $id (keys $self->{all_keys}) {
+  foreach my $id (keys %{$self->{all_keys}}) {
     my $label = $self->{all_keys}->{$id};
     $label =~ m/$key_pattern/;
     my $key_number = int($1);

@@ -719,7 +719,7 @@ sub _certUtilWriteCerts() {
   my $self = shift;
   my %args = (@_,);
   $args{OPTIONS} = ['-split'];
-  push($args{OPTIONS}, '-user') if $self->{OPTIONS}->{ENTRY}->{storelocation} eq "user";
+  push(@{$args{OPTIONS}}, '-user') if $self->{OPTIONS}->{ENTRY}->{storelocation} eq "user";
   $args{COMMAND} = '-store';
   my $tmpfile = CertNanny::Util->getTmpFile();
   $args{OUTFILE} = qq($tmpfile) if defined $args{SERIAL};
@@ -733,7 +733,7 @@ sub _certUtilWriteCertsDeleteCert() {
   my $self = shift;
   my %args = (@_,);
   $args{OPTIONS} = [];
-  push($args{OPTIONS}, '-user') if $self->{OPTIONS}->{ENTRY}->{storelocation} eq "user";
+  push(@{$args{OPTIONS}}, '-user') if $self->{OPTIONS}->{ENTRY}->{storelocation} eq "user";
   $args{COMMAND} = '-delstore';
   my $serial = $args{SERIAL};
 
@@ -790,9 +790,9 @@ sub _certReqWriteConfig() {
   my $inf_file_out = CertNanny::Util->getTmpFile();
   open(my $configfile, ">", $inf_file_out) or die "Cannot write $inf_file_out";
 
-  foreach my $section (keys $self->{OPTIONS}->{ENTRY}->{certreq}) {
+  foreach my $section (keys %{$self->{OPTIONS}->{ENTRY}->{certreq}}) {
     print $configfile "[$section]\n";
-    while (my ($key, $value) = each($self->{OPTIONS}->{ENTRY}->{certreq}->{$section})) {
+    while (my ($key, $value) = each(%{$self->{OPTIONS}->{ENTRY}->{certreq}->{$section}})) {
       if (-e $value and $^O eq "MSWin32") {
 
         #on Windows paths have a backslash, so in the string it is \\.
