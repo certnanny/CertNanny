@@ -279,9 +279,9 @@ sub installCert {
 
     my @cmd;
     if ($OSNAME eq "MSWin32") {
-        @cmd = (qq("$gsk6cmd"), '-keydb', '-create', '-type', 'cms', '-db', qq("$newkeystoredb"), '-pw', qq("$self->{PIN}"), '-stash',);
-    }else{
-        @cmd = (qq("$gsk6cmd"), '-keydb', '-create', '-type', 'cms', '-db', qq("$newkeystoredb"), '-pw', "'".$self->{PIN}."'", '-stash',);
+      @cmd = (qq("$gsk6cmd"), '-keydb', '-create', '-type', 'cms', '-db', qq("$newkeystoredb"), '-pw', qq("$self->{PIN}"), '-stash',);
+    } else {
+      @cmd = (qq("$gsk6cmd"), '-keydb', '-create', '-type', 'cms', '-db', qq("$newkeystoredb"), '-pw', "'".$self->{PIN}."'", '-stash',);
     }
         
  
@@ -301,86 +301,58 @@ sub installCert {
     CertNanny::Logging->info("New MQ Keystore $newkeystoredb created.");
 
     # remove all certificates from this keystore
-  if ($OSNAME eq "MSWin32") {
-    @cmd = (qq("$gsk6cmd"), '-cert', '-list', '-db', qq("$newkeystoredb"), '-pw', qq("$self->{PIN}"),);
-  }else{
-    @cmd = (qq("$gsk6cmd"), '-cert', '-list', '-db', qq("$newkeystoredb"), '-pw', "'".$self->{PIN}."'",);
-  }
+    if ($OSNAME eq "MSWin32") {
+      @cmd = (qq("$gsk6cmd"), '-cert', '-list', '-db', qq("$newkeystoredb"), '-pw', qq("$self->{PIN}"),);
+    } else {
+      @cmd = (qq("$gsk6cmd"), '-cert', '-list', '-db', qq("$newkeystoredb"), '-pw', "'".$self->{PIN}."'",);
+    }
    
     my @calabels;
-
-#    CertNanny::Logging->debug("Execute: " . CertNanny::Util->hidePin(join(' ', @cmd)));
-#
-#    my $fh;
-#    if (!open $fh, join(' ', @cmd) . " |") {
-#      CertNanny::Logging->error("Could not retrieve certificate list in MQ keystore");
-#      return undef;
-#    }
-#    my $match = $entry->{labelmatch} || "ibmwebspheremq.*";
-#    while (<$fh>) {
-#      chomp;
-#      s/\s*$//;
-#      next if (m{ \A Certificates\ in\ database}xms);
-#      next if (m{ \A No\ key}xms);
-#      next if (m{ \A \S }xms);
-#      next if (m{ $match }xms);
-#      s/^\s*//;
-#      push(@calabels, $_);
-#    } ## end while (<$fh>)
-#    close $fh;
 
     # Todo pgk: Testen hidePin, runCommand
     my $match = $entry->{labelmatch} || "ibmwebspheremq.*";
     chomp(my @certs = CertNanny::Util->runCommand(\@cmd, WANTOUT => 1, HIDEPWD => 1));
     
-  if(!defined $options->{gsk6cmd}){
-       if (@certs) {
+    if (!defined $options->{gsk6cmd}) {
+      if (@certs) {
         foreach my $certlabel (@certs) {       
-          if( ! ( $certlabel =~ m/Certificates found/ ) and ! ( $certlabel =~ m/default, - / )){ 
-         
+          if (($certlabel !~ m/Certificates found/) and ($certlabel !~ m/default, - /)) { 
           $certlabel =~ m/\s*(.*$)/;
           $certlabel = $1;
           CertNanny::Logging->debug("found label $certlabel");
           push(@calabels, $certlabel);
           }
         }
-       }
-   
-  }else{  
-    if (@certs) {
-      foreach (@certs) {
-        s/\s*$//;
-        next if (m{ \A Certificates\ in\ database}xms);
-        next if (m{ \A No\ key}xms);
-        next if (m{ \A \S }xms);
-        next if (m{ $match }xms);
-        s/^\s*//;
-        push(@calabels, $_);
       }
-    } else {
-      CertNanny::Logging->error("Could not retrieve certificate list in MQ keystore");
-      return undef;
+    } else {  
+      if (@certs) {
+        foreach (@certs) {
+          s/\s*$//;
+          next if (m{ \A Certificates\ in\ database}xms);
+          next if (m{ \A No\ key}xms);
+          next if (m{ \A \S }xms);
+          next if (m{ $match }xms);
+          s/^\s*//;
+          push(@calabels, $_);
+        }
+      } else {
+        CertNanny::Logging->error("Could not retrieve certificate list in MQ keystore");
+        return undef;
+      }
     }
-  }
 
     # now delete all preloaded CAs
     foreach my $label (@calabels) {
       CertNanny::Logging->debug("deleting label '$label' from MQ keystore");
       if ($OSNAME eq "MSWin32") {
-         @cmd = (qq("$gsk6cmd"), '-cert', '-delete', '-db', qq("$newkeystoredb"), '-pw', qq("$self->{PIN}"), '-label', qq("$label"),);
-      }else{
-         @cmd = (qq("$gsk6cmd"), '-cert', '-delete', '-db', qq("$newkeystoredb"), '-pw', "'".$self->{PIN}."'", '-label', qq("$label"),);
+        @cmd = (qq("$gsk6cmd"), '-cert', '-delete', '-db', qq("$newkeystoredb"), '-pw', qq("$self->{PIN}"), '-label', qq("$label"),);
+      } else {
+        @cmd = (qq("$gsk6cmd"), '-cert', '-delete', '-db', qq("$newkeystoredb"), '-pw', "'".$self->{PIN}."'", '-label', qq("$label"),);
       }
     
-      # CertNanny::Logging->debug("Execute: " . join(' ', hidepin(@cmd)));
-
-      # if (system(join(' ', @cmd)) != 0) {
-      #   CertNanny::Logging->error("Could not delete certificate from keystore");
-      #   return undef;
-      # }
       # Todo pgk: Testen hidePin, runCommand
       if (CertNanny::Util->runCommand(\@cmd, HIDEPWD => 1)) {
-        CertNanny::Logging->error("Could not delete label $label certificate from keystore");
+        CertNanny::Logging->debug("Could not delete label $label certificate from keystore");
         #return undef;
       }
     } ## end foreach (@calabels)
@@ -419,18 +391,11 @@ sub installCert {
       }
 
       if ($OSNAME eq "MSWin32") {
-          @cmd = (qq("$gsk6cmd"), '-cert', '-add', '-db', qq("$newkeystoredb"), '-pw', qq("$self->{PIN}"), '-file', qq("$cacertfile"), '-format', 'ascii', '-label', qq("$CN"),);       
-      }else{
-          @cmd = (qq("$gsk6cmd"), '-cert', '-add', '-db', qq("$newkeystoredb"), '-pw', "'".$self->{PIN}."'", '-file', qq("$cacertfile"), '-format', 'ascii', '-label', qq("$CN"),);       
+        @cmd = (qq("$gsk6cmd"), '-cert', '-add', '-db', qq("$newkeystoredb"), '-pw', qq("$self->{PIN}"), '-file', qq("$cacertfile"), '-format', 'ascii', '-label', qq("$CN"),);       
+      } else {
+        @cmd = (qq("$gsk6cmd"), '-cert', '-add', '-db', qq("$newkeystoredb"), '-pw', "'".$self->{PIN}."'", '-file', qq("$cacertfile"), '-format', 'ascii', '-label', qq("$CN"),);       
       }
    
-      # CertNanny::Logging->debug("Execute: " . join(' ', hidepin(@cmd)));
-      #
-      # if (system(join(' ', @cmd)) != 0) {
-      #   unlink $cacertfile;
-      #   CertNanny::Logging->error("Could not add certificate to keystore");
-      #   return undef;
-      # }
       # Todo pgk: Testen hidePin, runCommand
       if (CertNanny::Util->runCommand(\@cmd, HIDEPWD => 1)) {
         unlink $cacertfile;
@@ -454,32 +419,24 @@ sub installCert {
      return undef;
     }
     
-  my @importcmd;  
+    my @importcmd;  
 
-  if (!defined $options->{gsk6cmd}) {
-    CertNanny::Logging->debug("no gsk6cmd use gskcmd import command ");
-   if ($OSNAME eq "MSWin32") {
-     @importcmd = (qq("$gsk6cmd"), '-cert', '-import', '-db', qq("$pkcs12file"),'-type' ,'pkcs12' ,'-pw', qq("$self->{PIN}"), '-target', qq("$newkeystoredb"), '-target_pw', qq("$self->{PIN}"), '-target_type', 'cms');
-   }else{
-     @importcmd = (qq("$gsk6cmd"), '-cert', '-import', '-db', qq("$pkcs12file"),'-type' ,'pkcs12' ,'-pw', "'".$self->{PIN}."'", '-target', qq("$newkeystoredb"), '-target_pw', "'".$self->{PIN}."'", '-target_type', 'cms'); 
-   }
-   
-  }else{
-   CertNanny::Logging->debug("no gskcmd use gsk6cmd import command ");
+    if (!defined $options->{gsk6cmd}) {
+      CertNanny::Logging->debug("no gsk6cmd use gskcmd import command ");
       if ($OSNAME eq "MSWin32") {
-         @importcmd = (qq("$gsk6cmd"), '-cert', '-import', '-target', qq("$basename"), '-target_pw', qq("$self->{PIN}"), '-file', qq("$pkcs12file"), '-pw', qq("$self->{PIN}"), '-type', 'pkcs12',);      
-      }else{
-         @importcmd = (qq("$gsk6cmd"), '-cert', '-import', '-target', qq("$basename"), '-target_pw', "'".$self->{PIN}."'", '-file', qq("$pkcs12file"), '-pw', "'".$self->{PIN}."'", '-type', 'pkcs12',);         
+        @importcmd = (qq("$gsk6cmd"), '-cert', '-import', '-db', qq("$pkcs12file"),'-type' ,'pkcs12' ,'-pw', qq("$self->{PIN}"), '-target', qq("$newkeystoredb"), '-target_pw', qq("$self->{PIN}"), '-target_type', 'cms');
+      } else {
+        @importcmd = (qq("$gsk6cmd"), '-cert', '-import', '-db', qq("$pkcs12file"),'-type' ,'pkcs12' ,'-pw', "'".$self->{PIN}."'", '-target', qq("$newkeystoredb"), '-target_pw', "'".$self->{PIN}."'", '-target_type', 'cms'); 
+      }
+    } else {
+      CertNanny::Logging->debug("no gskcmd use gsk6cmd import command ");
+      if ($OSNAME eq "MSWin32") {
+        @importcmd = (qq("$gsk6cmd"), '-cert', '-import', '-target', qq("$basename"), '-target_pw', qq("$self->{PIN}"), '-file', qq("$pkcs12file"), '-pw', qq("$self->{PIN}"), '-type', 'pkcs12',);      
+      } else {
+        @importcmd = (qq("$gsk6cmd"), '-cert', '-import', '-target', qq("$basename"), '-target_pw', "'".$self->{PIN}."'", '-file', qq("$pkcs12file"), '-pw', "'".$self->{PIN}."'", '-type', 'pkcs12',);         
       }
     }
 
-    # CertNanny::Logging->debug("Execute: " . join(' ', hidepin(@cmd)));
-    #
-    # if (system(join(' ', @cmd)) != 0) {
-    #   CertNanny::Logging->error("Could not import PKCS#12 file to keystore");
-    #   chdir($lastdir);
-    #   return undef;
-    # }
     # Todo pgk: Testen hidePin, runCommand
     if (CertNanny::Util->runCommand(\@importcmd, HIDEPWD => 1)) {
       CertNanny::Logging->error("Could not import PKCS#12 file to gsk keystore");
@@ -489,27 +446,29 @@ sub installCert {
     chdir($lastdir);
 
     CertNanny::Logging->info("Keystore created");
-  } elsif ($options->{keygenmode} eq "internal") {
-    CertNanny::Logging->info("Internal key generation not supported");
+  } else {
+    if ($options->{keygenmode} eq "internal") {
+      CertNanny::Logging->info("Internal key generation not supported");
 
-    #   my @cmd = (qq("$gsk6cmd"),
-    #        '-certreq',
-    #        '-create',
-    #        '-file',
-    #        qq("$result->{REQUESTFILE}"),
-    #        '-db',
-    #        qq("$kdbfile"),
-    #        '-pw',
-    #        qq("$self->{PIN}"),
-    #        '-dn',
-    #        qq("$DN"),
-    #        '-label',
-    #        qq("$label"),
-    #        '-size',
-    #        '1024');
+      #   my @cmd = (qq("$gsk6cmd"),
+      #        '-certreq',
+      #        '-create',
+      #        '-file',
+      #        qq("$result->{REQUESTFILE}"),
+      #        '-db',
+      #        qq("$kdbfile"),
+      #        '-pw',
+      #        qq("$self->{PIN}"),
+      #        '-dn',
+      #        qq("$DN"),
+      #        '-label',
+      #        qq("$label"),
+      #        '-size',
+      #        '1024');
 
-    return undef;
-  } ## end elsif ($options->...)
+      return undef;
+    } ## end if ($options->...)
+  } ## end else
 
   # now replace the old keystore with the new one
   if (!-r $newkeystoredb) {
