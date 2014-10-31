@@ -74,8 +74,8 @@ sub new {
 
 
     if($self->{CONFIG}->get("cmd.opensslconf", "FILE")){
-     $ENV{OPENSSL_CONF} = $self->{CONFIG}->get("cmd.opensslconf", "FILE");
-     CertNanny::Logging->debug("set OPENSSL_CONF enviroment var to  to:" . $self->{CONFIG}->get("cmd.opensslconf", "FILE"));
+      $ENV{OPENSSL_CONF} = $self->{CONFIG}->get("cmd.opensslconf", "FILE");
+      CertNanny::Logging->debug("set OPENSSL_CONF enviroment var to  to:" . $self->{CONFIG}->get("cmd.opensslconf", "FILE"));
     }
 
     $self->{ITEMS} = ${$self->{CONFIG}->getRef("keystore", 'ref')};
@@ -131,21 +131,6 @@ sub _iterate_entries {
 } ## end sub _iterate_entries
 
 
-sub AUTOLOAD {
-  my $self = (shift)->getInstance();
-  my $attr = $AUTOLOAD;
-  $attr =~ s/.*:://;
-  #print "atrt: " .  $attr ;
-  return undef if $attr eq 'DESTROY';
-
-  # automagically call
-  if ($attr =~ /(?:info|check|renew|enroll|sync|test)/) {
-  #   print "atrt: " .  $attr ;
-    return $self->_iterate_entries("do_$attr");
-  }
-} ## end sub AUTOLOAD
-
-
 sub getConfigValue {
   my $self = (shift)->getInstance();
   return $self->{CONFIG}->get(@_);
@@ -163,6 +148,22 @@ sub setOption {
   CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3]);
   return 1;
 } ## end sub setOption
+
+
+sub AUTOLOAD {
+  my $self = (shift)->getInstance();
+  my $attr = $AUTOLOAD;
+  $attr =~ s/.*:://;
+  #print "atrt: " .  $attr ;
+  return undef if $attr eq 'DESTROY';
+
+  # automagically call
+  # Possible actions commandline options
+  if ($attr =~ /^(?:enroll|info|cfgdump|datadump|check|renew|sync|test|updateRootCA)$/) {
+  #   print "atrt: " .  $attr ;
+    return $self->_iterate_entries("do_$attr");
+  }
+} ## end sub AUTOLOAD
 
 
 sub do_enroll {
@@ -475,6 +476,67 @@ sub do_info {
   CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "Info");
   return 1;
 } ## end sub do_info
+
+
+sub do_cfgdump {
+  CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "Configuration Dump");
+  my $self = (shift)->getInstance();
+  my %args = (@_);
+
+  my $keystore = $args{KEYSTORE};
+  my $instance = $keystore->{INSTANCE};
+  my $options   = $instance->{OPTIONS};
+  my $entryname = $options->{ENTRYNAME};
+  my $config    = $options->{CONFIG};
+
+  foreach my $configFileName (keys %{$config->{CONFIGFILES}}) {
+    print "File: <$configFileName> SHA1: $config->{CONFIGFILES}->{$configFileName}->{SHA}\n";
+    while ((my $lnr, my $content) = each %{$config->{CONFIGFILES}->{$configFileName}->{CONTENT}}) {
+      printf("Line: %3s Content: <%s>\n", $lnr, $content);
+    }
+    print "\n";
+  }
+  
+  CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "Configuration Dump");
+  return 1;
+} ## end sub do_cfgdump
+
+
+sub do_datadump {
+  CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "Data Dump");
+  my $self = (shift)->getInstance();
+  my %args = (@_);
+
+  my $keystore = $args{KEYSTORE};
+  my $instance = $keystore->{INSTANCE};
+  my $options   = $instance->{OPTIONS};
+  my $entryname = $options->{ENTRYNAME};
+  my $config    = $options->{CONFIG};
+  
+  my $indent = 0;
+  sub _dumpValue {
+    my $href = shift;
+
+    foreach my $key (sort(keys(%{$href}))) {
+      if (ref($href->{$key}) eq "HASH") {
+        print('  ' x $indent . "$key Start HASH\n");
+        $indent++;
+        _dumpValue(\%{$href->{$key}});
+        $indent--;
+        print('  ' x $indent . "$key End HASH\n");
+      } else {
+        my $dummy = '  ' x $indent . $key . ' = ';
+        my $fillup = ' ' x (100 - length($dummy) - length($href->{$key}));
+        print($dummy . $fillup . $href->{$key} . "\n");
+      }
+    }
+  }
+
+  _dumpValue(\%{$config->{CONFIG}});
+
+  CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "Data Dump");
+  return 1;
+} ## end sub do_datadump
 
 
 sub do_check {
