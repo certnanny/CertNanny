@@ -284,15 +284,6 @@ sub installCert {
       @cmd = (qq("$gsk6cmd"), '-keydb', '-create', '-type', 'cms', '-db', qq("$newkeystoredb"), '-pw', "'".$self->{PIN}."'", '-stash',);
     }
         
- 
-    # CertNanny::Logging->debug("Execute: " . join(' ', hidepin(@cmd)));
-    # CertNanny::Logging->debug("Execute: " . CertNanny::Util->hidePin(join(' ', @cmd)));
-    #
-    # if (system(join(' ', @cmd)) != 0) {
-    #   CertNanny::Logging->error("Keystore creation failed");
-    #   return undef;
-    # }
-    # Todo pgk: Testen hidePin, runCommand
     if (CertNanny::Util->runCommand(\@cmd, HIDEPWD => 1)) {
       CertNanny::Logging->error("Keystore creation failed");
       return undef;
@@ -309,7 +300,6 @@ sub installCert {
    
     my @calabels;
 
-    # Todo pgk: Testen hidePin, runCommand
     my $match = $entry->{labelmatch} || "ibmwebspheremq.*";
     chomp(my @certs = CertNanny::Util->runCommand(\@cmd, WANTOUT => 1, HIDEPWD => 1));
     
@@ -350,7 +340,6 @@ sub installCert {
         @cmd = (qq("$gsk6cmd"), '-cert', '-delete', '-db', qq("$newkeystoredb"), '-pw', "'".$self->{PIN}."'", '-label', qq("$label"),);
       }
     
-      # Todo pgk: Testen hidePin, runCommand
       if (CertNanny::Util->runCommand(\@cmd, HIDEPWD => 1)) {
         CertNanny::Logging->debug("Could not delete label $label certificate from keystore");
         #return undef;
@@ -396,7 +385,6 @@ sub installCert {
         @cmd = (qq("$gsk6cmd"), '-cert', '-add', '-db', qq("$newkeystoredb"), '-pw', "'".$self->{PIN}."'", '-file', qq("$cacertfile"), '-format', 'ascii', '-label', qq("$CN"),);       
       }
    
-      # Todo pgk: Testen hidePin, runCommand
       if (CertNanny::Util->runCommand(\@cmd, HIDEPWD => 1)) {
         unlink $cacertfile;
         CertNanny::Logging->error("Could not add certificate to keystore");
@@ -437,7 +425,6 @@ sub installCert {
       }
     }
 
-    # Todo pgk: Testen hidePin, runCommand
     if (CertNanny::Util->runCommand(\@importcmd, HIDEPWD => 1)) {
       CertNanny::Logging->error("Could not import PKCS#12 file to gsk keystore");
       chdir($lastdir);
@@ -577,7 +564,6 @@ sub getKey {
                '-provider', 'IBMJCE', 
                '-type', 'CMS');
 
-    # Todo pgk: Testen hidePin, runCommand
     if (CertNanny::Util->runCommand(\@cmd, HIDEPWD => 1)) {
       CertNanny::Logging->error("getKey(): could not extract private key");
       unlink $p8file;
@@ -1305,8 +1291,7 @@ sub _getIBMJavaEnvironment {
 
     # remove any options left over
     $classpath =~ s/-?-\w+//g;
-    $classpath =~ s/^\s*//g;
-    $classpath =~ s/\s*$//g;
+    $classpath =~ s/^\s+|\s+$//g ;
 
     CertNanny::Logging->debug("gsk6cmd classpath: $classpath");
 
