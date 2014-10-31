@@ -460,20 +460,25 @@ sub _parse {
   # $self->{LOGBUFFER} = \my @dummy;
   $self->_parseFile();
 
+  #  - replace all found variables
+  foreach (keys %{$self->{CONFIG}}) {
+    _replaceVariables($self, $self->{CONFIG}, $_);
+  }
+
   my $openssl = $self->get('cmd.openssl', 'FILE');
   if (defined $openssl) {
     # All the parsing is done, now check for double parsing
     if (exists($self->{CONFIGFILES})) {
       foreach (keys %{$self->{CONFIGFILES}}) {
-        $self->{CONFIGFILES}{$_} = $self->_sha1_hex($_);
+        $self->{CONFIGFILES}{$_}{SHA} = $self->_sha1_hex($_);
       }
-      foreach my $val1 (keys %{$self->{CONFIGFILES}}) {
-        foreach my $val2 (keys %{$self->{CONFIGFILES}}) {
-          if (($val1 ne $val2) && ($self->{CONFIGFILES}{$val1} eq $self->{CONFIGFILES}{$val2})) {
-            CertNanny::Logging->error("double configfile: $val1 SHA1: $self->{CONFIGFILES}{$val1} <> $val2 SHA1: $self->{CONFIGFILES}{$val2}");
+      foreach my $filename1 (keys %{$self->{CONFIGFILES}}) {
+        foreach my $filename2 (keys %{$self->{CONFIGFILES}}) {
+          if (($filename1 ne $filename2) && ($self->{CONFIGFILES}{$filename1}{SHA} eq $self->{CONFIGFILES}{$filename2}{SHA})) {
+            CertNanny::Logging->error("double configfile: $filename1 SHA1: $self->{CONFIGFILES}{$filename1}{SHA} <> $filename2 SHA1: $self->{CONFIGFILES}{$filename2}{SHA}");
           }
         }
-        CertNanny::Logging->info("$val1 SHA1: $self->{CONFIGFILES}{$val1}");
+        CertNanny::Logging->info("$filename1 SHA1: $self->{CONFIGFILES}{$filename1}{SHA}");
       }
     } ## end else [ if (exists($self->{CONFIGFILES...}))]
 
@@ -496,7 +501,7 @@ sub _sha1_hex {
   my $self = (shift)->getInstance();
   my $file = shift;
   
-  return $self->{CONFIGFILES}{$file} if ($self->{CONFIGFILES}{$file});
+  return $self->{CONFIGFILES}{$file}{SHA} if ($self->{CONFIGFILES}{$file}{SHA});
   
   my $sha;
   my $openssl = $self->get('cmd.openssl', 'FILE');
@@ -548,25 +553,23 @@ sub _parseFile {
   } ## end if (!exists($self->{CONFIGFILES...}))
 
   CertNanny::Logging->debug("reading $configFile");
-  $self->{CONFIGFILES}{$configFile} = 1;
 
   #  - read all lines
   seek $handle,0,0;
+  my $lnr = 0;
   my $line; 
-  my @lines;
-  while (<$handle>) {
-    chomp;
-    tr/\r\n//d;
-    push(@lines, $_);
+  my %lines;
+  while (chomp($line = <$handle>)) {
+    $lnr++;
+    $line =~ s/^\s+|\s+$|\r\n//g; # Remove leading Blanks, trailing Blanks, Windows EOL
+    $line =~ s/^#.*//g;           # comment lines
+    $lines{$lnr} = $line if $line;
   }
   $handle->close();
   
   #  - evaluate all lines
-  my $lnr = 0;
-  foreach $line (@lines) {
-    $lnr++;
-    next if (/^\s*\#|^\s*$/);
-    if ($line =~ /^\s*(.+?)\s*=\s*(\S.*?)\s*(\s#\s.*)?$/ || /^\s*(\S.*?)\s*=?\s*(\s#\s.*)?$/) {
+  while (($lnr, $line) = each(%lines)) {
+    if ($line =~ /^(.+?)\s*=\s*(\S.*?)\s*(\s#\s.*)?$/ || /^(\S.*?)\s*=?\s*(\s#\s.*)?$/) {
       my @path = split(/\./, $1);
       my ($val, $var);
       if (defined($2) && $2 !~ /^\s*#\s.*$/) {
@@ -593,7 +596,7 @@ sub _parseFile {
         $var = $var->{$confPart};
       }
       if ($doDupCheck && defined($var->{$key})) {
-        print STDERR "Config file error: duplicate value definition in line $lnr ($line)\n";
+        print STDERR "Config file error: duplicate value definition in file $configFile line $lnr ($line)\n";
       }
       
       while ($val =~ m{__ENV__(.*?)__}xms) {
@@ -607,19 +610,22 @@ sub _parseFile {
 
       $var->{$key} = $val;
     } else {
-      if ($line !~ /^\s*include\s+(.+)\s*$/) {
+      if ($line !~ /^include\s+(.+)$/) {
         print STDERR "Config file error: parse error in line $lnr ($line)\n";
       }
     }
   }
 
   #  - replace all found variables
-  foreach (keys %{$self->{CONFIG}}) {
-    _replaceVariables($self, $self->{CONFIG}, $_);
+  while (($lnr, $line) = each(%lines)) {
+    _replaceVariables($self, \%lines, $lnr);
   }
 
-  #  - recursive execute _parsfile for all includes
-  foreach $line (@lines) {
+  #  - store content for operation 'status'
+  $self->{CONFIGFILES}{$configFile}{CONTENT} = \%lines;
+
+  #  - recursive execute _parsefile for all includes
+  while (($lnr, $line) = each(%lines)) {
     if ($line =~ /^\s*include\s+(.+)\s*$/) {
       my $configFileGlob = $1;
       my @configFileList;
@@ -646,27 +652,26 @@ sub _replaceVariables {
   my $cfgref = shift;
   my $key    = shift;
 
-  my $replaceobj = defined($cfgref->{$key}) ? $cfgref->{$key} : $key;
   # determine if this entry is a string or a hash array
-  if (ref($replaceobj) eq "HASH") {
-    foreach (keys %{$replaceobj}) {
-      _replaceVariables($self, $replaceobj, $_);
+  if (ref($cfgref->{$key}) eq "HASH") {
+    foreach (keys %{$cfgref->{$key}}) {
+      _replaceVariables($self, $cfgref->{$key}, $_);
     }
   } else {
     # actually replace variables
-    while ($replaceobj =~ /\$\((.*?)\)/) {
+    while ($cfgref->{$key} =~ /\$\((.*?)\)/) {
       my $var    = $1;
       # my $lcvar  = lc($var);
       # my $target = getRef($self, $lcvar);
       my $target = getRef($self, $var);
       $target     = "" unless defined $target;
 
-      $var        =~ s/\./\\\./g;
-      $replaceobj =~ s/\$\($var\)/$target/g;
+      $var            =~ s/\./\\\./g;
+      $cfgref->{$key} =~ s/\$\($var\)/$target/g;
     }
-  } ## end else [ if (ref($replaceobj...)]
+  } ## end else [ if (ref($cfgref->{$key}...)]
   
-  return $replaceobj;
+  return $cfgref->{$key};
 } ## end sub _replaceVariables
 
 1;
