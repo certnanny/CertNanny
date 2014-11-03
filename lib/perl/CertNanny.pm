@@ -631,13 +631,24 @@ sub do_renew {
       CertNanny::Util->backoffTime($self->{CONFIG});
       $instance->k_renew();
     } else {
-      CertNanny::Logging->debug("Certificate is still valid for more than $self->{ITEMS}->{ $entryname }->{warnexpiry_days} days");
+      if ($self->{force}) {
+        CertNanny::Logging->debug("Renewal forced (Certificate is still valid for more than $self->{ITEMS}->{ $entryname }->{warnexpiry_days} days)");
+        # schedule automatic renewal
+        CertNanny::Util->backoffTime($self->{CONFIG});
+        $instance->k_renew();
+      } else {
+        CertNanny::Logging->debug("Certificate is still valid for more than $self->{ITEMS}->{ $entryname }->{warnexpiry_days} days");
+      }
     }
 
     if (!$instance->k_checkValidity($self->{ITEMS}->{$entryname}->{warnexpiry_days})) {
-      CertNanny::Logging->notice("Certificate is valid for less than $self->{ITEMS}->{ $entryname }->{warnexpiry_days} days");
-      $instance->k_executeHook($config->get("keystore.$entryname.hook.warnexpiry"));
-      # $instance->k_warnExpiryHook();
+      if ($self->{force}) {
+        CertNanny::Logging->notice("Renewal forced (Certificate is valid for less than $self->{ITEMS}->{ $entryname }->{warnexpiry_days} days)");
+      } else {
+        CertNanny::Logging->notice("Certificate is valid for less than $self->{ITEMS}->{ $entryname }->{warnexpiry_days} days");
+        $instance->k_executeHook($config->get("keystore.$entryname.hook.warnexpiry"));
+        # $instance->k_warnExpiryHook();
+      }
     }
   }
 
