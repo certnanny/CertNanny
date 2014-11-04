@@ -49,7 +49,19 @@ You will also find the [issue tracker](https://github.com/certnanny/CertNanny/is
 
 [Official milestones/releases are tracked on GitHub.](https://github.com/certnanny/CertNanny/issues/milestones)
 
-### Version 1.1.4  **(Latest stable release)** 
+### Version 1.2.0  **(Latest stable release)** 
+
+Release date: 2014-11-04
+
+Feature and bugfix release:
+- Improved debugging
+- Removed carriage returns on all files that aren't specifically Windows
+- Code and comment cleanup
+- Multiple bugfixes
+- New options: cfgdump and datadump
+- New option --force to force renewal (for debugging)
+
+### Version 1.1.4
 
 Release date: 2014-07-09
 
@@ -135,4 +147,4 @@ Initial public release of CertNanny
 The version numbers for official releases shall be limited to two positions. This allows for local customization and repackaging sometimes needed for large-scale internal deployments without using up the available positions (AIX packages are effectively limited to three positions since the fourth is reserved for incremental updates).
 
 --------------------
-Last update: 2015-05-11
+Last update: 2014-11-04

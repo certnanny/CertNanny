@@ -161,7 +161,7 @@ sub new {
     if($chainfile ne ''){
       unless (-e $chainfile){
       CertNanny::Logging->debug("Cert chain file defined but doesn not exist $chainfile , force generation");
-      $self->k_getCaCerts();
+      $self->k_getAvailableCaCerts();
       $self->installCertChain();
       }   
     }
@@ -1393,7 +1393,7 @@ sub installRoots {
           # continue with target chainfile
           if (defined($locInstall{'chainfile'}) and (!defined($args{TARGET}) or ('CHAINFILE' =~ m/^$args{TARGET}/))) {
             # in addition to the Root Certs, the chainfile also keeps the chain
-            $self->k_getCaCerts();
+            $self->k_getAvailableCaCerts();
             if (my $chainArrRef = $self->k_buildCertificateChain($self->getCert())) {
               # delete root
               #CertNanny::Logging->debug("chainfile: ". Dumper($chainArrRef));

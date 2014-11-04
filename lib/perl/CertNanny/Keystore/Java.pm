@@ -902,7 +902,7 @@ sub installRoots {
       if (!$rc) {
         # delete every root CA, that does not exist in $availableRootCAs from keystore
         foreach my $certSHA1 (keys %{$installedRootCAs}) {
-          if (!exists($availableRootCAs->{$certSHA1})) {
+          if (!exists($availableRootCAs->{$certSHA1}) && ($self->k_getCertType($installedRootCAs->{$certSHA1}) eq 'installedRootCAs')) {
             CertNanny::Logging->debug("Deleting root cert " . $installedRootCAs->{$certSHA1}->{CERTINFO}->{SubjectName});
             @cmd =  (qq("$options->{keytool}"), -noprompt, -storepass => qq("$entry->{store}->{pin}"), '-keystore' ,qq("$locName"), '-delete', '-alias', '"'.$installedRootCAs->{$certSHA1}->{CERTALIAS}.'"' );
  

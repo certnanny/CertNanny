@@ -1,3 +1,19 @@
+2015-11-04  Andreas Leibl  <andreas@leibl.co.uk>
+
+	* certnanny: release version 1.2.0
+
+	* Improved debugging
+
+	* Removed carriage returns on all files that aren't specifically Windows
+
+	* Code and comment cleanup
+
+	* Multiple bugfixes
+
+	* New options: cfgdump and datadump
+
+	* New option --force to force renewal (for debugging)
+
 2015-05-11  Martin Bartosch  <m.bartosch@cynops.de>
 
 	* Solaris and AIX packing improvements
