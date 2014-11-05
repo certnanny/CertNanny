@@ -41,3 +41,10 @@
 *.gif binary
 *.ico binary
 *.svg text
+
+# Fully qualified exceptions allways at the end: The last one wins!
+# Windows files
+Windows/HowToBuildMSIreadme.txt binary
+Windows/certnanny.wixproj binary
+contrib/wizard.pl binary
+etc/Keystore-DEFAULT-w32.cfg.template binary
