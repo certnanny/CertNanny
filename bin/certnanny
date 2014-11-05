@@ -52,6 +52,7 @@ my $msg = "CertNanny, version $CertNanny::VERSION";
 GetOptions(\%cmdLineParam, qw(help|?
                               man
                               cfg|cfgfile|conf|config=s
+                              force
                               win_user=s
                               win_password=s
                               challengepassword=s
@@ -61,7 +62,7 @@ if ($cmdLineParam{man}){
  pod2usage(-exitstatus => 0, -verbose => 2);
  return 0;
 }
-pod2usage(-msg => $msg, -verbose => 1)     if ($cmdLineParam{help} or (!exists $cmdLineParam{cfg}));
+pod2usage(-msg => $msg, -verbose => 1) if ($cmdLineParam{help} or (!exists $cmdLineParam{cfg}));
       
 die "Could not read config file $cmdLineParam{cfg}. Stopped" unless (-r $cmdLineParam{cfg});
 
@@ -148,6 +149,7 @@ foreach my $cmd (@ARGV) {   # command line parameters are already stripped off. 
     if (defined $cmdLineParam{challengepassword} and $cmdLineParam{challengepassword} ne '') {
       $monitor->setOption('globalchallengepassword', $cmdLineParam{challengepassword});
     }
+    $monitor->setOption("force", $cmdLineParam{force} || 0);
    
     $monitor->$cmd(%cmdLineParam) || die "Invalid action: $cmd. Stopped";   # execute the command $cmd an give it all the command line parameters as a hash
   } ## end if ($OSNAME eq 'MSWin32')
@@ -182,8 +184,8 @@ if ($OSNAME eq 'MSWin32') {
     # print "state: " . $State . "\n";
 
     # if ($State == 0 ) {
-    #	    Win32::Daemon::State( SERVICE_RUNNING() );
-    #	    $PrevState = SERVICE_RUNNING();
+    #     Win32::Daemon::State( SERVICE_RUNNING() );
+    #     $PrevState = SERVICE_RUNNING();
     #   }
 
     if (SERVICE_START_PENDING() == $State) {
@@ -312,6 +314,8 @@ Options:
   --cfg                specify config file to use
   --challengepassword  specify a challenge password to use for an
                        initial enrollment (all keystores)
+  --force              Force automatic renewal on all configured keystores
+                       (only used with action renew)
   --win_user           specify alternative Windows username to run the 
                        Windows Service
   --win_password       specify password corresponding to win_user
@@ -343,6 +347,10 @@ Prints the manual page and exits.
 =item B<--cfg> file
  
 Uses the specified file for configuration. Mandatory.
+
+=item B<--force>
+ 
+Forces an automatic renewal on all configured keystores (only used as option for action renew).
 
 =back
 
@@ -1780,12 +1788,12 @@ OK:
 
   CN=www.example.com:cert1,O=Example Ltd.,DC=example,DC=com
   CN=www.example.com:cert2,O=Example Ltd.,DC=example,DC=com
-	
+  
 Buggy:
 
   CN=www.example.com:cert,O=Example Ltd.,DC=example,DC=com
   CN=www.example.com:cert2,O=Example Ltd.,DC=example,DC=com
-	
+  
 =back
 
 =head4 2.2.2.5 Windows IIS keystore
