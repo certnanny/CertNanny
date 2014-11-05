@@ -1,13 +1,4 @@
-agent/lib/certs
-agent/lib/rootcerts
-agent/lib/state
-agent/lib/cfg
-agent/bin/sscep.exe
-agent/bin/certnanny.exe
-agent/bin/certnanny.zip
-agent/bin/cn_packed
-agent/log
-agent/tmp
+bin/certnanny.pl
 .includepath
 .project
 .checkstyle
