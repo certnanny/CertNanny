@@ -3,19 +3,7 @@ Contributed and related code
 * sscep
 
 sscep is a command line SCEP client, available at
-http://www.klake.org/~jt/sscep/
-
-The official version published on this web site implements an older SCEP 
-draft which does not support signing a request with an existing key.
-This version works properly with CertNanny, but automatic approval
-will NOT work.
-
-To build an sscep binary that supports automatic approval, either use
-the sscep-ng.tar.gz sources or patch your downloaded sscep sources
-using sscep-ng2.patch.gz and sscep-non-unix.patch.gz. 
-
-To create RPMs use sscep.spec.
-
+https://github.com/certnanny/sscep
 
 * ExtractKey
 

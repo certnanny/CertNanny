@@ -8,11 +8,9 @@ CertNanny source directory.
 Prerequisites
 
 In order to run this software you will need 
-- Perl 5.6.1 or higher
-- OpenSSL 0.9.7 (does NOT work with 0.9.7d!) or 0.9.8
-- sscep Release 20040325 (http://www.klake.org/~jt/sscep/)
-  sscep patches to these sources are included in this distribution,
-  see the contrib/ directory.
+- Perl 5.8 or higher
+- OpenSSL 0.9.8 or 1.0.x
+- sscep (https://github.com/certnanny/sscep)
 
 On Win32 platforms you will also need
 - Win32 Daemon 5006 (perl ppm.pl install http://www.roth.net/perl/packages/win32-daemon.ppd)
@@ -21,30 +19,9 @@ On Win32 platforms you will also need
 
 3rd party tool installation
 
-- Make sure OpenSSL is installed on your system. It is not recommended
-  to use OpenSSL 0.9.7d to avoid problems with sscep. 0.9.7a, c, e and g
-  are known to work. 
+- Make sure OpenSSL is installed on your system.
 
 - Compile sscep. You will need the OpenSSL development libraries for this.
-
-  It is recommended to apply the patch included in the contrib/ directory
-  to create a sscep binary that supports automatic approval.
-  See contrib/README for details.
-
-  IMPORTANT: DO NOT COMPILE sscep WITH OPENSSL 0.9.7d
-  If you are using OpenSSL 0.9.7d on your system, make sure you
-  compile sscep STATICALLY with a version different than 0.9.7d.
-
-  Problems have been observed with OpenSSL 0.9.7a. If sscep is compiled
-  against this version, it may happen that sscep does not recognize
-  the certificate fetched from the SCEP server to match with its request.
-  This is due to different ASN.1 encodings of the Subject Name in
-  request and certificate. Although the string represented by these
-  encodings are the same, sscep may complain that the downloaded certificate
-  does not match the request.
-  If this behaviour is observed it is recommended to use the latest
-  OpenSSL 0.9.7 version available.
-
 
 Program installation
 - run make create documentation files:
