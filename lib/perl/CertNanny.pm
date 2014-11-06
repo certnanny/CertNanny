@@ -159,7 +159,12 @@ sub AUTOLOAD {
 
   # automagically call
   # Possible actions commandline options
-  if ($attr =~ /^(?:enroll|info|cfgdump|datadump|check|renew|sync|test|updateRootCA)$/) {
+  if ($attr =~ /^(?:cfgdump|datadump|test)$/) {
+  #   print "atrt: " .  $attr ;
+    my $action = "do_$attr";
+    return $self->$action();
+  }
+  if ($attr =~ /^(?:info|enroll|check|renew|sync|updateRootCA)$/) {
   #   print "atrt: " .  $attr ;
     return $self->_iterate_entries("do_$attr");
   }
@@ -483,11 +488,7 @@ sub do_cfgdump {
   my $self = (shift)->getInstance();
   my %args = (@_);
 
-  my $keystore = $args{KEYSTORE};
-  my $instance = $keystore->{INSTANCE};
-  my $options   = $instance->{OPTIONS};
-  my $entryname = $options->{ENTRYNAME};
-  my $config    = $options->{CONFIG};
+  my $config    = $self->{CONFIG};
 
   foreach my $configFileName (keys %{$config->{CONFIGFILES}}) {
     print "File: <$configFileName> SHA1: $config->{CONFIGFILES}->{$configFileName}->{SHA}\n";
@@ -507,27 +508,36 @@ sub do_datadump {
   my $self = (shift)->getInstance();
   my %args = (@_);
 
-  my $keystore = $args{KEYSTORE};
-  my $instance = $keystore->{INSTANCE};
-  my $options   = $instance->{OPTIONS};
-  my $entryname = $options->{ENTRYNAME};
-  my $config    = $options->{CONFIG};
+  my $config    = $self->{CONFIG};
   
-  my $indent = 0;
+  my @hashname;
   sub _dumpValue {
     my $href = shift;
 
-    foreach my $key (sort(keys(%{$href}))) {
-      if (ref($href->{$key}) eq "HASH") {
-        print('  ' x $indent . "$key Start HASH\n");
-        $indent++;
-        _dumpValue(\%{$href->{$key}});
-        $indent--;
-        print('  ' x $indent . "$key End HASH\n");
-      } else {
-        my $dummy = '  ' x $indent . $key . ' = ';
+    # First handle all values
+    foreach my $key (sort {lc($a) cmp lc($b)} keys %{$href}) {
+      if (ref($href->{$key}) ne "HASH") {
+        next if ($key eq 'INHERIT');                  # We do not dump this INHERIT stuff since it does give no information
+        my $dummy = '  ' x ($#hashname + 1) . $key . ' = ';
         my $fillup = ' ' x (100 - length($dummy) - length($href->{$key}));
         print($dummy . $fillup . $href->{$key} . "\n");
+      }
+    }
+    # Then handle all HASHs
+    # no $self->{keystore}              : print all
+    foreach my $key (sort {lc($a) cmp lc($b)} keys %{$href}) {
+      if (ref($href->{$key}) eq "HASH") {
+        next if (!defined($hashname[0]) && ($key eq 'certmonitor'));         # certmonitor is depricated:      don't print
+        next if (!defined($hashname[0]) && ($key eq 'keystore') && 
+                (uc($self->{keystore}) eq 'COMMON'));                        # $self->{keystore} = common:     print all but the keystores
+        next if (defined($hashname[0]) && ($hashname[0] eq 'keystore') && 
+                ($self->{keystore} ne '') && 
+                !defined($hashname[1]) && ($key ne $self->{keystore}));      # $self->{keystore} = <keystore>: print all but the keystores plus <keystore>
+        push(@hashname, $key);
+        print('  ' x $#hashname . "$key Start\n");
+        _dumpValue(\%{$href->{$key}});
+        print('  ' x $#hashname . "$key End\n");
+        pop(@hashname);
       }
     }
   }

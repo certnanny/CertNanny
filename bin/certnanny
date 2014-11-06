@@ -52,6 +52,7 @@ my $msg = "CertNanny, version $CertNanny::VERSION";
 GetOptions(\%cmdLineParam, qw(help|?
                               man
                               cfg|cfgfile|conf|config=s
+                              keystore=s
                               force
                               win_user=s
                               win_password=s
@@ -80,11 +81,10 @@ foreach my $cmd (@ARGV) {   # command line parameters are already stripped off. 
 
     # Windows Service related commands
 
-#    my $servicename = $monitor->getConfigValue("platform.windows.servicename") || "CertNanny";
-       my $servicename ;
+    my $servicename ;
     if ($cmd eq "install") {
-     $servicename = CertNanny::Config->getInstance()->get("platform.windows.servicename") || "CertNanny";
-     print "Installing CertNanny Service.\n";
+      $servicename = CertNanny::Config->getInstance()->get("platform.windows.servicename") || "CertNanny";
+      print "Installing CertNanny Service.\n";
       my $cfgpath         = $cmdLineParam{cfg};
       my $sleep = $cmdLineParam{sleep} || 300;
       my $servicepath     = File::Spec->catfile($FindBin::Bin, $FindBin::Script);
@@ -150,6 +150,7 @@ foreach my $cmd (@ARGV) {   # command line parameters are already stripped off. 
       $monitor->setOption('globalchallengepassword', $cmdLineParam{challengepassword});
     }
     $monitor->setOption("force", $cmdLineParam{force} || 0);
+    $monitor->setOption("keystore", $cmdLineParam{keystore} || '');
    
     $monitor->$cmd(%cmdLineParam) || die "Invalid action: $cmd. Stopped";   # execute the command $cmd an give it all the command line parameters as a hash
   } ## end if ($OSNAME eq 'MSWin32')
@@ -304,34 +305,46 @@ certnanny - Certificate monitoring and renewal client
    
 =head1 SYNOPSIS
     
-certnanny --cfg=<configfile> [options] <action>
+certnanny --cfg=<configfile> <action> [options]
     
 Options:
 
-  --help               brief help message
-  --man                full documentation
+  --help                brief help message
+  --man                 full documentation
 
-  --cfg                specify config file to use
-  --challengepassword  specify a challenge password to use for an
-                       initial enrollment (all keystores)
-  --force              Force automatic renewal on all configured keystores
-                       (only used with action renew)
-  --win_user           specify alternative Windows username to run the 
-                       Windows Service
-  --win_password       specify password corresponding to win_user
+  --cfg=<Configuration> specify config file to use
+  --challengepassword   specify a challenge password to use for an
+                        initial enrollment (all keystores)
+  --force               Force automatic renewal on all configured keystores
+                        (only used with action renew)
+  --keystore=<Keystore> specify the keystore to be dumped
+                        possible values for <Keystore>:
+                        <keystore name> : Only this keystore will be dumped
+                        common          : All that does not belong to a 
+                                          particular keystore is dumped
+                        <empty>         : Everything is dumped
+                        (only used with action dumpdata)
+  --win_user            specify alternative Windows username to run the 
+                        Windows Service
+  --win_password        specify password corresponding to win_user
 
 Actions:
 
-  check                Check all configured keystores
-  renew                Run automatic renewal on all configured keystores
-  enroll               Run inital enrollment for configured keystores 
-                       that do NOT have a certificate installed.
-  updateRootCA         Run trusted root CA certificate update via SCEP 
-  install              Install CertNanny as a Windows Service (applicable
-                       only on Windows platforms)
-  uninstall            Uninstall CertNanny service (applicable only on 
-                       Windows platforms)
-    
+  check                 Check all configured keystores
+  renew                 Run automatic renewal on all configured keystores
+  enroll                Run inital enrollment for configured keystores 
+                        that do NOT have a certificate installed.
+  updateRootCA          Run trusted root CA certificate update via SCEP 
+  install               Install CertNanny as a Windows Service (applicable
+                        only on Windows platforms)
+  uninstall             Uninstall CertNanny service (applicable only on 
+                        Windows platforms)
+  cfgdump               Dumps the content of all CertNanny configuration file
+                        sorted by file (comments and whitespaces are stripped
+                        off)                
+  datadump              Dumps the content of the internal CertNanny data 
+                        structure. The keystore to be dumped can be specified 
+                        by the option --keystore
 =head1 OPTIONS
 
 =over 8
@@ -378,7 +391,9 @@ Check the configured keystores and schedule automatic renewal.
 Can be repeated as many times as desired and will automatically keep
 the correct state.
 
-If a initial enrollment configuration is found, certnanny will try to request a new certificate and create the keystore. 
+If a initial enrollment configuration is found, certnanny will try to request a new certificate and create the keystore.
+
+With thw option --force an immediate renewal is done no matter how long the old certificate is still valid.
 
 =item B<enroll>
  
@@ -485,6 +500,35 @@ As a windows service, CertNanny runs in renew mode only.
 =item B<uninstall>
 
 Uninstall CertNanny Win32 Service. Removes CertNanny froom the Windows Services list. 
+
+=item B<cfgdump>
+ 
+CertNanny prints out the lines of the configuration files, that where interpreted by 
+CertNanny.
+The output is sorted by configuration file. Additional information like a checksum of 
+the configuration file or the line number are given
+This option is meant to be used for troubleshooting. The output may be requested by
+the CertNanny support.
+
+CAUTION: Passwords and PINs are readable in the output and must be deleted befor 
+         sending the output to the support team.
+
+=item B<datadump>
+ 
+CertNanny prints its internal data structure that was build up according to read
+configuration files. out the lines of the configuration files, that where interpreted by 
+CertNanny.
+The amount if information printed out can be controlled by an option --keystore.
+
+The following values are possible:
+  <not present>            : All information is printed
+  --keystore=common        : All common information, that does not belong to a
+                             particular keystore is printed
+  --keystore=<keystorename>: All common information plus the information belonging to 
+                             the particular keystore <keystorename> is printed.
+                             
+This option is meant to be used for troubleshooting. The output may be requested by
+the CertNanny support. There are no PINS or Passwords readable in this output.
 
 =back
  
