@@ -64,7 +64,7 @@ sub new {
     use Perl::OSType ':all';
     use Sys::Hostname;
 
-    CertNanny::Logging->info("CertNanny running on " . hostname . " (" . os_type() . " $Config{osname} $Config{osvers}) under Perl $Config{version}");
+    CertNanny::Logging->info("CertNanny running on " . os_type() . " ($Config{myuname}) under Perl $Config{version}");
     
     # set default library path
     my @dirs = File::Spec->splitdir($FindBin::Bin);
