@@ -924,11 +924,12 @@ sub getInstalledCAs {
         # if ($_ =~ m/^([^,]*), ([0-3][0-9]\.[0-1][0-9]\.20[0-9][0-9]), (trustedCertEntry),.*$/) {
         #  ($certAlias, $certCreateDate, $certType) = ($1, $2, $3);
         #}
-        CertNanny::Logging->debug("found certLabel $certlabel"); 
+        CertNanny::Logging->debug("analyzing $gsk6cmd output line <$certlabel>"); 
         if( ! ( $certlabel =~ m/Certificates found/ ) and ! ( $certlabel =~ m/default, - / )) {
          
           $certlabel =~ m/\s*(.*$)/;
           $certlabel = $1;
+          CertNanny::Logging->debug("found certLabel <$certlabel>"); 
           my @certcmd;
           my $certexport= CertNanny::Util->getTmpFile();  
           if ($OSNAME eq "MSWin32") {
