@@ -428,7 +428,7 @@ sub createRequest() {
     
     #Todo pgk Testen: runCommand
     if (CertNanny::Util->runCommand(\@cmd) != 0) {
-      CertNanny::Logging->error("createRequest(): Executing certreq cmd error: join(' ', @cmd)");
+      CertNanny::Logging->error("createRequest(): Executing certreq cmd error: " . join(' ', @cmd));
       return undef;
     }
   } ## end unless (-e $result->{REQUESTFILE...})
