@@ -6,15 +6,6 @@
 #
 #############################################
 
-
-#Name of the CertNanny service 
-# Windows Service Name
-platform.windows.servicename     = CertNanny
-                               
-#time frame for starting the renewal process (in seconds)
-#once a day  86400
-platform.windows.serviceinterval = 86400
-
 #helper variable to ease configuration 
 #can be accesed via $(prefix)
 prefix                           = /var/CertNanny/
