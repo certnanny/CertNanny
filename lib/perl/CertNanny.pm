@@ -151,7 +151,7 @@ sub setOption {
 
   $self->{$key} = $value;
 
-  CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3]);
+  CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "Key: $key  Value: $value");
   return 1;
 } ## end sub setOption
 
