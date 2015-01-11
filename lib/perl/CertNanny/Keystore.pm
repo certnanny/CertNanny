@@ -141,7 +141,7 @@ sub new {
     } ## end else [ if (defined $self->{INSTANCE...})]
   
     # get previous renewal status
-    $self->k_retrieveState() or return;
+    $self->k_retrieveState($args{ENTRY}->{selfhealing} || -1) or return;
   
     # check if we can write to the file
     $self->k_storeState() || croak "Could not write state file $self->{STATE}->{FILE}";
@@ -154,7 +154,7 @@ sub new {
 sub DESTROY {
   my $self = shift;
 
-  $self->k_storeState();
+  $self->k_storeState(1);
 
   return undef unless (exists $self->{TMPFILE});
 
@@ -497,11 +497,19 @@ sub k_storeState {
 
   # store last state to statefile if it is defined
   my $self = shift;
+  my $onError = shift || 0;
 
   my $file = $self->{OPTIONS}->{ENTRY}->{statefile};
   my $tmpFile = "$file.$$";
   my $bakFile = "$file.bak";
   return 1 unless (defined $file and $file ne "");
+  
+  if ($onError) {
+    # We did exit on an error. Therefore we decrement Selfhealingcounter;
+    if (defined($self->{STATE}->{DATA}->{RENEWAL}->{TRYCOUNT}) && $self->{STATE}->{DATA}->{RENEWAL}->{TRYCOUNT} > 0) {
+      $self->{STATE}->{DATA}->{RENEWAL}->{TRYCOUNT}--;
+    }
+  }
 
   # store internal state
   if (ref $self->{STATE}->{DATA}) {
@@ -538,6 +546,7 @@ sub k_retrieveState {
 
   # retrieve last state from statefile if it exists
   my $self = shift;
+  my $selfhealing = shift;
 
   my $file = $self->{OPTIONS}->{ENTRY}->{statefile};
   return 1 unless (defined $file and $file ne "");
@@ -555,8 +564,36 @@ sub k_retrieveState {
       croak "Could not read state from file $file";
     }
   } ## end if (-r $file)
+  if (defined($selfhealing) && !defined($self->{STATE}->{DATA}->{RENEWAL}->{TRYCOUNT})) {
+    $self->{STATE}->{DATA}->{RENEWAL}->{TRYCOUNT} = $selfhealing;
+  }
   return 1;
 } ## end sub k_retrieveState
+
+
+sub _checkclearState {
+
+  # checks the number of unsucessfull state operations
+  # if necessary clear statefile and retrieve empty state
+  my $self = shift;
+  my $force = shift || 0;
+
+  $self->{STATE}->{DATA}->{RENEWAL}->{TRYCOUNT}-- if ($self->{STATE}->{DATA}->{RENEWAL}->{TRYCOUNT} > 0);
+
+  # clean state entry
+  if ($force || $self->{STATE}->{DATA}->{RENEWAL}->{TRYCOUNT} == 0) {
+    foreach my $entry (qw( CERTFILE KEYFILE REQUESTFILE )) {
+      eval {unlink $self->{STATE}->{DATA}->{RENEWAL}->{REQUEST}->{$entry};};
+    }
+
+    # delete state file
+    eval {unlink $self->{OPTIONS}->{ENTRY}->{statefile};};
+
+    $self->{STATE}->{DATA} = undef;
+  }
+
+  return 1;
+} ## end sub k_clearState
 
 
 sub k_setCert {
@@ -942,6 +979,7 @@ sub k_renew {
 
       if (!defined $self->{STATE}->{DATA}->{RENEWAL}->{REQUEST}) {
         CertNanny::Logging->error("Could not create certificate request");
+        $self->_checkclearState(0);
         return undef;
       }
       $self->_renewalState("sendrequest");
@@ -950,6 +988,7 @@ sub k_renew {
 
       if (!$self->_sendRequest()) {
         CertNanny::Logging->error("Could not send request");
+        $self->_checkclearState(0);
         return undef;
       }
     } elsif ($self->_renewalState() eq "completed") {
@@ -958,13 +997,8 @@ sub k_renew {
       # reset state
       $self->_renewalState(undef);
 
-      # clean state entry
-      foreach my $entry (qw( CERTFILE KEYFILE REQUESTFILE )) {
-        unlink $self->{STATE}->{DATA}->{RENEWAL}->{REQUEST}->{$entry};
-      }
-
-      # delete state file
-      unlink $self->{OPTIONS}->{ENTRY}->{statefile};
+      # clean state entry and delete state file
+      $self->_checkclearState(1);
       last;
     } else {
       CertNanny::Logging->error("State unknown: " . $self->_renewalState());
@@ -2059,7 +2093,7 @@ sub _sendRequest {
        #  CertNanny::Logging->debug("CertNanny::Keystore::_sendRequest ". Dumper(%args) );
   
 
-# Todo Testen createPKCS12: Passt das noch? Die Methode war im Keystore als Dummy implementiert und nur in den Keys ausprogrammiert, wird aber �ber $self aufgerufen?!?
+# Todo Testen createPKCS12: Passt das noch? Die Methode war im Keystore als Dummy implementiert und nur in den Keys ausprogrammiert, wird aber ueber $self aufgerufen?!?
 # Todo Testen createPKCS12: Was passiert hier? keine Zuweisung des Ergebnisses ....
       my $exportp12 = $self->createPKCS12(%args);
       CertNanny::Logging->debug("Created importp12 file: " . $importp12);

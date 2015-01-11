@@ -168,7 +168,7 @@ sub new {
 
     # RETRIEVE AND STORE STATE
     # get previous renewal status
-    $self->k_retrieveState() || return undef;
+    $self->k_retrieveState($entry->{selfhealing) || return undef;
 
     # check if we can write to the file
     $self->k_storeState()    || croak "Could not write state file $self->{STATE}->{FILE}";
@@ -933,7 +933,7 @@ sub generateKey {
     my $keyfile = $entryname . "-key.pem";
     $outfile = File::Spec->catfile($entry->{statedir}, $keyfile);
 
-    # Todo Arkadius: Ist $self und $entry hier nicht dasselbe -> Groß-/Kleinschreibung der elemente ?!?
+    # Todo Arkadius: Ist $self und $entry hier nicht dasselbe -> Groï¿½-/Kleinschreibung der elemente ?!?
     my $pin        = $self->{PIN}        || $entry->{key}->{pin} || "";
     my $bits       = $self->{SIZE}       || $entry->{size}       || '2048';
     my $engine     = $self->{ENGINE}     || $entry->{engine}     || 'no';
