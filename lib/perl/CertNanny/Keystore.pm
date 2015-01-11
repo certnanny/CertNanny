@@ -507,12 +507,21 @@ sub k_storeState {
 
     $dump->Purity(1);
 
+    my $tmpFile = $file.$$;
     my $fh;
-    if (!open $fh, '>', $file) {
-      croak "Could not write state to file $file";
+    if (!open $fh, '>', $tmpFile) {
+      croak "Error writing Keystore state ($file). Could not write state to tmp. file $tmpFile";
     }
     print $fh $dump->Dump;
     close $fh;
+    
+    File::Copy::move($file, $file . ".bak");
+    if (!File::Copy::move($tmpFile, $file)) {
+      File::Copy::move($file . ".bak", $file);
+      croak "Error moving keystore tmp. state file $tmpFile to $file";
+    } else {
+      unlink($file . ".bak");
+    }
   } ## end if (ref $self->{STATE}...)
 
   return 1;
