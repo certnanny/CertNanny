@@ -8,6 +8,7 @@ agent/bin/certnanny.zip
 agent/bin/cn_packed
 agent/log
 agent/tmp
+bin/certnanny.pl
 .includepath
 .project
 .checkstyle
