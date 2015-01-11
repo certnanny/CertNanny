@@ -499,6 +499,8 @@ sub k_storeState {
   my $self = shift;
 
   my $file = $self->{OPTIONS}->{ENTRY}->{statefile};
+  my $tmpFile = "$file.$$";
+  my $bakFile = "$file.bak";
   return 1 unless (defined $file and $file ne "");
 
   # store internal state
@@ -507,7 +509,6 @@ sub k_storeState {
 
     $dump->Purity(1);
 
-    my $tmpFile = $file.$$;
     my $fh;
     if (!open $fh, '>', $tmpFile) {
       croak "Error writing Keystore state ($file). Could not write state to tmp. file $tmpFile";
@@ -515,12 +516,17 @@ sub k_storeState {
     print $fh $dump->Dump;
     close $fh;
     
-    File::Copy::move($file, $file . ".bak");
-    if (!File::Copy::move($tmpFile, $file)) {
-      File::Copy::move($file . ".bak", $file);
-      croak "Error moving keystore tmp. state file $tmpFile to $file";
+    if (File::Copy::move($file, $bakFile)) {
+      if (File::Copy::move($tmpFile, $file)) {
+        eval {unlink($bakFile);};
+      } else {
+        File::Copy::move($bakFile, $file);
+        eval {unlink($tmpFile);};
+        croak "Error moving keystore tmp. state file $tmpFile to $file";
+      }
     } else {
-      unlink($file . ".bak");
+      eval {unlink($bakFile);};
+      croak "Error creating backup $bakFile of state file $file";
     }
   } ## end if (ref $self->{STATE}...)
 
