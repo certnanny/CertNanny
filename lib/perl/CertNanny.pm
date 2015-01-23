@@ -116,10 +116,12 @@ sub _iterate_entries {
     my $keystore = CertNanny::Keystore->new(CONFIG    => $self->{CONFIG},              # give it the whole configuration
                                             ENTRY     => $self->{ITEMS}->{$entryName}, # all keystore parameters from configfile
                                             ENTRYNAME => $entryName);                  # and the keystore name from configfile
+    # Keystore exists -> normal Operation
     if ($keystore) {
       $self->$action(ENTRYNAME => $entryName,
                      KEYSTORE  => $keystore);
     } else {
+      # Keystore does not exists -> create new Keystore (enroll) no matter wether we did a renew or an enroll
       CertNanny::Logging->error("Could not instantiate keystore $entryName");
       if ($action eq 'do_renew' or $action eq 'do_enroll') {
         CertNanny::Logging->info("Check for initial enrollment configuration.");
@@ -149,10 +151,25 @@ sub setOption {
   my $key   = shift;
   my $value = shift;
 
-  $self->{$key} = $value;
+  $self->{OPTION}->{$key} = $value;
 
   CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "Key: $key  Value: $value");
   return 1;
+} ## end sub setOption
+
+
+sub getOption {
+  CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3]);
+  my $self  = (shift)->getInstance();
+  my $key   = shift;
+
+  my $value;
+  if (defined($self->{OPTION}->{$key}) && ($self->{OPTION}->{$key} ne '')) {
+    $value = $self->{OPTION}->{$key};
+  }
+  
+  CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "Key: $key  Value: " . defined($value) ? $value : "undef");
+  return $value;
 } ## end sub setOption
 
 
@@ -164,13 +181,23 @@ sub AUTOLOAD {
   return undef if $attr eq 'DESTROY';
 
   # automagically call
-  # Possible actions commandline options
-  if ($attr =~ /^(?:cfgdump|datadump|test)$/) {
+  # Possible actions
+  #  check
+  #  renew
+  #  enroll
+  #  cleanup
+  #  install
+  #  uninstall
+  #  updateRootCA
+  #  dump
+  #  executeHook
+  
+  if ($attr =~ /^(?:dump|test)$/) {
   #   print "atrt: " .  $attr ;
     my $action = "do_$attr";
     return $self->$action();
   }
-  if ($attr =~ /^(?:info|enroll|check|renew|sync|updateRootCA)$/) {
+  if ($attr =~ /^(?:check|renew|enroll|cleanup|updateRootCA|executeHook)$/) {
   #   print "atrt: " .  $attr ;
     return $self->_iterate_entries("do_$attr");
   }
@@ -347,9 +374,7 @@ sub do_enroll {
       if ($self->{ITEMS}->{$entryname}->{initialenroll}->{auth}->{mode} eq 'password') {
         if (!defined $keystore->{INSTANCE}->{OPTIONS}->{ENTRY}->{initialenroll}->{auth}->{challengepassword}) {
           CertNanny::Logging->debug('Using commandline argument challangePassword for initial enrollment');
-          if (exists $self->{globalchallengepassword} && $self->{globalchallengepassword} ne '') {
-            $keystore->{INSTANCE}->{OPTIONS}->{ENTRY}->{initialenroll}->{auth}->{challengepassword} = $self->{globalchallengepassword};
-          }
+          $keystore->{INSTANCE}->{OPTIONS}->{ENTRY}->{initialenroll}->{auth}->{challengepassword} = $self->getOption('challengepassword');
         } ## end if (!defined $newkeystore...)
       } ## end if ($self->{ITEMS}->{$entryname...})
       
@@ -533,12 +558,12 @@ sub do_datadump {
     # no $self->{keystore}              : print all
     foreach my $key (sort {lc($a) cmp lc($b)} keys %{$href}) {
       if (ref($href->{$key}) eq "HASH") {
-        next if (!defined($hashname[0]) && ($key eq 'certmonitor'));         # certmonitor is depricated:      don't print
+        next if (!defined($hashname[0]) && ($key eq 'certmonitor'));               # certmonitor is depricated:      don't print
         next if (!defined($hashname[0]) && ($key eq 'keystore') && 
-                (uc($self->{keystore}) eq 'COMMON'));                        # $self->{keystore} = common:     print all but the keystores
+                (uc($self->getOption('keystore')) eq 'COMMON'));                   # $self->{keystore} = common:     print all but the keystores
         next if (defined($hashname[0]) && ($hashname[0] eq 'keystore') && 
-                ($self->{keystore} ne '') && 
-                !defined($hashname[1]) && ($key ne $self->{keystore}));      # $self->{keystore} = <keystore>: print all but the keystores plus <keystore>
+                $self->getOption('keystore') && 
+                !defined($hashname[1]) && ($key ne $self->getOption('keystore'))); # $self->{keystore} = <keystore>: print all but the keystores plus <keystore>
         push(@hashname, $key);
         print('  ' x $#hashname . "$key Start\n");
         _dumpValue(\%{$href->{$key}});
@@ -647,7 +672,7 @@ sub do_renew {
       CertNanny::Util->backoffTime($self->{CONFIG});
       $instance->k_renew();
     } else {
-      if ($self->{force}) {
+      if ($self->getOption('force')) {
         CertNanny::Logging->debug("Renewal forced (Certificate is still valid for more than $self->{ITEMS}->{ $entryname }->{warnexpiry_days} days)");
         # schedule automatic renewal
         CertNanny::Util->backoffTime($self->{CONFIG});
@@ -658,7 +683,7 @@ sub do_renew {
     }
 
     if (!$instance->k_checkValidity($self->{ITEMS}->{$entryname}->{warnexpiry_days})) {
-      if ($self->{force}) {
+      if ($self->getOption('force')) {
         CertNanny::Logging->notice("Renewal forced (Certificate is valid for less than $self->{ITEMS}->{ $entryname }->{warnexpiry_days} days)");
       } else {
         CertNanny::Logging->notice("Certificate is valid for less than $self->{ITEMS}->{ $entryname }->{warnexpiry_days} days");
