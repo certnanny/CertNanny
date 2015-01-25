@@ -126,7 +126,6 @@ sub _iterate_entries {
         }
       } ## end if ($action eq ' renew'...)
     } ## end else [ if ($keystore) ]
-   ## print "\n\n";
   } ## end foreach my $entryName (keys %{$self...})
 
   return 1;
@@ -171,28 +170,25 @@ sub AUTOLOAD {
   my $self = (shift)->getInstance();
   my $attr = $AUTOLOAD;
   $attr =~ s/.*:://;
-  #print "atrt: " .  $attr ;
   return undef if $attr eq 'DESTROY';
 
   # automagically call
   # Possible actions
-  #  check
-  #  renew
-  #  enroll
-  #  cleanup
-  #  install
-  #  uninstall
-  #  updateRootCA
-  #  dump
-  #  executeHook
+  #  do_check
+  #  do_renew
+  #  do_enroll
+  #do_cleanup
+  #  do_updateRootCA
+  #do_dump
+  #do_executeHook
+  
+  #?do_sync
   
   if ($attr =~ /^(?:dump|test)$/) {
-  #   print "atrt: " .  $attr ;
     my $action = "do_$attr";
     return $self->$action();
   }
   if ($attr =~ /^(?:check|renew|enroll|cleanup|updateRootCA|executeHook)$/) {
-  #   print "atrt: " .  $attr ;
     return $self->_iterate_entries("do_$attr");
   }
 } ## end sub AUTOLOAD
@@ -508,69 +504,65 @@ sub do_info {
 } ## end sub do_info
 
 
-sub do_cfgdump {
-  CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "Configuration Dump");
+sub _dumpValue {
+  my $self = shift;
+  my $cref = shift;
+  my $aref = shift;
+
+  # First handle all values
+  foreach my $key (sort {lc($a) cmp lc($b)} keys %{$cref}) {
+    if (ref($cref->{$key}) ne "HASH") {
+      next if ($key eq 'INHERIT');                  # We do not dump this INHERIT stuff since it does give no information
+      my $name  = '  ' x ($#$aref + 1) . $key . ' = ';
+      my $value = $name =~ /(pw|target_pw|storepass|keypass|srcstorepass|deststorepass|srckeypass|destkeypass)/ ? "*HIDDEN*" : $cref->{$key};
+      my $fillup = ' ' x (100 - length($name) - length($value));
+      print($name . $fillup . $value . "\n");
+    }
+  }
+  # Then handle all HASHs
+  # no $self->{keystore}              : print all
+  foreach my $key (sort {lc($a) cmp lc($b)} keys %{$cref}) {
+    if (ref($cref->{$key}) eq "HASH") {
+      my $target = $self->getOption('keystore');
+      next if (!defined($$aref[0]) && 
+               ($key eq 'keystore') && (uc($target) eq 'COMMON')); # print all but the keystores
+      next if (defined($$aref[0]) && !defined($$aref[1]) && $target &&
+              ($$aref[0] eq 'keystore') && ($key ne $target)); # $self->{keystore} = <keystore>: print all but the keystores plus <keystore>
+      push(@$aref, $key);
+      print('  ' x $#$aref . "$key Start\n");
+      $self->_dumpValue(\%{$cref->{$key}}, $aref);
+      print('  ' x $#$aref . "$key End\n");
+      pop(@$aref);
+    }
+  }
+}
+
+
+sub do_dump {
+  CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "Dump");
   my $self = (shift)->getInstance();
   my %args = (@_);
 
   my $config    = $self->{CONFIG};
 
-  foreach my $configFileName (keys %{$config->{CONFIGFILES}}) {
-    print "File: <$configFileName> SHA1: $config->{CONFIGFILES}->{$configFileName}->{SHA}\n";
-    while ((my $lnr, my $content) = each %{$config->{CONFIGFILES}->{$configFileName}->{CONTENT}}) {
-      printf("Line: %3s Content: <%s>\n", $lnr, $content);
+  if ($self->{OPTION}->{object} eq 'cfg') {
+    my @hashname;
+    $self->_dumpValue(\%{$config->{CONFIG}}, \@hashname);
+  }
+
+  if ($self->{OPTION}->{object} eq 'data') {
+    foreach my $configFileName (keys %{$config->{CONFIGFILES}}) {
+      print "File: <$configFileName> SHA1: $config->{CONFIGFILES}->{$configFileName}->{SHA}\n";
+      while ((my $lnr, my $content) = each %{$config->{CONFIGFILES}->{$configFileName}->{CONTENT}}) {
+        printf("Line: %3s Content: <%s>\n", $lnr, $content);
+      }
+      print "\n";
     }
-    print "\n";
   }
   
-  CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "Configuration Dump");
+  CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "Dump");
   return 1;
 } ## end sub do_cfgdump
-
-
-sub do_datadump {
-  CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "Data Dump");
-  my $self = (shift)->getInstance();
-  my %args = (@_);
-
-  my $config    = $self->{CONFIG};
-  
-  my @hashname;
-  sub _dumpValue {
-    my $href = shift;
-
-    # First handle all values
-    foreach my $key (sort {lc($a) cmp lc($b)} keys %{$href}) {
-      if (ref($href->{$key}) ne "HASH") {
-        next if ($key eq 'INHERIT');                  # We do not dump this INHERIT stuff since it does give no information
-        my $dummy = '  ' x ($#hashname + 1) . $key . ' = ';
-        my $fillup = ' ' x (100 - length($dummy) - length($href->{$key}));
-        print($dummy . $fillup . $href->{$key} . "\n");
-      }
-    }
-    # Then handle all HASHs
-    # no $self->{keystore}              : print all
-    foreach my $key (sort {lc($a) cmp lc($b)} keys %{$href}) {
-      if (ref($href->{$key}) eq "HASH") {
-        next if (!defined($hashname[0]) && ($key eq 'keystore') && 
-                (uc($self->getOption('keystore')) eq 'COMMON'));                   # $self->{keystore} = common:     print all but the keystores
-        next if (defined($hashname[0]) && ($hashname[0] eq 'keystore') && 
-                $self->getOption('keystore') && 
-                !defined($hashname[1]) && ($key ne $self->getOption('keystore'))); # $self->{keystore} = <keystore>: print all but the keystores plus <keystore>
-        push(@hashname, $key);
-        print('  ' x $#hashname . "$key Start\n");
-        _dumpValue(\%{$href->{$key}});
-        print('  ' x $#hashname . "$key End\n");
-        pop(@hashname);
-      }
-    }
-  }
-
-  _dumpValue(\%{$config->{CONFIG}});
-
-  CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "Data Dump");
-  return 1;
-} ## end sub do_datadump
 
 
 sub do_check {
