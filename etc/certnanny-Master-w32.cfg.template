@@ -23,7 +23,12 @@ path.tmpdir                      = $(CNDATA)\tmp\
 log.level = 3
 #Name and destination of the certnanny logfile
 
-log.file                         = $(CNDATA)\certnanny.log
+log.out.console                  = 1
+log.out.file                     = $(CNDATA)logs/certnanny.log
+log.out.syslog                   = tcp://localhost:2486
+log.err.console                  = 1
+log.err.file                     = $(CNDATA)logs/certnanny.err
+log.err.syslog                   = tcp://localhost:2486
 
 #randomWait if this is set there will be a random backoff time while renewing a certificate to ease the stress on the PKI (e.g. 1000 servers run certanny with the same config for a cron job ) 
 randomWait =  300

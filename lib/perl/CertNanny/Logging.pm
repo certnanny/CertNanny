@@ -25,12 +25,14 @@ use utf8;
 use vars qw(@ISA @EXPORT @EXPORT_OK %EXPORT_TAGS $VERSION);
 
 @EXPORT = qw(printerr printout 
-             logLevel log2File log2Console LogOff 
+             logLevel
+             log2File log2Console log2SysLog LogOff
+             err2File err2Console err2SysLog errOff
              log debug info notice error fatal);    # Symbols to autoexport (:DEFAULT tag)
 
 my $INSTANCE;
 
-my ($stdOutFake, $stdErrFake, @logBuffer, $logTarget);
+my ($stdOutFake, $stdErrFake, @logBuffer, $logTarget, $errTarget);
 
 my $dbgInfo = 1;
 # 0: level, PID, text                         i.E.: 2013-09-13 15:58:26 : [info] [788] reading H:\data\Config\CertNanny\CfgFiles\Keystore\uat-certnanny-test Keystore openssl.cfg SHA1: BeCBVMvnNzl8HZU5tF4vzR4uIog
@@ -42,7 +44,8 @@ BEGIN {
   open($stdOutFake, ">&", STDOUT);
   open($stdErrFake, ">&", STDERR);
   $logTarget;  # DO NOT SET HERE! USE logOff, log2File(1|0), log2Console(1|0) INSTEAD
-  # logTarget is a bit-Vektor:
+  $errTarget;  # DO NOT SET HERE! USE errOff, err2File(1|0), err2Console(1|0) INSTEAD
+  # logTarget and errTarget are a bit-Vektor:
   # -1 not yet initialised
   # Bit 0 (1) : Logging to Console
   # Bit 1 (2) : Logging to File
@@ -58,6 +61,7 @@ sub getInstance {
     shift;
     my %args = (@_);
     $logTarget = -1;
+    $errTarget = -1;
     $INSTANCE->{CONFIG} = $args{CONFIG};
     if (defined $INSTANCE->{CONFIG}) {
       # only instantiate if $self->{CONFIG} exists.
@@ -78,9 +82,13 @@ sub getInstance {
       $INSTANCE->logLevel($logLevel);
 
       # Determine Logtargets
-      $INSTANCE->log2Console('STATUS', $args{CONFIG}->get('log.console'));
-      $INSTANCE->log2File('STATUS', $args{CONFIG}->get('log.file') ne '');
-      $INSTANCE->log2SysLog('STATUS', $args{CONFIG}->get('log.syslog') ne '');
+      $INSTANCE->log2Console('STATUS', $args{CONFIG}->get('log.out.console'));
+      $INSTANCE->log2File('STATUS', $args{CONFIG}->get('log.out.file') ne '');
+      $INSTANCE->log2SysLog('STATUS', $args{CONFIG}->get('log.out.syslog') ne '');
+      # Determine Errtargets
+      $INSTANCE->err2Console('STATUS', $args{CONFIG}->get('log.err.console'));
+      $INSTANCE->err2File('STATUS', $args{CONFIG}->get('log.err.file') ne '');
+      $INSTANCE->err2SysLog('STATUS', $args{CONFIG}->get('log.err.syslog') ne '');
     }
   }
   return $INSTANCE;
@@ -118,20 +126,20 @@ sub printerr {
   my $str = join('', @_);
   
   # Log to console
-  if ($logTarget & 1) {
+  if ($errTarget & 1) {
     $| = 1;
     open STDERR, ">&", $stdErrFake;
     print STDERR $str;
   }
   # Log to file
-  if ($logTarget & 2) {
+  if ($errTarget & 2) {
     $| = 1;
-    my $file = $self->{CONFIG}->get('log.file', "FILE");
+    my $file = $self->{CONFIG}->get('log.err.file', "FILE");
     open STDERR, ">>", $file || die "Could not redirect STDERR. Stopped";
     print STDERR $str;
   }
   # Log to syslog
-  if ($logTarget & 4) {
+  if ($errTarget & 4) {
   }
 } ## end sub printerr
 
@@ -149,7 +157,7 @@ sub printout {
   # Log to file
   if ($logTarget & 2) {
     $| = 1;
-    my $file = $self->{CONFIG}->get('log.file', "FILE");
+    my $file = $self->{CONFIG}->get('log.out.file', "FILE");
     open STDOUT, ">>", $file || die "Could not redirect STDOUT. Stopped";
     print STDOUT $str;
   }
@@ -171,6 +179,103 @@ sub logLevel {
 } ## end sub logLevel
 
 
+sub errOff {
+  my $self = (shift)->getInstance();
+
+  if ($errTarget != 0) {
+    $self->debug('Error Logging is disabled');
+    $| = 1;
+    open STDERR, ">", "/dev/null";
+    $errTarget = 0;
+  } ## end if ($errTarget != 0)
+
+  return 1;
+} ## end sub logOff
+
+
+sub err2Console {
+  my $self  = (shift)->getInstance();
+  my %args = (STATUS => 0,
+              @_);
+
+  $errTarget = 1 if $errTarget == -1;
+  my $status = $errTarget & 1;
+
+  if ($args{STATUS}) {
+    $errTarget |= 0b00000001;
+  } else {
+    $errTarget &= 0b11111110;
+  }
+
+  if ($status != ($errTarget & 1)) {
+    if ($errTarget & 1) {
+      $self->debug('Console Error Logging enabled');
+    } else {
+      $self->debug('Console Error Logging disabled');
+    }
+  }  
+  
+  return 1;
+} ## end sub err2Console
+
+
+sub err2File {
+  my $self = (shift)->getInstance();
+  my %args = (STATUS => 0,
+              CLEAR  => undef,
+              @_);
+
+  $errTarget = 2 if $errTarget == -1;
+  my $status = $errTarget & 2;
+
+  if ($args{STATUS}) {
+    $errTarget |= 0b00000010;
+  } else {
+    $errTarget &= 0b11111101;
+  }
+
+  my $file = $self->{CONFIG}->get('log.err.file', "FILE");
+  my $filedir = dirname($file);
+  eval {unlink $file} if $args{CLEAR};
+  eval {mkdir($filedir)};
+  if ($status != ($errTarget & 2)) {
+    if ($errTarget & 1) {
+      $self->debug("File Error Logging enabled to $file");
+    } else {
+      $self->debug('File Error Logging disabled');
+    }
+  }
+
+  return 1;
+} ## end sub err2File
+
+
+sub err2SysLog {
+  my $self  = (shift)->getInstance();
+  my %args = (STATUS => 0,
+              @_);
+
+  $errTarget = 1 if $errTarget == -1;
+  my $status = $errTarget & 4;
+
+  if ($args{STATUS}) {
+    $errTarget |= 0b00000100;
+  } else {
+    $errTarget &= 0b11111011;
+  }
+
+  if ($status != ($errTarget & 4)) {
+    if ($errTarget & 4) {
+      $self->debug('SysLog Error Logging enabled');
+    } else {
+      $self->debug('SysLog Error Logging disabled');
+    }
+  }  
+  
+  return 1;
+} ## end sub err2SysLog
+
+
 sub logOff {
   my $self = (shift)->getInstance();
   
@@ -178,7 +283,6 @@ sub logOff {
     $self->debug('Logging is disabled');
     $| = 1;
     open STDOUT, ">", "/dev/null";
-    open STDERR, ">", "/dev/null";
     $logTarget = 0;
   } ## end if ($logTarget != 0)
   
@@ -227,7 +331,7 @@ sub log2File {
     $logTarget &= 0b11111101;
   }
 
-  my $file = $self->{CONFIG}->get('log.file', "FILE");
+  my $file = $self->{CONFIG}->get('log.out.file', "FILE");
   my $filedir = dirname($file);
   eval {unlink $file} if $args{CLEAR};
   eval {mkdir($filedir)};

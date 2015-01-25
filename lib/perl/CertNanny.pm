@@ -512,7 +512,7 @@ sub _dumpValue {
     if (ref($cref->{$key}) ne "HASH") {
       next if ($key eq 'INHERIT');                  # We do not dump this INHERIT stuff since it does give no information
       my $name  = '  ' x ($#$aref + 1) . $key . ' = ';
-      my $value = $name =~ /(pw|target_pw|storepass|keypass|srcstorepass|deststorepass|srckeypass|destkeypass)/ ? "*HIDDEN*" : $cref->{$key};
+      my $value = $name =~ /(pin|pw|target_pw|storepass|keypass|srcstorepass|deststorepass|srckeypass|destkeypass)/ ? "*HIDDEN*" : $cref->{$key};
       my $fillup = ' ' x (100 - length($name) - length($value));
       CertNanny::Logging->printout($name . $fillup . $value . "\n");
     }
@@ -552,6 +552,10 @@ sub do_dump {
     foreach my $configFileName (keys %{$config->{CONFIGFILES}}) {
       CertNanny::Logging->printout("File: <$configFileName> SHA1: $config->{CONFIGFILES}->{$configFileName}->{SHA}\n");
       while ((my $lnr, my $content) = each %{$config->{CONFIGFILES}->{$configFileName}->{CONTENT}}) {
+        my $name = (split('=', $content))[0];
+        if ($name =~ /(pin|pw|target_pw|storepass|keypass|srcstorepass|deststorepass|srckeypass|destkeypass)/) {
+          $content = "${name}= *HIDDEN*";
+        }
         CertNanny::Logging->printout(sprintf("Line: %3s Content: <%s>\n", $lnr, $content));
       }
       CertNanny::Logging->printout("\n");
