@@ -175,7 +175,7 @@ sub AUTOLOAD {
   #  do_check
   #  do_renew
   #  do_enroll
-  #do_cleanup
+  #  do_cleanup
   #  do_updateRootCA
   #  do_dump
   #do_executeHook
@@ -488,8 +488,8 @@ sub do_cleanup {
   my $self = (shift)->getInstance();
   my %args = (@_);
 
-  my $keystore = $args{KEYSTORE};
-  my $instance = $keystore->{INSTANCE};
+  my $keystore  = $args{KEYSTORE};
+  my $instance  = $keystore->{INSTANCE};
   my $options   = $instance->{OPTIONS};
   my $entryname = $options->{ENTRYNAME};
   my $config    = $options->{CONFIG};
@@ -506,14 +506,32 @@ sub do_info {
   my $self = (shift)->getInstance();
   my %args = (@_);
 
-  my $keystore = $args{KEYSTORE};
-  my $instance = $keystore->{INSTANCE};
+  my $keystore  = $args{KEYSTORE};
+  my $instance  = $keystore->{INSTANCE};
   my $options   = $instance->{OPTIONS};
   my $entryname = $options->{ENTRYNAME};
   my $config    = $options->{CONFIG};
 
   my $info = $instance->k_getInfo("SubjectName", "NotAfter");
   CertNanny::Logging->printout(Dumper $info);
+
+  CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "Info");
+  return 1;
+} ## end sub do_info
+
+
+sub do_executeHook {
+  CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "Info");
+  my $self = (shift)->getInstance();
+  my %args = (@_);
+
+  my $keystore  = $args{KEYSTORE};
+  my $instance  = $keystore->{INSTANCE};
+  my $options   = $instance->{OPTIONS};
+  my $entryname = $options->{ENTRYNAME};
+  my $config    = $options->{CONFIG};
+
+
 
   CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "Info");
   return 1;
@@ -590,8 +608,8 @@ sub do_check {
   my $self = (shift)->getInstance();
   my %args = (@_);
 
-  my $keystore = $args{KEYSTORE};
-  my $instance = $keystore->{INSTANCE};
+  my $keystore  = $args{KEYSTORE};
+  my $instance  = $keystore->{INSTANCE};
   my $options   = $instance->{OPTIONS};
   my $entryname = $options->{ENTRYNAME};
   my $config    = $options->{CONFIG};
@@ -641,8 +659,8 @@ sub do_renew {
   my $self   = (shift)->getInstance();
   my %args = (@_);
 
-  my $keystore = $args{KEYSTORE};
-  my $instance = $keystore->{INSTANCE};
+  my $keystore  = $args{KEYSTORE};
+  my $instance  = $keystore->{INSTANCE};
   my $options   = $instance->{OPTIONS};
   my $entryname = $options->{ENTRYNAME};
   my $config    = $options->{CONFIG};
@@ -708,8 +726,8 @@ sub do_sync {
   my $self = (shift)->getInstance();
   my %args = (@_);
 
-  my $keystore = $args{KEYSTORE};
-  my $instance = $keystore->{INSTANCE};
+  my $keystore  = $args{KEYSTORE};
+  my $instance  = $keystore->{INSTANCE};
   my $options   = $instance->{OPTIONS};
   my $entryname = $options->{ENTRYNAME};
   my $config    = $options->{CONFIG};
@@ -761,8 +779,8 @@ sub do_updateRootCA {
   my $self = (shift)->getInstance();
   my %args = (@_);
 
-  my $keystore = $args{KEYSTORE};
-  my $instance = $keystore->{INSTANCE};
+  my $keystore  = $args{KEYSTORE};
+  my $instance  = $keystore->{INSTANCE};
   my $options   = $instance->{OPTIONS};
   my $entryname = $options->{ENTRYNAME};
   my $config    = $options->{CONFIG};
