@@ -587,7 +587,7 @@ sub _parseFile {
         $var = $var->{$confPart};
       }
       if ($doDupCheck && defined($var->{$key})) {
-        print STDERR "Config file error: duplicate value definition in file $configFile line $lnr ($line)\n";
+        CertNanny::Logging->printerr("Config file error: duplicate value definition in file $configFile line $lnr ($line)\n");
       }
       
       while ($val =~ m{__ENV__(.*?)__}xms) {
@@ -602,7 +602,7 @@ sub _parseFile {
       $var->{$key} = $val;
     } else {
       if ($line !~ /^include\s+(.+)$/) {
-        print STDERR "Config file error: parse error in line $lnr ($line)\n";
+        CertNanny::Logging->printerr("Config file error: parse error in line $lnr ($line)\n");
       }
     }
   }

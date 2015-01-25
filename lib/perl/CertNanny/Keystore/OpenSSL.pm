@@ -135,7 +135,7 @@ sub new {
       CertNanny::Logging->debug("Using HSM $hsmtype");
       eval "use CertNanny::HSM::$hsmtype";
       if ($@) {
-        print STDERR $@;
+        CertNanny::Logging->printerr($@);
         return undef;
       }
       eval "\$self->{HSM} = CertNanny::HSM::$hsmtype->new(\$entry, \$config, \$entryname)";

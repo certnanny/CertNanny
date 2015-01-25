@@ -50,8 +50,8 @@ sub new {
     return undef;
   }
 
-  $self->{OPTIONS}->{sscep}->{Verbose} = "true" if $config->get("loglevel") >= 5;
-  $self->{OPTIONS}->{sscep}->{Debug}   = "true" if $config->get("loglevel") >= 6;
+  $self->{OPTIONS}->{sscep}->{Verbose} = "true" if $config->get('log.file') >= 5;
+  $self->{OPTIONS}->{sscep}->{Debug}   = "true" if $config->get('log.file') >= 6;
 
   $self->{certdir} = $entry_options->{scepcertdir};
   if (!defined $self->{certdir}) {

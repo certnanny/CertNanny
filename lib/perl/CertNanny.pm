@@ -93,8 +93,6 @@ sub new {
 
 sub DESTROY {
   # Windows apparently flushes file handles on close() and ignores autoflush...
-  close STDOUT;
-  close STDERR;
   $INSTANCE = undef;
 }
 
@@ -103,7 +101,7 @@ sub _iterate_entries {
   my $self   = (shift)->getInstance();
   my $action = shift;
 
-  my $loglevel = $self->{CONFIG}->get('loglevel') || 3;
+  my $loglevel = $self->{CONFIG}->get('log.level') || 3;
 
   foreach my $entryName (keys %{$self->{ITEMS}}) {    # Instantiate every keystore, that is configured
     CertNanny::Logging->debug("Checking keystore $entryName");
@@ -728,7 +726,7 @@ sub do_test {
   # my $a1  = shift(@ARGV);
   # my $a2  = shift(@ARGV);
 
-  CertNanny::Logging->log2Console(); 
+  CertNanny::Logging->log2Console('STATUS', 1); 
   my $ret = $args{KEYSTORE}->{INSTANCE}->$cmd(@ARGV);
 
   CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "Test");

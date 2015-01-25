@@ -51,7 +51,7 @@ sub new {
   # keystore must be available
   my $type = $args{ENTRY}->{type};
   if (!defined $type || ($type eq "none")) {
-    print STDERR "Skipping keystore (no keystore type defined)\n";
+    CertNanny::Logging->printerr("Skipping keystore (no keystore type defined)\n");
     return undef;
   }
   
@@ -73,8 +73,6 @@ sub new {
     $args{ENTRY}->{statefile} = $statefile;
   }
 
-  CertNanny::Logging->logLevel($args{CONFIG}->get('loglevel') || 3);
-
   # set defaults
   # $self->{CONFIG} = $args{CONFIG};
   
@@ -92,8 +90,8 @@ sub new {
   # dynamically load keystore instance module
   eval "require CertNanny::Keystore::${type}";
   if ($@) {
-    print STDERR $@;
-    print STDERR "ERROR: Could not load keystore handler '$type'\n";
+    CertNanny::Logging->printerr($@);
+    CertNanny::Logging->printerr("ERROR: Could not load keystore handler '$type'\n");
     return undef;
   }
 
@@ -103,7 +101,7 @@ sub new {
   eval "\$self->{INSTANCE} = new CertNanny::Keystore::$type((\%args,                   # give it whole configuration plus all keystore parameters and keystore name from configfile
                                                              \%{\$self->{OPTIONS}}))"; # give it some common parameters from configfile
   if ($@) {
-    print STDERR $@;
+    CertNanny::Logging->printerr($@);
     return undef;
   }
 
@@ -1494,12 +1492,12 @@ sub k_buildCertificateChain {
     my $child  = shift;
    
     if (!defined $parent || !defined $child) {
-      print STDERR "ERROR: is_issuer: missing parameters\n";
+      CertNanny::Logging->printerr("ERROR: is_issuer: missing parameters\n");
       return undef;
     }
 
     if (ref $parent ne 'HASH' || ref $child ne 'HASH') {
-      print STDERR "ERROR: is_issuer: illegal parameters\n";
+      CertNanny::Logging->printerr("ERROR: is_issuer: illegal parameters\n");
       return undef;
     }
 
@@ -2224,7 +2222,7 @@ sub _getEnroller {
     my $enrollertype     = ucfirst($enrollertype_cfg);
     eval "use CertNanny::Enroll::$enrollertype";
     if ($@) {
-      print STDERR $@;
+      CertNanny::Logging->printerr($@);
       CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "get enroller");
       return undef;
     }
@@ -2233,7 +2231,7 @@ sub _getEnroller {
     
     eval "\$entry->{ENROLLER} = CertNanny::Enroll::$enrollertype->new(\$entry, \$config, \$entryname)";
     if ($@) {
-      print STDERR $@;
+      CertNanny::Logging->printerr($@);
       CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "get enroller");
       return undef;
     }

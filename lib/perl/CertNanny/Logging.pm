@@ -15,6 +15,8 @@ use Data::Dumper;
 use FindBin qw($Script);
 use Carp;
 
+use File::Basename;
+
 use strict;
 use warnings;
 use English;
@@ -22,7 +24,8 @@ use utf8;
 
 use vars qw(@ISA @EXPORT @EXPORT_OK %EXPORT_TAGS $VERSION);
 
-@EXPORT = qw(logLevel log2File log2Console LogOff 
+@EXPORT = qw(printerr printout 
+             logLevel log2File log2Console LogOff 
              log debug info notice error fatal);    # Symbols to autoexport (:DEFAULT tag)
 
 my $INSTANCE;
@@ -38,7 +41,13 @@ my $dbgInfo = 1;
 BEGIN {
   open($stdOutFake, ">&", STDOUT);
   open($stdErrFake, ">&", STDERR);
-  $logTarget;  # 0: Off   1: Console   2: File  #  DO NOT SET HERE! USE logOff, log2File, log2Console INSTEAD
+  $logTarget;  # DO NOT SET HERE! USE logOff, log2File(1|0), log2Console(1|0) INSTEAD
+  # logTarget is a bit-Vektor:
+  # -1 not yet initialised
+  # Bit 0 (1) : Logging to Console
+  # Bit 1 (2) : Logging to File
+  # ToDo: Logging to syslog
+  # Bit 2 (4) : Logging to Syslog (to be implemented)
 }
 
 sub getInstance {
@@ -59,7 +68,7 @@ sub getInstance {
       # Prio 0: Default : 3
       $logLevel = 3;
       # Prio 1: If a config file value is given, take this
-      if (defined($args{CONFIG}->get('loglevel')))      {$logLevel = $args{CONFIG}->get('loglevel')}
+      if (defined($args{CONFIG}->get('log.level')))     {$logLevel = $args{CONFIG}->get('log.level')}
       # Prio 2: If a commandline parameter debug is given without value, take 4
       if (defined($args{debug}) && ($args{debug} == 0)) {$logLevel = 4}
       # Prio 3: If a commandline parameter debug is given with value, take the value of debug
@@ -67,6 +76,11 @@ sub getInstance {
       # Prio 4: If a commandline parameter verbose is given, take 6
       if (defined($args{verbose}))                      {$logLevel = 6} 
       $INSTANCE->logLevel($logLevel);
+
+      # Determine Logtargets
+      $INSTANCE->log2Console('STATUS', $args{CONFIG}->get('log.console'));
+      $INSTANCE->log2File('STATUS', $args{CONFIG}->get('log.file') ne '');
+      $INSTANCE->log2SysLog('STATUS', $args{CONFIG}->get('log.syslog') ne '');
     }
   }
   return $INSTANCE;
@@ -94,7 +108,56 @@ sub DESTROY {
   foreach my $file (@{$self->{TMPFILE}}) {
     unlink $file;
   }
+  close STDOUT;
+  close STDERR;
 }
+
+
+sub printerr {
+  my $self = (shift)->getInstance();
+  my $str = join('', @_);
+  
+  # Log to console
+  if ($logTarget & 1) {
+    $| = 1;
+    open STDERR, ">&", $stdErrFake;
+    print STDERR $str;
+  }
+  # Log to file
+  if ($logTarget & 2) {
+    $| = 1;
+    my $file = $self->{CONFIG}->get('log.file', "FILE");
+    open STDERR, ">>", $file || die "Could not redirect STDERR. Stopped";
+    print STDERR $str;
+  }
+  # Log to syslog
+  if ($logTarget & 4) {
+  }
+} ## end sub printerr
+
+
+sub printout {
+  my $self = (shift)->getInstance();
+  my $str = join('', @_);
+  
+  # Log to console
+  if ($logTarget & 1) {
+    $| = 1;
+    open STDOUT, ">&", $stdOutFake;
+    print STDOUT $str;
+  }
+  # Log to file
+  if ($logTarget & 2) {
+    $| = 1;
+    my $file = $self->{CONFIG}->get('log.file', "FILE");
+    open STDOUT, ">>", $file || die "Could not redirect STDOUT. Stopped";
+    print STDOUT $str;
+  }
+  # Log to syslog
+  if ($logTarget & 4) {
+  }
+
+} ## end sub logLevel
 
 
 sub logLevel {
@@ -124,15 +187,26 @@ sub logOff {
 
 
 sub log2Console {
-  my $self = (shift)->getInstance();
-  
-  if ($logTarget != 1) {
-    $self->debug('Logging is redirected to console');
-    $| = 1;
-    open STDOUT, ">&", $stdOutFake;
-    open STDERR, ">&", $stdErrFake;
-    $logTarget = 1;
-  } ## end if ($logTarget != 1)
+  my $self  = (shift)->getInstance();
+  my %args = (STATUS => 0,
+              @_);
+
+  $logTarget = 1 if $logTarget == -1;
+  my $status = $logTarget & 1;
+
+  if ($args{STATUS}) {
+    $logTarget |= 0b00000001;
+  } else {
+    $logTarget &= 0b11111110;
+  }
+
+  if ($status != ($logTarget & 1)) {
+    if ($logTarget & 1) {
+      $self->debug('Console Logging enabled');
+    } else {
+      $self->debug('Console Logging disabled');
+    }
+  }  
   
   return 1;
 } ## end sub log2Console
@@ -140,23 +214,59 @@ sub log2Console {
 
 sub log2File {
   my $self = (shift)->getInstance();
-  my $clear = shift || undef;
+  my %args = (STATUS => 0,
+              CLEAR  => undef,
+              @_);
 
-  if ($logTarget != 2) {
-    if (my $file = $self->{CONFIG}->get("logfile", "FILE")) {
-      $self->debug('Logging is redirected to ' . $self->{CONFIG}->get('logfile'));
-      eval {unlink $file} if $clear;
-      #TODO sub logFile Fehlerbehandlung
-      #write alle messages into a file
-      $| = 1;
-      open STDOUT, ">>", $file || die "Could not redirect STDOUT. Stopped";
-      open STDERR, ">>", $file || die "Could not redirect STDERR. Stopped";
-    } ## end if ($self->{CONFIG}->get...)
-    $logTarget = 2;
-  } ## end if ($logTarget != 2)
+  $logTarget = 2 if $logTarget == -1;
+  my $status = $logTarget & 2;
+
+  if ($args{STATUS}) {
+    $logTarget |= 0b00000010;
+  } else {
+    $logTarget &= 0b11111101;
+  }
+
+  my $file = $self->{CONFIG}->get('log.file', "FILE");
+  my $filedir = dirname($file);
+  eval {unlink $file} if $args{CLEAR};
+  eval {mkdir($filedir)};
+  if ($status != ($logTarget & 2)) {
+    if ($logTarget & 1) {
+      $self->debug("File Logging enabled to $file");
+    } else {
+      $self->debug('File Logging disabled');
+    }
+  }
 
   return 1;
 } ## end sub log2File
+
+
+sub log2SysLog {
+  my $self  = (shift)->getInstance();
+  my %args = (STATUS => 0,
+              @_);
+
+  $logTarget = 1 if $logTarget == -1;
+  my $status = $logTarget & 4;
+
+  if ($args{STATUS}) {
+    $logTarget |= 0b00000100;
+  } else {
+    $logTarget &= 0b11111011;
+  }
+
+  if ($status != ($logTarget & 4)) {
+    if ($logTarget & 4) {
+      $self->debug('SysLog Logging enabled');
+    } else {
+      $self->debug('SysLog Logging disabled');
+    }
+  }  
+  
+  return 1;
+} ## end sub log2SysLog
 
 
 sub log {
@@ -173,12 +283,11 @@ sub log {
                'error'  => 1,
                'fatal'  => 0);
 
-  print STDERR "WARNING: log called with undefined priority '$prio'"
+  push @logBuffer, "WARNING: log called with undefined priority '$prio'"
     unless exists $level{$prio};
-  if ($level{$prio} <= $self->logLevel()) {
 
-    # fallback to STDERR
-    #TODO sub log wieder rueckgaengig machen
+  my $logStr = '';
+  if ($level{$prio} <= $self->logLevel()) {
     (my $sec, my $min, my $hour, my $mday, my $mon, my $year, my $wday, my $yday, my $isdst) = localtime(time);
     $year = sprintf("%04d", $year + 1900);
     $mon  = sprintf("%02d", $mon + 1);
@@ -187,7 +296,7 @@ sub log {
     $min  = sprintf("%02d", $min);
     $sec  = sprintf("%02d", $sec);
 
-    my ($logStr, $subroutine, $i, $line) = ('' ,'', 0, 0);
+    my ($subroutine, $i, $line) = ('' ,'', 0, 0);
     while (defined(caller($i))) {
       $logStr = (caller($i))[3];
       $line = $line ? (caller($i-1))[2] : __LINE__;
@@ -210,21 +319,20 @@ sub log {
     } else {
       $logStr = "$year-$mon-$mday $hour:$min:$sec : [$prio] [$$] $arg->{MSG}\n";
     }
-
-    if ($logTarget >= 0) {   # Bereit
-      while (@logBuffer) {
-        print STDERR shift(@logBuffer);
-      }
-      print STDERR $logStr;
-    } else {                         # Noch nicht bereit
-      push @logBuffer, $logStr;
-    }
+    push @logBuffer, $logStr;
 
     # call hook
     #$self->executehook($self->{INSTANCE}->{OPTIONS}->{ENTRY}->{hook}->{log},
     #			   '__PRIORITY__' => $prio,
     #			   '__MESSAGE__' => $arg->{MSG});
   } ## end if ($level{$prio} <= $self...)
+
+  if ($logTarget >= 0) {   # Bereit
+    while (@logBuffer) {
+      $self->printerr(shift(@logBuffer));
+    }
+  }
+
   return 1;
 } ## end sub log
 
