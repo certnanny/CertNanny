@@ -148,7 +148,7 @@ sub new {
 
   # RETRIEVE AND STORE STATE
   # get previous renewal status
-  $self->k_retrieveState($entry->{selfhealing) || return undef;
+  $self->k_retrieveState() || return undef;
 
   # check if we can write to the file
   $self->k_storeState()    || croak "Could not write state file $self->{STATE}->{FILE}";

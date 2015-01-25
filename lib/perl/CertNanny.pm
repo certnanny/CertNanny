@@ -286,7 +286,7 @@ sub do_enroll {
                                                  ENTRYNAME => $entryname);
 
       if ($newkeystore) {
-        if (!$newkeystore->{INSTANCE}->k_retrieveState($entry->{selfhealing} || -1)) {
+        if (!$newkeystore->{INSTANCE}->k_retrieveState()) {
           CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "Enrollment");
           return undef;
         }
@@ -362,7 +362,7 @@ sub do_enroll {
       my $keystore = CertNanny::Keystore->new(CONFIG    => $self->{CONFIG},
                                               ENTRY     => $self->{ITEMS}->{$entryname},
                                               ENTRYNAME => $entryname);
-      $keystore->{INSTANCE}->k_retrieveState($entry->{selfhealing} || -1) || croak "Could not write state file $keystore->{STATE}->{FILE}";
+      $keystore->{INSTANCE}->k_retrieveState() || croak "Could not write state file $keystore->{STATE}->{FILE}";
       $keystore->{INSTANCE}->{ENTRY}->{INITIALENROLLEMNT} = 'yes';
 
       if ($self->{ITEMS}->{$entryname}->{initialenroll}->{auth}->{mode} eq 'password') {

@@ -141,7 +141,7 @@ sub new {
     } ## end else [ if (defined $self->{INSTANCE...})]
   
     # get previous renewal status
-    $self->k_retrieveState($args{ENTRY}->{selfhealing} || -1) or return;
+    $self->k_retrieveState() or return;
   
     # check if we can write to the file
     $self->k_storeState() || croak "Could not write state file $self->{STATE}->{FILE}";
@@ -563,7 +563,6 @@ sub k_retrieveState {
   # retrieve last state from statefile if it exists
   CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "retrieve stored CertNanny state");
   my $self = shift;
-  my $selfhealing = shift;
 
   my $file = $self->{OPTIONS}->{ENTRY}->{statefile};
   return 1 unless (defined $file and $file ne "");
@@ -581,8 +580,8 @@ sub k_retrieveState {
       croak "Could not read state from file $file";
     }
   } ## end if (-r $file)
-  if (defined($selfhealing) && !defined($self->{STATE}->{DATA}->{RENEWAL}->{TRYCOUNT})) {
-    $self->{STATE}->{DATA}->{RENEWAL}->{TRYCOUNT} = $selfhealing;
+  if (!defined($self->{STATE}->{DATA}->{RENEWAL}->{TRYCOUNT})) {
+    $self->{STATE}->{DATA}->{RENEWAL}->{TRYCOUNT} = $self->{OPTIONS}->{ENTRY}->{selfhealing} || -1;
   }
 
   CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "retrieve stored CertNanny state");
