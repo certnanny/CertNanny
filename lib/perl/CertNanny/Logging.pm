@@ -53,7 +53,20 @@ sub getInstance {
     if (defined $INSTANCE->{CONFIG}) {
       # only instantiate if $self->{CONFIG} exists.
       # otherwise initalisation phase is not yet finished
-      $INSTANCE->logLevel($args{CONFIG}->get('loglevel') || 3);
+      # and we determine the loglevel
+      # Determining Debug Level
+      my $logLevel;
+      # Prio 0: Default : 3
+      $logLevel = 3;
+      # Prio 1: If a config file value is given, take this
+      if (defined($args{CONFIG}->get('loglevel')))      {$logLevel = $args{CONFIG}->get('loglevel')}
+      # Prio 2: If a commandline parameter debug is given without value, take 4
+      if (defined($args{debug}) && ($args{debug} == 0)) {$logLevel = 4}
+      # Prio 3: If a commandline parameter debug is given with value, take the value of debug
+      if (defined($args{debug}) && ($args{debug} != 0)) {$logLevel = $args{debug}}
+      # Prio 4: If a commandline parameter verbose is given, take 6
+      if (defined($args{verbose}))                      {$logLevel = 6} 
+      $INSTANCE->logLevel($logLevel);
     }
   }
   return $INSTANCE;

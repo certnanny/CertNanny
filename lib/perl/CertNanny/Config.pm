@@ -77,7 +77,7 @@ sub new {
     $INSTANCE = $self;
     $INSTANCESTACKIDX = -1;
 
-    $self->{CONFIGFILE} = $args{CONFIG} || 'certnanny.cfg';
+    $self->{CONFIGFILE} = $args{config};
     $self->{CONFIGPATH} = (fileparse($self->{CONFIGFILE}))[1];
 
     CertNanny::Logging->info("CertNanny started with configfile <$self->{CONFIGFILE}>");
