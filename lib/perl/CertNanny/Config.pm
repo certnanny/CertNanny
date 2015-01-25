@@ -28,10 +28,6 @@
 #
 # keystore.<instance>.<var>
 #
-#
-# Note: for backward compatibility with the old 'CertMonitor' release
-# it is also possible to use certmonitor.* instead of keystore.*
-#
 
 package CertNanny::Config;
 
@@ -483,10 +479,8 @@ sub _parse {
     } ## end else [ if (exists($self->{CONFIGFILES...}))]
 
     # postprocess sub-ca settings (configuration inheritance)
-    foreach my $toplevel (qw(certmonitor keystore)) {
-      foreach my $entry (keys(%{$self->{CONFIG}->{$toplevel}})) {
-        $self->_inheritConfig($self->{CONFIG}->{$toplevel}, $entry);
-      }
+    foreach my $entry (keys(%{$self->{CONFIG}->{keystore}})) {
+      $self->_inheritConfig($self->{CONFIG}->{keystore}, $entry);
     }
   } else {
     CertNanny::Logging->error("No openssl shell specified");
@@ -547,9 +541,6 @@ sub _parseFile {
                                                  type             => 'none',
                                                  scepsignaturekey => 'new',},},};
     $self->{CFGFLAG} = {};
-
-    # backward compatibility
-    $self->{CONFIG}->{certmonitor} = $self->{CONFIG}->{keystore};
   } ## end if (!exists($self->{CONFIGFILES...}))
 
   CertNanny::Logging->debug("reading $configFile");
