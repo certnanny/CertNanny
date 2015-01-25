@@ -67,6 +67,7 @@ sub getInstance {
       # only instantiate if $self->{CONFIG} exists.
       # otherwise initalisation phase is not yet finished
       # and we determine the loglevel
+
       # Determining Debug Level
       my $logLevel;
       # Prio 0: Default : 3
@@ -89,6 +90,10 @@ sub getInstance {
       $INSTANCE->err2Console('STATUS', $args{CONFIG}->get('log.err.console'));
       $INSTANCE->err2File('STATUS', $args{CONFIG}->get('log.err.file') ne '');
       $INSTANCE->err2SysLog('STATUS', $args{CONFIG}->get('log.err.syslog') ne '');
+      if (defined($args{verbose})) {
+        $INSTANCE->log2Console('STATUS', 1);
+        $INSTANCE->err2Console('STATUS', 1);
+      } 
     }
   }
   return $INSTANCE;
