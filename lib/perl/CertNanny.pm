@@ -85,12 +85,6 @@ sub new {
     }
 
     $self->{ITEMS} = ${$self->{CONFIG}->getRef("keystore", 'ref')};
-
-    if (!defined $self->{ITEMS}) {
-      # fall back to legacy configuration (backward compatibility to
-      # CertMonitor)
-      $self->{ITEMS} = ${$self->{CONFIG}->getRef("certmonitor", 'ref')};
-    }
     delete $self->{ITEMS}->{DEFAULT};
   }
   return $INSTANCE;
@@ -281,7 +275,7 @@ sub do_enroll {
       $entry->{certreq}       = $save{certreq}    if (exists $save{certreq});
 
       #reset the keystore configuration after the inital enrollment back to the .cfg file specified settings including engine
-      # $self->{ITEMS}->{$entryname} = $conf->{CONFIG}->{certmonitor}->{$entryname};
+      # $self->{ITEMS}->{$entryname} = $conf->{CONFIG}->{keystore}->{$entryname};
 
       # $conf->{CONFIG}->{ENTRY}->{INITIALENROLLEMNT} = 'yes';
       # $self->{CONFIG} = CertNanny::Config->popConf();
@@ -467,7 +461,7 @@ sub do_enroll {
         $entry->{certreq}       = $save{certreq}    if (exists $save{certreq});
     
         #reset the keystore configuration after the inital enrollment back to the .cfg file specified settings including engine
-        # $self->{ITEMS}->{$entryname} = $conf->{CONFIG}->{certmonitor}->{$entryname};
+        # $self->{ITEMS}->{$entryname} = $conf->{CONFIG}->{keystore}->{$entryname};
 
         # $conf->{CONFIG}->{ENTRY}->{INITIALENROLLEMNT} = 'yes';
         # $self->{CONFIG} = CertNanny::Config->popConf();
@@ -558,7 +552,6 @@ sub do_datadump {
     # no $self->{keystore}              : print all
     foreach my $key (sort {lc($a) cmp lc($b)} keys %{$href}) {
       if (ref($href->{$key}) eq "HASH") {
-        next if (!defined($hashname[0]) && ($key eq 'certmonitor'));               # certmonitor is depricated:      don't print
         next if (!defined($hashname[0]) && ($key eq 'keystore') && 
                 (uc($self->getOption('keystore')) eq 'COMMON'));                   # $self->{keystore} = common:     print all but the keystores
         next if (defined($hashname[0]) && ($hashname[0] eq 'keystore') && 

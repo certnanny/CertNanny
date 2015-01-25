@@ -2089,10 +2089,10 @@ sub _sendRequest {
       # Todo Arkadius: Macht das sinn? Config ist singleton. Besser $config direkt verwenden
       my $conf = CertNanny::Config->new($self->{OPTIONS}->{CONFIG}->{CONFIGFILE});
       ##reset location to be passed correctly to the post install hook
-      $entry->{location} = $conf->{CONFIG}->{certmonitor}->{$entryname}->{location};
+      $entry->{location} = $conf->{CONFIG}->{keystore}->{$entryname}->{location};
       
       if (!$entry->{initialenroll}->{targetPIN}  or $entry->{initialenroll}->{targetPIN} eq "") {
-        $entry->{initialenroll}->{targetPIN} = $conf->{CONFIG}->{certmonitor}->{$entryname}->{key}->{pin};
+        $entry->{initialenroll}->{targetPIN} = $conf->{CONFIG}->{keystore}->{$entryname}->{key}->{pin};
       }
       
       my @cachain;
@@ -2108,7 +2108,7 @@ sub _sendRequest {
                   CERTFORMAT   => 'PEM',
                   CERTFILE     => $self->{STATE}->{DATA}->{RENEWAL}->{REQUEST}->{CERTFILE},
                   EXPORTPIN    => $entry->{initialenroll}->{targetPIN},
-                  PIN    => $conf->{CONFIG}->{certmonitor}->{$entryname}->{key}->{pin}
+                  PIN    => $conf->{CONFIG}->{keystore}->{$entryname}->{key}->{pin}
                   );
                   
        #  CertNanny::Logging->debug("CertNanny::Keystore::_sendRequest ". Dumper(%args) );

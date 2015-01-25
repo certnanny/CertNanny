@@ -34,12 +34,12 @@ sub new {
   # type is determined, now delete it so only sections will be scanned.
   delete $entry_options->{enroll}->{type};
   ##if monitorsysinfo is not set we set it to be enabled by default
-  if (!exists $config->{CONFIG}->{certmonitor}->{$entryname}->{enroll}->{sscep}->{monitorSysInfo}) {
-    $config->{CONFIG}->{certmonitor}->{$entryname}->{enroll}->{sscep}->{monitorSysInfo} = 'yes';
+  if (!exists $config->{CONFIG}->{keystore}->{$entryname}->{enroll}->{sscep}->{monitorSysInfo}) {
+    $config->{CONFIG}->{keystore}->{$entryname}->{enroll}->{sscep}->{monitorSysInfo} = 'yes';
   }
 
-  #print ' $entryname sscep self is:' .Dumper($config) . $config->{CONFIG}->{certmonitor}->{$entryname}->{enroll}->{sscep}->{monitorsysinfo};
-  $self->{OPTIONS} = $self->defaultOptions($config->{CONFIG}->{certmonitor}->{$entryname}->{enroll}->{sscep}->{monitorSysInfo}, $config, $entryname);
+  #print ' $entryname sscep self is:' .Dumper($config) . $config->{CONFIG}->{keystore}->{$entryname}->{enroll}->{sscep}->{monitorsysinfo};
+  $self->{OPTIONS} = $self->defaultOptions($config->{CONFIG}->{keystore}->{$entryname}->{enroll}->{sscep}->{monitorSysInfo}, $config, $entryname);
   $self->readConfig($entry_options->{enroll});
   #CertNanny::Logging->debug("enroll sscep self" .Dumper($self));
 
@@ -406,7 +406,7 @@ sub defaultOptions {
   # keystore.DEFAULT.enroll.sscep.meta.myarg = bar
   # keystore.DEFAULT.enroll.sscep.meta.foo = sub { return 'bar' }
   # keystore.DEFAULT.enroll.sscep.meta.blah = `whoami`
-  my $userconfig = $config->{CONFIG}->{certmonitor}->{$entryname}->{enroll}->{sscep}->{meta};
+  my $userconfig = $config->{CONFIG}->{keystore}->{$entryname}->{enroll}->{sscep}->{meta};
 
   my %custmetadata;
 
