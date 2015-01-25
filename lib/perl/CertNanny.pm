@@ -177,7 +177,7 @@ sub AUTOLOAD {
   #  do_enroll
   #do_cleanup
   #  do_updateRootCA
-  #do_dump
+  #  do_dump
   #do_executeHook
   
   #?do_sync
@@ -481,6 +481,24 @@ sub do_enroll {
   CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "Enrollment");
   return 1;
 } ## end sub do_enroll
+
+
+sub do_cleanup {
+  CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "CleanUp");
+  my $self = (shift)->getInstance();
+  my %args = (@_);
+
+  my $keystore = $args{KEYSTORE};
+  my $instance = $keystore->{INSTANCE};
+  my $options   = $instance->{OPTIONS};
+  my $entryname = $options->{ENTRYNAME};
+  my $config    = $options->{CONFIG};
+
+  $instance->k_checkclearState(1);
+
+  CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "CleanUp");
+  return 1;
+} ## end sub do_info
 
 
 sub do_info {

@@ -587,7 +587,7 @@ sub k_retrieveState {
 } ## end sub k_retrieveState
 
 
-sub _checkclearState {
+sub k_checkclearState {
 
   # checks the number of unsucessfull state operations
   # if necessary clear statefile and retrieve empty state
@@ -997,7 +997,7 @@ sub k_renew {
 
       if (!defined $self->{STATE}->{DATA}->{RENEWAL}->{REQUEST}) {
         CertNanny::Logging->error("Could not create certificate request");
-        $self->_checkclearState(0);
+        $self->k_checkclearState(0);
         return undef;
       }
       $self->_renewalState("sendrequest");
@@ -1006,7 +1006,7 @@ sub k_renew {
 
       if (!$self->_sendRequest()) {
         CertNanny::Logging->error("Could not send request");
-        $self->_checkclearState(0);
+        $self->k_checkclearState(0);
         return undef;
       }
     } elsif ($self->_renewalState() eq "completed") {
@@ -1016,7 +1016,7 @@ sub k_renew {
       $self->_renewalState(undef);
 
       # clean state entry and delete state file
-      $self->_checkclearState(1);
+      $self->k_checkclearState(1);
       last;
     } else {
       CertNanny::Logging->error("State unknown: " . $self->_renewalState());
