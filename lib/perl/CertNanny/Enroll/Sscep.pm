@@ -38,7 +38,7 @@ sub new {
     $config->{CONFIG}->{keystore}->{$entryname}->{enroll}->{sscep}->{monitorSysInfo} = 'yes';
   }
 
-  #print ' $entryname sscep self is:' .Dumper($config) . $config->{CONFIG}->{keystore}->{$entryname}->{enroll}->{sscep}->{monitorsysinfo};
+  #CertNanny::Logging->printout(' $entryname sscep self is:' .Dumper($config) . $config->{CONFIG}->{keystore}->{$entryname}->{enroll}->{sscep}->{monitorsysinfo});
   $self->{OPTIONS} = $self->defaultOptions($config->{CONFIG}->{keystore}->{$entryname}->{enroll}->{sscep}->{monitorSysInfo}, $config, $entryname);
   $self->readConfig($entry_options->{enroll});
   #CertNanny::Logging->debug("enroll sscep self" .Dumper($self));
@@ -112,7 +112,7 @@ sub execute {
   open FH, "$cmd |" or die "Couldn't execute $cmd: $!\n";
   while (defined(my $line = <FH>)) {
     chomp($line);
-    print "$line\n";
+    CertNanny::Logging->printout("$line\n");
   }
   close FH;
   my $exitval = $? >> 8;
@@ -142,7 +142,7 @@ sub enroll {
 
   CertNanny::Logging->info("Sending request");
 
-  #print Dumper $self->{STATE}->{DATA};
+  #CertNanny::Logging->printout(Dumper $self->{STATE}->{DATA});
 
   my %certs = $self->getCA();
   if (!%certs) {

@@ -495,7 +495,7 @@ sub do_info {
   my $config    = $options->{CONFIG};
 
   my $info = $instance->k_getInfo("SubjectName", "NotAfter");
-  print Dumper $info;
+  CertNanny::Logging->printout(Dumper $info);
 
   CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "Info");
   return 1;
@@ -514,7 +514,7 @@ sub _dumpValue {
       my $name  = '  ' x ($#$aref + 1) . $key . ' = ';
       my $value = $name =~ /(pw|target_pw|storepass|keypass|srcstorepass|deststorepass|srckeypass|destkeypass)/ ? "*HIDDEN*" : $cref->{$key};
       my $fillup = ' ' x (100 - length($name) - length($value));
-      print($name . $fillup . $value . "\n");
+      CertNanny::Logging->printout($name . $fillup . $value . "\n");
     }
   }
   # Then handle all HASHs
@@ -527,9 +527,9 @@ sub _dumpValue {
       next if (defined($$aref[0]) && !defined($$aref[1]) && $target &&
               ($$aref[0] eq 'keystore') && ($key ne $target)); # $self->{keystore} = <keystore>: print all but the keystores plus <keystore>
       push(@$aref, $key);
-      print('  ' x $#$aref . "$key Start\n");
+      CertNanny::Logging->printout('  ' x $#$aref . "$key Start\n");
       $self->_dumpValue(\%{$cref->{$key}}, $aref);
-      print('  ' x $#$aref . "$key End\n");
+      CertNanny::Logging->printout('  ' x $#$aref . "$key End\n");
       pop(@$aref);
     }
   }
@@ -550,11 +550,11 @@ sub do_dump {
 
   if ($self->{OPTION}->{object} eq 'data') {
     foreach my $configFileName (keys %{$config->{CONFIGFILES}}) {
-      print "File: <$configFileName> SHA1: $config->{CONFIGFILES}->{$configFileName}->{SHA}\n";
+      CertNanny::Logging->printout("File: <$configFileName> SHA1: $config->{CONFIGFILES}->{$configFileName}->{SHA}\n");
       while ((my $lnr, my $content) = each %{$config->{CONFIGFILES}->{$configFileName}->{CONTENT}}) {
-        printf("Line: %3s Content: <%s>\n", $lnr, $content);
+        CertNanny::Logging->printout(sprintf("Line: %3s Content: <%s>\n", $lnr, $content));
       }
-      print "\n";
+      CertNanny::Logging->printout("\n");
     }
   }
   

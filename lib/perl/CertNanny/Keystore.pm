@@ -1912,7 +1912,7 @@ sub _sendRequest {
 
   #my $enroller = $self->_getEnroller();
   #return $enroller->enroll();
-  #print Dumper $self->{STATE}->{DATA};
+  #CertNanny::Logging->printout(Dumper $self->{STATE}->{DATA});
 
   if (!$self->k_getAvailableCaCerts()) {
     CertNanny::Logging->error("Could not get CA certs");
