@@ -598,15 +598,17 @@ sub do_dump {
 
   my $config    = $self->{CONFIG};
 
-  if ($self->{OPTION}->{object} eq 'cfg') {
+  if ($self->{OPTION}->{object} eq 'data') {
     my @hashname;
     $self->_dumpValue(\%{$config->{CONFIG}}, \@hashname);
   }
 
-  if ($self->{OPTION}->{object} eq 'data') {
-    foreach my $configFileName (keys %{$config->{CONFIGFILES}}) {
+  if ($self->{OPTION}->{object} eq 'cfg') {
+    foreach my $configFileName (sort {lc($a) cmp lc($b)} keys %{$config->{CONFIGFILES}}) {
       CertNanny::Logging->printout("File: <$configFileName> SHA1: $config->{CONFIGFILES}->{$configFileName}->{SHA}\n");
-      while ((my $lnr, my $content) = each %{$config->{CONFIGFILES}->{$configFileName}->{CONTENT}}) {
+      foreach my $lnr (sort {lc($a) <=> lc($b)} keys %{$config->{CONFIGFILES}->{$configFileName}->{CONTENT}}) {
+#      while ((my $lnr, my $content) = each %{$config->{CONFIGFILES}->{$configFileName}->{CONTENT}}) {
+        my $content = $config->{CONFIGFILES}->{$configFileName}->{CONTENT}->{$lnr};
         my $name = (split('=', $content))[0];
         if ($name =~ /(pin|pw|target_pw|storepass|keypass|srcstorepass|deststorepass|srckeypass|destkeypass)/) {
           $content = "${name}= *HIDDEN*";

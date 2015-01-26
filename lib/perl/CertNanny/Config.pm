@@ -511,10 +511,12 @@ sub _sha1_hex {
 
 
 sub _parseFile {
-  my $self       = (shift)->getInstance();
-  my $configPath = shift || $self->{CONFIGPATH};
-  my $configFile = shift || $self->{CONFIGFILE};
-
+  my $self         = (shift)->getInstance();
+  my $configPath   = shift || $self->{CONFIGPATH};
+  my $configFile   = shift || $self->{CONFIGFILE};
+  my $configPrefix = shift;
+  
+  # CertNanny::Logging->printout(sprintf("Parsing <%s> in dir <%s> with prefix <%s>\n", $configFile, $configPath, $configPrefix));
   # Parsing is done in the following steps
   #  - initialize datastructures (only done once)
   #  - read all lines
@@ -559,9 +561,16 @@ sub _parseFile {
   $handle->close();
   
   #  - evaluate all lines
+  my @prefix = split(/\./, $configPrefix);
   while (($lnr, $line) = each(%lines)) {
     if ($line =~ /^(.+?)\s*=\s*(\S.*?)\s*(\s#\s.*)?$/ || /^(\S.*?)\s*=?\s*(\s#\s.*)?$/) {
       my @path = split(/\./, $1);
+      for (my $i=0; $i<=$#prefix; $i++) {
+        if ($prefix[$i] ne $path[$i]) {
+          @path = (@prefix, @path); 
+          last;
+        }
+      }
       my ($val, $var);
       if (defined($2) && $2 !~ /^\s*#\s.*$/) {
         $val = $2;
@@ -601,7 +610,7 @@ sub _parseFile {
 
       $var->{$key} = $val;
     } else {
-      if ($line !~ /^include\s+(.+)$/) {
+      if ($line !~ /^(include|keystores)\s+(.+)$/) {
         CertNanny::Logging->printerr("Config file error: parse error in line $lnr ($line)\n");
       }
     }
@@ -617,19 +626,31 @@ sub _parseFile {
 
   #  - recursive execute _parsefile for all includes
   while (($lnr, $line) = each(%lines)) {
-    if ($line =~ /^\s*include\s+(.+)\s*$/) {
-      my $configFileGlob = $1;
-      my @configFileList;
+    # CertNanny::Logging->printerr("Line: $line\n");
+    if ($line =~ /^\s*(include|keystores)[\s=]+(.+)\s*$/) {
+      my $includeType = $1;
+      my @includeList = split(' ', $2);
+      foreach my $item (@includeList) {
+        my $prefix;
+        my $configFileGlob;
+        my @configFileList;
+        if ($includeType eq 'keystores') {
+          $configFileGlob = 'Keystore-'.$item.'.cfg';
+          $prefix         = 'keystore.' . $item;
+        } else {
+          $configFileGlob = $item;
+        }
 
-      # Test if $configFileGlob contains regular files
-      @configFileList = @{CertNanny::Util->fetchFileList($configFileGlob)};
-   
-      if (!@configFileList) {
-        $configFileGlob = $configPath . $configFileGlob;
+        # Test if $configFileGlob contains regular files
         @configFileList = @{CertNanny::Util->fetchFileList($configFileGlob)};
-      }
-      foreach (@configFileList) {
-        $self->_parseFile((fileparse($_))[1], $_);
+   
+        if (!@configFileList) {
+          $configFileGlob = $configPath . $configFileGlob;
+          @configFileList = @{CertNanny::Util->fetchFileList($configFileGlob)};
+        }
+        foreach my $file (@configFileList) {
+          $self->_parseFile((fileparse($file))[1], $file, $prefix);
+        }
       }
     }
   }
