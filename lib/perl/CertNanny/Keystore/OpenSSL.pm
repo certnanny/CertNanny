@@ -104,11 +104,8 @@ sub new {
     } ## end foreach my $format (qw(FORMAT KEYFORMAT CACERTFORMAT ROOTCACERTFORMAT))
 
     # Keytype defaults to OpenSSL; valid is OpenSSL or PKCS8
-    
     $self->{KEYTYPE} = $entry->{key}->{type} || 'OpenSSL';
-    
 
-    
     if ($self->{KEYTYPE} !~ m{ \A (?: OpenSSL | PKCS8 ) \z }xms) {
       croak("Incorrect keystore type $self->{KEYTYPE}");
       return undef;
