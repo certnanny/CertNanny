@@ -1,4 +1,3 @@
-#TODO package CertNanny::Logging mehr kommentieren
 #
 # CertNanny - Automatic renewal for X509v3 certificates using SCEP
 # 2011-04 Stefan Kraus <stefan.kraus05@gmail.com>
@@ -49,7 +48,7 @@ BEGIN {
   # -1 not yet initialised
   # Bit 0 (1) : Logging to Console
   # Bit 1 (2) : Logging to File
-  # ToDo: Logging to syslog
+  # ToDo Logging to syslog
   # Bit 2 (4) : Logging to Syslog (to be implemented)
 }
 

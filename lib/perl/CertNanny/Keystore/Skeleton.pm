@@ -443,7 +443,6 @@ sub selfSign {
   CertNanny::Logging->debug("The following configuration was written to $tmpconfigfile:\n" . CertNanny::Util->readFile($tmpconfigfile));
 
   # generate request
-  # Todo pgk: Testen runCommand
   my @cmd = (qq("$openssl"), 'req', '-config', qq("$tmpconfigfile"), '-x509', '-new', '-sha1', '-out', qq("$outfile"), '-key', qq("$entry->{keyfile}"),);
 
   push(@cmd, ('-passin', 'env:PIN')) unless $pin eq "";
@@ -598,7 +597,6 @@ sub _createPKCS12 {
   if ($args{CERTFORMAT} eq "DER") {
     $certfile = CertNanny::Util->getTmpFile();
 
-    # Todo pgk: Testen runCommand
     @cmd = (qq("$openssl"), 'x509', '-in', qq("$args{CERTFILE}"), '-inform', qq("$args{CERTFORMAT}"), '-out', qq("$certfile"), '-outform', 'PEM',);
     if (CertNanny::Util->runCommand(\@cmd) != 0) {
       CertNanny::Logging->error("Certificate format conversion failed");

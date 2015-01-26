@@ -297,7 +297,6 @@ sub installCert {
   my $entryname = $options->{ENTRYNAME};
   my $config    = $options->{CONFIG};
 
-  # Todo pgk: {KEYFILE} or {key}->{file} ?
   my $keyfile = $self->{STATE}->{DATA}->{RENEWAL}->{REQUEST}->{KEYFILE};
   my $pin = $self->{PIN} || $entry->{key}->{pin} || "";
 
@@ -764,7 +763,6 @@ sub createRequest {
     #CertNanny::Logging->debug("The following configuration was written to $tmpconfigfile:\n" . CertNanny::Util->readFile($tmpconfigfile));
 
     # generate request
-    # Todo pgk: Testen runCommand
     my @cmd = (qq("$openssl"), 'req', '-config', qq("$tmpconfigfile"), '-new', '-sha1', '-out', qq("$result->{REQUESTFILE}"), '-key', qq("$result->{KEYFILE}"),);
     push(@cmd, ('-passin', 'env:PIN')) unless $pin eq "";
     push(@cmd, @engine_cmd);

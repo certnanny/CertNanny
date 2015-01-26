@@ -201,15 +201,9 @@ sub getCert {
     $derfile_tmp = $self->_certUtilWriteCerts((SERIAL => $serial));
   } ## end unless (defined($derfile_tmp...))
  
-# Todo pgk: Testen {CONFIG}->get
   my $openssl = $config->get('cmd.openssl', 'FILE');
   my @cmd = (qq("$openssl"), 'x509', '-in', qq("$derfile_tmp"), '-inform', 'DER');
-# Todo pgk: Testen
   $certdata = CertNanny::Util->runCommand(\@cmd, WANTOUT => 1);
-#  my $cmd = join(" ", @cmd);
-#  CertNanny::Logging->debug("Execute: $cmd");
-#  $certdata = `$cmd`;
-#  CertNanny::Logging->debug("Dumping resulting certificate in PEM format:\n$certdata");
   
   CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "Get main certificate from keystore");
   return {CERTDATA   => $certdata,
@@ -251,15 +245,6 @@ sub installCert {
   my $certfile = $args{CERTFILE};
 
   my @cmd      = ('certreq', '-accept', qq("$certfile"));
-#  my $cmd      = join(" ", @cmd);
-#  CertNanny::Logging->debug("Execute: $cmd");
-#  my $cmd_output = `$cmd`;
-#  CertNanny::Logging->debug("certreq output:\n$cmd_output");
-#  if ($? != 0) {
-#    CertNanny::Logging->error("installCert(): Certificate could not be imported. Output of command $cmd was:\n$cmd_output");
-#    return undef;
-#  }
-  # Todo pgk: Testen hidePin, runCommand
   if (CertNanny::Util->runCommand(\@cmd, HIDEPWD => 1)) {
     CertNanny::Logging->error("installCert(): Certificate could not be imported.");
     return undef;
@@ -426,7 +411,6 @@ sub createRequest() {
     #   return undef;
     # }
     
-    #Todo pgk Testen: runCommand
     my $rc = CertNanny::Util->runCommand(\@cmd);
     if ($rc != 0) {
       CertNanny::Logging->error("createRequest(): Executing certreq cmd: " . join(' ', @cmd) . " error: " . $rc);

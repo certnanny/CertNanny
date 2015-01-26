@@ -250,7 +250,6 @@ sub installCert {
     CertNanny::Logging->info("Creating MQ keystore (via PKCS#12)");
 
     # create prototype PKCS#12 file
-    # Todo pgk: {KEYFILE} oder {key}->{file}
     my $keyfile  = $self->{STATE}->{DATA}->{RENEWAL}->{REQUEST}->{KEYFILE};
     my $certfile = $args{CERTFILE};
     my $label    = $self->{CERT}->{LABEL};

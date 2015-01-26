@@ -1910,15 +1910,10 @@ sub _sendRequest {
   my $entryname = $options->{ENTRYNAME};
   my $config    = $options->{CONFIG};
 
-  #my $enroller = $self->_getEnroller();
-  #return $enroller->enroll();
-  #CertNanny::Logging->printout(Dumper $self->{STATE}->{DATA});
-
   if (!$self->k_getAvailableCaCerts()) {
     CertNanny::Logging->error("Could not get CA certs");
     return undef;
   }
-  #CertNanny::Logging->debug("Keystore _sendrequest self" .Dumper($self));
 
   my $requestfile      = $self->{STATE}->{DATA}->{RENEWAL}->{REQUEST}->{REQUESTFILE};
   my $requestkeyfile   = $self->{STATE}->{DATA}->{RENEWAL}->{REQUEST}->{KEYFILE};
@@ -1986,7 +1981,6 @@ sub _sendRequest {
   if ($scepsignaturekey =~ /(old|existing)/i) {
 
     # get existing private key from keystore
-    
     my $oldkey = $self->getKey();
 
     if ($self->_hasEngine()) {
@@ -1996,7 +1990,6 @@ sub _sendRequest {
       # only necessary if no engine support is available
       # otherwise the keystore or engine is responsible for returning
       # the correct format
-      #CertNanny::Logging->debug(Dumper($oldkey));
 
       my $oldkey_pem_unencrypted = $self->k_convertKey(%{$oldkey},
                                                        OUTFORMAT => 'PEM',
@@ -2096,7 +2089,6 @@ sub _sendRequest {
 
       push(@cachain, @{$self->{STATE}->{DATA}->{ROOTCACERTS}});
       push(@cachain, @{$self->{STATE}->{DATA}->{CERTCHAIN}});
-      
 
       my %args = (FILENAME     => $outp12,
                   FRIENDLYNAME => 'cert1',
@@ -2105,11 +2097,8 @@ sub _sendRequest {
                   CERTFORMAT   => 'PEM',
                   CERTFILE     => $self->{STATE}->{DATA}->{RENEWAL}->{REQUEST}->{CERTFILE},
                   EXPORTPIN    => $entry->{initialenroll}->{targetPIN},
-                  PIN    => $conf->{CONFIG}->{keystore}->{$entryname}->{key}->{pin}
+                  PIN          => $conf->{CONFIG}->{keystore}->{$entryname}->{key}->{pin}
                   );
-                  
-       #  CertNanny::Logging->debug("CertNanny::Keystore::_sendRequest ". Dumper(%args) );
-  
 
 # Todo Testen createPKCS12: Passt das noch? Die Methode war im Keystore als Dummy implementiert und nur in den Keys ausprogrammiert, wird aber ueber $self aufgerufen?!?
 # Todo Testen createPKCS12: Was passiert hier? keine Zuweisung des Ergebnisses ....
@@ -2135,7 +2124,7 @@ sub _sendRequest {
         my %p12args = (FILENAME  => $outp12,
                        PIN       => $entry->{initialenroll}->{targetPIN},
                        ENTRYNAME => $entryname,
-                       ENTRY => $entry,
+                       ENTRY     => $entry,
                        CONF      => $conf);
 
         # create pkcs12 file
@@ -2144,8 +2133,6 @@ sub _sendRequest {
         # PIN => cert label to be used in pkcs#12 structure
         # ENTRYNAME => certificate location
         # CONF => keystore config to be implemented
-    
-    #CertNanny::Logging->debug("CertNanny::Keystore::${target}::importP12 ". Dumper(%p12args) );
     
         eval "CertNanny::Keystore::${target}::importP12( %p12args )";
         if ($@) {
