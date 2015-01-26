@@ -92,9 +92,6 @@ sub new {
   # optional alias defaults to first key
   if (!defined $entry->{alias}) {
     my @cmd = $self->_buildKeytoolCmd($entry->{location}, '-list');
-    # CertNanny::Logging->debug("Execute: " . CertNanny::Util->hidePin(join(' ', @cmd)));
-    # my @keys = `@cmd`;
-    # Todo pgk: Testen hidePin, runCommand
     my @keys = CertNanny::Util->runCommand(\@cmd, WANTOUT => 1);
     @keys = grep m{, keyEntry,$}, @keys;
     if ($?) {
@@ -198,10 +195,6 @@ sub getCert {
     }
     if (!$rc) {
       my @cmd = $self->_buildKeytoolCmd($args{CERTFILE}, '-export', '-rfc', -alias => qq{"$entry->{alias}"});
-      # CertNanny::Logging->debug("Execute: " . join(' ', hidepin(@cmd)));
-      # Todo pgk: Testen hidePin
-      #CertNanny::Logging->debug("Execute: " . CertNanny::Util->hidePin(join(' ', @cmd)));
-      #$certData = `@cmd`;
       $certData = CertNanny::Util->runCommand(\@cmd, WANTOUT => 1, HIDEPWD => 1);
       if ($? || !defined $certData) {
         chomp($certData);
@@ -649,8 +642,6 @@ sub generateKey {
   push(@cmd, '-list');
   
   @cmd = $self->_buildKeytoolCmd($location, @cmd);
-  # CertNanny::Logging->debug("Execute: " . join(' ', hidepin(@cmd)));
-  # Todo pgk: Testen hidePin
   if (CertNanny::Util->runCommand(\@cmd, HIDEPWD => 1) != 0) {
     # we need to generate a new one since we don't already have one
     CertNanny::Logging->info("generateKey(): Creating new key with alias $newalias and keysize $bits");
@@ -669,8 +660,6 @@ sub generateKey {
      
 
     @cmd = $self->_buildKeytoolCmd($location, @cmd);
-    # CertNanny::Logging->debug("Execute: " . join(' ', hidepin(@cmd)));
-    # Todo pgk: Testen hidePin
     if (CertNanny::Util->runCommand(\@cmd, HIDEPWD => 1) != 0) {
       CertNanny::Logging->error("generateKey(): Could not create the new key, see above output for details");
       return undef;
@@ -1007,8 +996,6 @@ sub _importCert {
   my @cmd = $self->_buildKeytoolCmd($location, '-import', '-noprompt', -alias => qq{"$alias"}, -file => qq{"$certfile"});
   CertNanny::Logging->info("Importing certificate with alias $alias");
   
-  # CertNanny::Logging->debug("Execute: " . join(' ', hidepin(@cmd)));
-  # Todo pgk: Testen hidePin
   if (CertNanny::Util->runCommand(\@cmd, HIDEPWD => 1) == 0) {
     return 1;
   } else {
@@ -1029,8 +1016,6 @@ sub _changeAlias {
   push(@cmd, qq{"$destalias"});
   @cmd = $self->_buildKeytoolCmd($location, @cmd);
   
-  # CertNanny::Logging->debug("Execute: " . join(' ', hidepin(@cmd)));
-  # Todo pgk: Testen hidePin
   if (CertNanny::Util->runCommand(\@cmd, HIDEPWD => 1) != 0) {
     CertNanny::Logging->error("Could not change alias from $alias to $destalias");
     return undef;
