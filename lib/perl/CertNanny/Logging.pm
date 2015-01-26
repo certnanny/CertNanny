@@ -136,11 +136,13 @@ sub printerr {
     print STDERR $str;
   }
   # Log to file
-  if ($errTarget & 2) {
+  if (($errTarget & 2) && defined($self->{CONFIG})) {
     $| = 1;
     my $file = $self->{CONFIG}->get('log.err.file', "FILE");
-    open STDERR, ">>", $file || die "Could not redirect STDERR. Stopped";
-    print STDERR $str;
+    if (defined($file)) {
+      open STDERR, ">>", $file || die "Could not redirect STDERR. Stopped";
+      print STDERR $str;
+    }
   }
   # Log to syslog
   if ($errTarget & 4) {
@@ -159,11 +161,13 @@ sub printout {
     print STDOUT $str;
   }
   # Log to file
-  if ($logTarget & 2) {
+  if (($logTarget & 2) && defined($self->{CONFIG})) {
     $| = 1;
     my $file = $self->{CONFIG}->get('log.out.file', "FILE");
-    open STDOUT, ">>", $file || die "Could not redirect STDOUT. Stopped";
-    print STDOUT $str;
+    if (defined($file)) {
+      open STDOUT, ">>", $file || die "Could not redirect STDOUT. Stopped";
+      print STDOUT $str;
+    }
   }
   # Log to syslog
   if ($logTarget & 4) {
