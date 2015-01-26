@@ -103,28 +103,28 @@ sub _iterate_entries {
 
   my $loglevel = $self->{CONFIG}->get('log.level') || 3;
 
-  foreach my $entryName (keys %{$self->{ITEMS}}) {    # Instantiate every keystore, that is configured
-    CertNanny::Logging->debug("Checking keystore $entryName");
+  foreach my $entryname (keys %{$self->{ITEMS}}) {    # Instantiate every keystore, that is configured
+    CertNanny::Logging->debug("Checking keystore $entryname");
     my $keystore = CertNanny::Keystore->new(CONFIG    => $self->{CONFIG},              # give it the whole configuration
-                                            ENTRY     => $self->{ITEMS}->{$entryName}, # all keystore parameters from configfile
-                                            ENTRYNAME => $entryName);                  # and the keystore name from configfile
+                                            ENTRY     => $self->{ITEMS}->{$entryname}, # all keystore parameters from configfile
+                                            ENTRYNAME => $entryname);                  # and the keystore name from configfile
     # Keystore exists -> normal Operation
     if ($keystore) {
-      $self->$action(ENTRYNAME => $entryName,
+      $self->$action(ENTRYNAME => $entryname,
                      KEYSTORE  => $keystore);
     } else {
       # Keystore does not exists -> create new Keystore (enroll) no matter wether we did a renew or an enroll
-      CertNanny::Logging->error("Could not instantiate keystore $entryName");
+      CertNanny::Logging->error("Could not instantiate keystore $entryname");
       if ($action eq 'do_renew' or $action eq 'do_enroll') {
         CertNanny::Logging->info("Check for initial enrollment configuration.");
-        if ($self->{ITEMS}->{$entryName}->{initialenroll}->{auth}) {
-          CertNanny::Logging->info("Found initial enrollment configuration for " . $self->{ITEMS}->{$entryName}->{initialenroll}->{subject});
-          $self->do_enroll(ENTRY     => $self->{ITEMS}->{$entryName},
-                           ENTRYNAME => $entryName);
+        if ($self->{ITEMS}->{$entryname}->{initialenroll}->{auth}) {
+          CertNanny::Logging->info("Found initial enrollment configuration for " . $self->{ITEMS}->{$entryname}->{initialenroll}->{subject});
+          $self->do_enroll(ENTRY     => $self->{ITEMS}->{$entryname},
+                           ENTRYNAME => $entryname);
         }
       } ## end if ($action eq ' renew'...)
     } ## end else [ if ($keystore) ]
-  } ## end foreach my $entryName (keys %{$self...})
+  } ## end foreach my $entryname (keys %{$self...})
 
   return 1;
 } ## end sub _iterate_entries
@@ -175,10 +175,10 @@ sub AUTOLOAD {
   #  do_check
   #  do_renew
   #  do_enroll
-  #  do_cleanup
+  # do_cleanup
   #  do_updateRootCA
   #  do_dump
-  #do_executeHook
+  # do_executeHook
   
   #?do_sync
   
@@ -531,7 +531,9 @@ sub do_executeHook {
   my $entryname = $options->{ENTRYNAME};
   my $config    = $options->{CONFIG};
 
-  my $hook =        $self->getOption('hook');
+  my $myKeystore  = $self->getOption('keystore');
+  if (!defined($myKeystore) || ($myKeystore eq $entryname))
+  my $hook        = $self->getOption('hook');
   my $definitions = $self->getOption('define');
   my %args;
   foreach (@{$definitions}) {
@@ -607,7 +609,6 @@ sub do_dump {
     foreach my $configFileName (sort {lc($a) cmp lc($b)} keys %{$config->{CONFIGFILES}}) {
       CertNanny::Logging->printout("File: <$configFileName> SHA1: $config->{CONFIGFILES}->{$configFileName}->{SHA}\n");
       foreach my $lnr (sort {lc($a) <=> lc($b)} keys %{$config->{CONFIGFILES}->{$configFileName}->{CONTENT}}) {
-#      while ((my $lnr, my $content) = each %{$config->{CONFIGFILES}->{$configFileName}->{CONTENT}}) {
         my $content = $config->{CONFIGFILES}->{$configFileName}->{CONTENT}->{$lnr};
         my $name = (split('=', $content))[0];
         if ($name =~ /(pin|pw|target_pw|storepass|keypass|srcstorepass|deststorepass|srckeypass|destkeypass)/) {
