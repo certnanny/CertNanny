@@ -887,11 +887,6 @@ sub convertCert {
   push(@cmd, ('-outform', $args{OUTFORMAT}));
 
   $output->{CERTFORMAT} = $args{OUTFORMAT};
-
-  # my $cmd = join(' ', @cmd);
-  # CertNanny::Logging->debug("Execute: " . join(' ', @cmd));
-
-  # $output->{CERTDATA} = `join(' ', @cmd)`;
   $output->{CERTDATA} = CertNanny::Util->runCommand(\@cmd, WANTOUT => 1);
   unlink $infile if defined $infile;
 
