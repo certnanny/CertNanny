@@ -84,7 +84,7 @@ include Keystore-DEFAULT.cfg
 #include Keystore-OpenSSL-PKCS8.cfg
 #include Keystore-PKCS12.cfg
 #
-# Alternative Syntax to include keystores
+# Alternative syntax to include keystores
 # keystores                   = <keystorename> <keystorename> ...
 # i.E.: keystores                     = java openssl
 # A file named Keystore-<keystorename>.cfg is expected
