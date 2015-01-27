@@ -76,13 +76,24 @@ cmd.ifconfig                     = /sbin/ifconfig
 # include certnanny-local.cfg
 
 include Keystore-DEFAULT.cfg
+
 #include Keystore-Java.cfg
 #include Keystore-OpenSSL.cfg
 #include Keystore-Windows.cfg
 #include Keystore-MQ.cfg
 #include Keystore-OpenSSL-PKCS8.cfg
 #include Keystore-PKCS12.cfg
-
+#
+# Alternative Syntax to include keystores
+# keystores                   = <keystorename> <keystorename> ...
+# i.E.: keystores                     = java openssl
+# A file named Keystore-<keystorename>.cfg is expected
+# In the file  Keystore-<keystorename>.cfg the keystore must be named <keystorename>
+# <keystorename> is case sensitiv
+# In the file Keystore-<keystorename>.cfg keys can be specified without the prefix keystore.<keystorename>
+# i.E.:       type                = Java
+# instead of: keystore.java.type  = Java
+# if <keystorename> is java 
 
 ####Include system specific configuration files####
 # Do not edit or delete
