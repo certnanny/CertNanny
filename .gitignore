@@ -2,3 +2,4 @@ bin/certnanny.pl
 .includepath
 .project
 .checkstyle
+/.externalToolBuilders/
