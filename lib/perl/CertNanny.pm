@@ -792,7 +792,7 @@ sub do_test {
   # my $a1  = shift(@ARGV);
   # my $a2  = shift(@ARGV);
 
-  CertNanny::Logging->log2Console('STATUS', 1); 
+  CertNanny::Logging->switchConsoleLog('STATUS', 1); 
   my $ret = $args{KEYSTORE}->{INSTANCE}->$cmd(@ARGV);
 
   CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "Test");
