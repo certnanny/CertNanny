@@ -71,8 +71,6 @@ die "Could not read config file $cmdLineParam{cfg}. Stopped" unless (-r $cmdLine
 return 1 unless CertNanny::Config->getInstance(CONFIG => $cmdLineParam{cfg});
 CertNanny::Util->getInstance(CONFIG => CertNanny::Config->getInstance(CONFIG => $cmdLineParam{cfg}));
 CertNanny::Logging->getInstance(CONFIG => CertNanny::Config->getInstance(CONFIG => $cmdLineParam{cfg}));
-CertNanny::Logging->log2File();
-#CertNanny::Logging->log2Console();
 
 #print "before foreach args";
 
@@ -230,7 +228,7 @@ if ($OSNAME eq 'MSWin32') {
 
         # The service is running as normal...
         # ...add the main code here...
-        $monitor->log2File();
+        $monitor->switchFileLog('STATUS', 1);
         #print $LOG "stdout/stderr redirect\n";
 
         my $rc;
