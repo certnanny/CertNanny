@@ -26,30 +26,23 @@ use vars qw(@ISA @EXPORT @EXPORT_OK %EXPORT_TAGS $VERSION);
 @EXPORT = qw(printerr printout 
              logLevel
              switchLogging
-             switchFileLog switchConsoleLog switchSysLog logOff
-             switchFileErr switchConsoleErr switchSysErr errOff
+             switchFileOut switchConsoleOut switchSysLogOut outOff
+             switchFileErr switchConsoleErr switchSysLogErr errOff
              log debug info notice error fatal);    # Symbols to autoexport (:DEFAULT tag)
 
 my $INSTANCE;
 
 my ($stdOutFake, $stdErrFake, @outBuffer, @errBuffer);
 my %logTarget;
-
-my $dbgInfo = 1;
-# 0: level, PID, text                         i.E.: 2013-09-13 15:58:26 : [info] [788] reading H:\data\Config\CertNanny\CfgFiles\Keystore\uat-certnanny-test Keystore openssl.cfg SHA1: BeCBVMvnNzl8HZU5tF4vzR4uIog
-# 1: last detail w/o getInstance and Logging  i.E.: 2013-09-13 15:58:26 : [info] [788] [CertNanny::Config::_parseFile(406)] reading H:\data\Config\CertNanny\CfgFiles\Keystore\uat-certnanny-test Keystore openssl.cfg SHA1: BeCBVMvnNzl8HZU5tF4vzR4uIog
-# 2: full details w/o getInstance and Logging i.E.: 2013-09-13 15:58:26 : [info] [788] [CertNanny::Config::Config::new(83)->CertNanny::Config::_parse(343)->CertNanny::Config::_parseFile(428)->CertNanny::Config::_parseFile(406)] reading H:\data\Config\CertNanny\CfgFiles\Keystore\uat-certnanny-test Keystore openssl.cfg SHA1: BeCBVMvnNzl8HZU5tF4vzR4uIog
-# 3: full details                             i.E.: 2013-09-13 15:58:26 : [info] [788] [CertNanny::Config::getInstance(65)->CertNanny::Config::new(83)->CertNanny::Config::_parse(343)->CertNanny::Config::_parseFile(428)->CertNanny::Config::_parseFile(406)->CertNanny::Logging::info(224)->CertNanny::Logging::log(168)] reading H:\data\Config\CertNanny\CfgFiles\Keystore\uat-certnanny-test Keystore openssl.cfg SHA1: BeCBVMvnNzl8HZU5tF4vzR4uIog
+my %logTargetOpen;
+my $dbgInfo;
+my $bufferOut;
 
 BEGIN {
   open($stdOutFake, ">&", STDOUT);
   open($stdErrFake, ">&", STDERR);
-  # logTarget and errTarget are a bit-Vektor:
-  # -1 not yet initialised
-  # Bit 0 (1) : Logging to Console
-  # Bit 1 (2) : Logging to File
-  # ToDo Logging to syslog
-  # Bit 2 (4) : Logging to Syslog (to be implemented)
+  $dbgInfo = 1;
+  $bufferOut = 1;
 }
 
 
@@ -71,9 +64,9 @@ sub getInstance {
       if (!defined($args{CONFIG}->get('log.level')))    {$args{CONFIG}->set('log.level',    $args{CONFIG}->get('loglevel'))}
       if (!defined($args{CONFIG}->get('log.out.file'))) {$args{CONFIG}->set('log.out.file', $args{CONFIG}->get('logfile'))}
       if (!defined($args{CONFIG}->get('log.err.file'))) {$args{CONFIG}->set('log.err.file', $args{CONFIG}->get('logfile'))}
-      my $logLevel;
+
       # Prio 0: Default : 3
-      $logLevel = 3;
+      my $logLevel = 3;
       # Prio 1: If a config file value is given, take this
       if (defined($args{CONFIG}->get('log.level')))     {$logLevel = $args{CONFIG}->get('log.level')}
       # Prio 2: If a commandline parameter debug is given without value, take 4
@@ -85,17 +78,27 @@ sub getInstance {
       $INSTANCE->logLevel($logLevel);
 
       # Determine Logtargets
-      $INSTANCE->switchConsoleLog('STATUS', $args{CONFIG}->get('log.out.console'));
-      $INSTANCE->switchFileLog   ('STATUS', $args{CONFIG}->get('log.out.file') ne '');
-      $INSTANCE->switchSysLog    ('STATUS', $args{CONFIG}->get('log.out.syslog') ne '');
+      $INSTANCE->switchFileOut   ('STATUS', defined($args{CONFIG}->get('log.out.file')) && ($args{CONFIG}->get('log.out.file') ne ''));
+      $INSTANCE->switchConsoleOut('STATUS', $args{CONFIG}->get('log.out.console'));
+      $INSTANCE->switchSysLogOut ('STATUS', defined($args{CONFIG}->get('log.out.syslog')) && ($args{CONFIG}->get('log.out.syslog') ne ''));
       # Determine Errtargets
+      $INSTANCE->switchFileErr   ('STATUS', defined($args{CONFIG}->get('log.err.file')) && ($args{CONFIG}->get('log.err.file') ne ''));
       $INSTANCE->switchConsoleErr('STATUS', $args{CONFIG}->get('log.err.console'));
-      $INSTANCE->switchFileErr   ('STATUS', $args{CONFIG}->get('log.err.file') ne '');
-      $INSTANCE->switchSysErr    ('STATUS', $args{CONFIG}->get('log.err.syslog') ne '');
+      $INSTANCE->switchSysLogErr ('STATUS', defined($args{CONFIG}->get('log.err.syslog')) && ($args{CONFIG}->get('log.err.syslog') ne ''));
       if (defined($args{verbose})) {
-        $INSTANCE->switchConsoleLog('STATUS', 1);
+        $INSTANCE->switchConsoleOut('STATUS', 1);
         $INSTANCE->switchConsoleErr('STATUS', 1);
-      } 
+      }
+      # Now we now, what to do with Logs and it's no more buffering needed
+      $bufferOut = 0;
+
+      # Determining Debug Details
+      # 0: level, PID, text                         i.E.: 2013-09-13 15:58:26 : [info] [788] reading H:\data\Config\CertNanny\CfgFiles\Keystore\uat-certnanny-test Keystore openssl.cfg SHA1: BeCBVMvnNzl8HZU5tF4vzR4uIog
+      # 1: last detail w/o getInstance and Logging  i.E.: 2013-09-13 15:58:26 : [info] [788] [CertNanny::Config::_parseFile(406)] reading H:\data\Config\CertNanny\CfgFiles\Keystore\uat-certnanny-test Keystore openssl.cfg SHA1: BeCBVMvnNzl8HZU5tF4vzR4uIog
+      # 2: full details w/o getInstance and Logging i.E.: 2013-09-13 15:58:26 : [info] [788] [CertNanny::Config::Config::new(83)->CertNanny::Config::_parse(343)->CertNanny::Config::_parseFile(428)->CertNanny::Config::_parseFile(406)] reading H:\data\Config\CertNanny\CfgFiles\Keystore\uat-certnanny-test Keystore openssl.cfg SHA1: BeCBVMvnNzl8HZU5tF4vzR4uIog
+      # 3: full details                             i.E.: 2013-09-13 15:58:26 : [info] [788] [CertNanny::Config::getInstance(65)->CertNanny::Config::new(83)->CertNanny::Config::_parse(343)->CertNanny::Config::_parseFile(428)->CertNanny::Config::_parseFile(406)->CertNanny::Logging::info(224)->CertNanny::Logging::log(168)] reading H:\data\Config\CertNanny\CfgFiles\Keystore\uat-certnanny-test Keystore openssl.cfg SHA1: BeCBVMvnNzl8HZU5tF4vzR4uIog
+      $dbgInfo = 1;
+      if (defined($args{CONFIG}->get('log.detail')))    {$dbgInfo = $args{CONFIG}->get('log.detail')}
     }
   }
   return $INSTANCE;
@@ -119,6 +122,8 @@ sub new {
 sub DESTROY {
   my $self = shift;
 
+  $self->printerr();
+  $self->printout();
   return undef unless (exists $self->{TMPFILE});
   foreach my $file (@{$self->{TMPFILE}}) {
     unlink $file;
@@ -134,35 +139,68 @@ sub _print {
   my $str    = join('', @_);
   
   my $myOut;
-  my $myFile;
-  my $buffer;
-  if ($target eq 'Err') {
-    $myOut  = $stdErrFake;
-    $myFile = defined($self->{CONFIG}) ? $self->{CONFIG}->get('log.err.file', "FILE") :  undef;
-    $buffer = \@errBuffer;
-  } else {
-    $myOut  = $stdOutFake;
-    $myFile = defined($self->{CONFIG}) ? $self->{CONFIG}->get('log.out.file', "FILE") :  undef;
-    $buffer = \@outBuffer;
-  }
+  my $myOutStd;
+  my $myFile     = defined($self->{CONFIG}) ? $self->{CONFIG}->get('log.'.lc($target).'.file', "FILE")     :  undef;
+  my $myLastFile = defined($self->{CONFIG}) ? $self->{CONFIG}->get('log.'.lc($target).'.filelast', "FILE") :  undef;
+  my $buffer     = ($target eq 'Err') ? \@errBuffer : \@outBuffer;
   push(@$buffer, $str);
   
-  if ($logTarget{$target.'Console'} ||
-     ($logTarget{$target.'File'} && defined($myFile)) ||
-      $logTarget{$target.'SysLog'}) {
+  #if ($logTarget{$target.'Console'} ||
+  #   ($logTarget{$target.'File'} && defined($myFile)) ||
+  #   ($logTarget{$target.'File'} && defined($myLastFile)) ||
+  #    $logTarget{$target.'SysLog'}) {
+  if (!$bufferOut) {
     while (@$buffer) {
       $str = shift(@$buffer);
+      # Log to file
+      if ($logTarget{$target.'File'}) {
+        if (defined($myFile)) {
+          if ($target eq 'Err') {
+            $| = 1;
+            open STDERR, ">>", $myFile || die "Could not redirect STDERR. Stopped";
+            print STDERR $str;
+            close STDERR;
+          } else {
+            open STDOUT, ">>", $myFile || die "Could not redirect STDOUT. Stopped";
+            print STDOUT $str;
+            close STDOUT;
+          }
+        }
+        if (defined($myLastFile)) {
+          $| = 1;
+          if ($target eq 'Err') {
+            if (!$logTargetOpen{$target.'File.Last'}) {
+              open STDERR, ">", $myLastFile || die "Could not redirect STDERR. Stopped";
+              $logTargetOpen{$target.'File.Last'} = 1;
+            } else {
+              open STDERR, ">>", $myLastFile || die "Could not redirect STDERR. Stopped";
+            }
+            print STDERR $str;
+            close STDERR;
+          } else {
+            if (!$logTargetOpen{$target.'File.Last'}) {
+              open STDOUT, ">", $myLastFile || die "Could not redirect STDOUT. Stopped";
+              $logTargetOpen{$target.'File.Last'} = 1;
+            } else {
+              open STDOUT, ">>", $myLastFile || die "Could not redirect STDOUT. Stopped";
+            }
+            print STDOUT $str;
+            close STDOUT;
+          }
+        }
+      }
       # Log to console
       if ($logTarget{$target.'Console'}) {
         $| = 1;
-        open STDERR, ">&", $myOut;
-        print STDERR $str;
-      }
-      # Log to file
-      if ($logTarget{$target.'File'} && defined($myFile)) {
-        $| = 1;
-        open STDERR, ">>", $myFile || die "Could not redirect STDERR. Stopped";
-        print STDERR $str;
+        if ($target eq 'Err') {
+          open STDERR, ">&", $stdErrFake;
+          print STDERR $str;
+          close STDERR;
+        } else {
+          open STDOUT, ">&", $stdOutFake;
+          print STDOUT $str;
+          close STDOUT;
+        }
       }
       # Log to syslog
       if ($logTarget{$target.'SysLog'}) {
@@ -182,7 +220,7 @@ sub printerr {
 
 sub printout {
   my $self = (shift)->getInstance();
-  $self->_print('Log', @_);
+  $self->_print('Out', @_);
   return 1;
 } ## end sub logLevel
 
@@ -229,9 +267,9 @@ sub errOff {
 } ## end sub logOff
 
 
-sub logOff {
+sub outOff {
   my $self = (shift)->getInstance();
-  $self->Off('Log');
+  $self->Off('Out');
   return 1;
 } ## end sub logOff
 
@@ -241,14 +279,20 @@ sub switchLogging {
   my %args = (STATUS => 0,
               @_);
               
+  my $type   = substr($args{TARGET}, 0, 3);
+  my $target = substr($args{TARGET}, 3);
   if ($args{STATUS}) {
     if (defined($args{FILE})) {
       eval {unlink $args{FILE}} if $args{CLEAR};
       eval {mkdir(dirname($args{FILE}))};
+      $target .= ":$args{FILE}";
+    }
+    if (defined($args{FILELAST})) {
+      eval {unlink $args{FILELAST}} if $args{CLEAR};
+      eval {mkdir(dirname($args{FILELAST}))};
+      $target .= " (last):$args{FILELAST}";
     }
     if (!$logTarget{$args{TARGET}}) {
-      my $type   = substr($args{TARGET}, 0, 3);
-      my $target = substr($args{TARGET}, 3);
       $type = ($type eq 'Err') ? 'Errorlogging to ' : 'Logging to ';
       $self->debug($type . $target . ' enabled')
     }
@@ -256,10 +300,13 @@ sub switchLogging {
   } else {
     if (defined($args{FILE})) {
       eval {unlink $args{FILE}} if $args{CLEAR};
+      $target .= ": $args{FILE}";
+    }
+    if (defined($args{FILELAST})) {
+      eval {unlink $args{FILELAST}} if $args{CLEAR};
+      $target .= " (last): $args{FILELAST}";
     }
     if ($logTarget{$args{TARGET}})  {
-      my $type   = substr($args{TARGET}, 0, 3);
-      my $target = substr($args{TARGET}, 3);
       $type = ($type eq 'Err') ? 'Errorlogging to ' : 'Logging to ';
       $self->debug($type . $target . ' disabled')
     }
@@ -282,56 +329,58 @@ sub switchConsoleErr {
 
 sub switchFileErr {
   my $self = (shift)->getInstance();
-  $self->switchLogging('TARGET', 'ErrFile',
-                       'STATUS', !$logTarget{'ErrFile'},
-                       'MESSAGE', "File Error Logging to " . $self->{CONFIG}->get('log.err.file'),
-                       'FILE'   , $self->{CONFIG}->get('log.err.file', "FILE"),
-                       'CLEAR',  undef,
+  $self->switchLogging('TARGET',   'ErrFile',
+                       'STATUS',   !$logTarget{'ErrFile'},
+                       'MESSAGE',  "File Error Logging to " . $self->{CONFIG}->get('log.err.file') || '',
+                       'FILE',     $self->{CONFIG}->get('log.err.file', "FILE"),
+                       'FILELAST', $self->{CONFIG}->get('log.err.filelast', "FILE"),
+                       'CLEAR',    undef,
                        @_);
   return 1;
 } ## end sub switchFileErr
 
 
-sub switchSysErr {
+sub switchSysLogErr {
   my $self  = (shift)->getInstance();
   $self->switchLogging('TARGET', 'ErrSysLog',
                        'STATUS', !$logTarget{'ErrSysLog'},
                        'MESSAGE', 'SysLog Error Logging',
                        @_);
   return 1;
-} ## end sub switchSysErr
+} ## end sub switchSysLogErr
 
 
-sub switchConsoleLog {
+sub switchConsoleOut {
   my $self  = (shift)->getInstance();
-  $self->switchLogging('TARGET', 'LogConsole',
-                       'STATUS', !$logTarget{'LogConsole'},
+  $self->switchLogging('TARGET', 'OutConsole',
+                       'STATUS', !$logTarget{'OutConsole'},
                        'MESSAGE', 'Console Logging',
                        @_);
   return 1;
-} ## end sub switchConsoleLog
+} ## end sub switchConsoleOut
 
 
-sub switchFileLog {
+sub switchFileOut {
   my $self = (shift)->getInstance();
-  $self->switchLogging('TARGET', 'LogFile',
-                       'STATUS', !$logTarget{'LogFile'},
-                       'MESSAGE', "File Logging to " . $self->{CONFIG}->get('log.err.file'),
-                       'FILE'   , $self->{CONFIG}->get('log.log.file', "FILE"),
-                       'CLEAR',  undef,
+  $self->switchLogging('TARGET',   'OutFile',
+                       'STATUS',   !$logTarget{'OutFile'},
+                       'MESSAGE',  "File Logging to " . $self->{CONFIG}->get('log.out.file') || '',
+                       'FILE',     $self->{CONFIG}->get('log.out.file', "FILE"),
+                       'FILELAST', $self->{CONFIG}->get('log.out.filelast', "FILE"),
+                       'CLEAR',    undef,
                        @_);
   return 1;
-} ## end sub switchFileLog
+} ## end sub switchFileOut
 
 
-sub switchSysLog {
+sub switchSysLogOut {
   my $self  = (shift)->getInstance();
-  $self->switchLogging('TARGET', 'LogSysLog',
-                       'STATUS', !$logTarget{'LogSysLog'},
+  $self->switchLogging('TARGET', 'OutSysLog',
+                       'STATUS', !$logTarget{'OutSysLog'},
                        'MESSAGE', 'SysLog Logging',
                        @_);
   return 1;
-} ## end sub switchSysLog
+} ## end sub switchSysLogOut
 
 
 sub log {
@@ -348,8 +397,7 @@ sub log {
                'error'  => 1,
                'fatal'  => 0);
 
-  push @outBuffer, "WARNING: log called with undefined priority '$prio'"
-    unless exists $level{$prio};
+  push @outBuffer, "WARNING: log called with undefined priority '$prio'" unless exists $level{$prio};
 
   my $logStr = '';
   if ($level{$prio} <= $self->logLevel()) {
@@ -361,7 +409,7 @@ sub log {
     $min  = sprintf("%02d", $min);
     $sec  = sprintf("%02d", $sec);
 
-    my ($subroutine, $i, $line) = ('' ,'', 0, 0);
+    my ($subroutine, $i, $line) = ('', 0, 0);
     while (defined(caller($i))) {
       $logStr = (caller($i))[3];
       $line = $line ? (caller($i-1))[2] : __LINE__;
@@ -384,7 +432,7 @@ sub log {
     } else {
       $logStr = "$year-$mon-$mday $hour:$min:$sec : [$prio] [$$] $arg->{MSG}\n";
     }
-    $self->printerr($logStr);
+    $self->printout($logStr);
 
     # call hook
     #$self->executehook($self->{INSTANCE}->{OPTIONS}->{ENTRY}->{hook}->{log},

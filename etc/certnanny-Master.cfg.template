@@ -24,18 +24,29 @@ path.tmpdir                      = $(prefix)tmp/
 # NOTE: Set the desired log level here. For common usage 2 or 3 should
 #       be OK.
 # 0: fatal, 1: error, 2: notice, 3: info, 4: debug, 5: scep verbose, 6: scep debug
-#log.level                        = 0
+log.level                        = 3
 
+# depricated
+#loglevel                        = 3
+
+# Log Detail settings
+# 0: Timestamp, Level, PID, text       i.E.: 2015-01-29 21:47:15 : [debug] [64726] Start CertNanny::do_dump Dump
+# 1: 0 + direct calling proc           i.E.: 2015-01-29 21:47:48 : [debug] [64747] [CertNanny::do_dump(601)] Start CertNanny::do_dump Dump
+# 2: 1 + chain of all calling procs    i.E.: 2015-01-29 21:48:40 : [debug] [64781] [CertNanny::AUTOLOAD(187)->CertNanny::do_dump(601)] Start CertNanny::do_dump Dump
+# 3: 2 + getInstance and Logging procs i.E.: 2015-01-29 21:49:47 : [debug] [64820] [CertNanny::AUTOLOAD(187)->CertNanny::do_dump(601)->CertNanny::Logging::debug(451)->CertNanny::Logging::log(415)] Start CertNanny::do_dump Dump
+log.detail                       = 3
+
+#Name and destination of the certnanny logfile
 log.out.console                  = 1
 log.out.file                     = $(prefix)logs/certnanny.log
+log.out.filelast                 = $(prefix)logs/certnanny.last.log
 #log.out.syslog                   = tcp://localhost:2486
 log.err.console                  = 1
 log.err.file                     = $(prefix)logs/certnanny.err
+log.err.filelast                 = $(prefix)logs/certnanny.last.err
 #log.err.syslog                   = tcp://localhost:2486
 
-#Name and destination of the certnanny logfile
-
-#loglevel                         = 3
+#depricated
 #logfile                          = $(prefix)logs/certnanny.log
 
 #randomWait if this is set there will be a random backoff time while renewing a certificate to ease the stress 
@@ -68,6 +79,21 @@ cmd.ifconfig                     = /sbin/ifconfig
 
 
 ####Include keystore configuration files####
+# If you specify keystores CertNanny searches for configuration
+# files named Keystore-<keystorename>.cfg and includes them
+# Within these files you don't need the prefix keystore.<keystorename>
+# but it is not an error when you use it. If you use it the keystorename
+# must be identical to the one specified here.
+# Example:
+# keystores = openssl java
+# includes the two cfg file Keystore-openssl.cfg and Keystore-java.cfg
+# In these cfg files you may specify values as
+# store.pin    =   123456 
+# or as (depricated)
+# keystore.java.store.pin    =   123456 
+keystores                        = openssl java
+
+# depricated
 # if you specify a directory all files in the directory will be included
 # include KeystoreConfigDirectory/
 # or specify several files by globbing to be included

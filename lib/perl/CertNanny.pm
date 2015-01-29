@@ -150,7 +150,7 @@ sub setOption {
 
 
 sub getOption {
-  CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3]);
+  # CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3]);
   my $self  = (shift)->getInstance();
   my $key   = shift;
 
@@ -159,7 +159,7 @@ sub getOption {
     $value = $self->{OPTION}->{$key};
   }
   
-  CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "Key: $key  Value: " . defined($value) ? $value : "undef");
+  # CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "Key: $key  Value:", defined($value) ? $value : "undefined");
   return $value;
 } ## end sub setOption
 
@@ -607,9 +607,7 @@ sub do_dump {
   if ($self->{OPTION}->{object} eq 'data') {
     my @hashname;
     $self->_dumpValue(\%{$config->{CONFIG}}, \@hashname);
-  }
-
-  if ($self->{OPTION}->{object} eq 'cfg') {
+  } elsif ($self->{OPTION}->{object} eq 'cfg') {
     foreach my $configFileName (sort {lc($a) cmp lc($b)} keys %{$config->{CONFIGFILES}}) {
       CertNanny::Logging->printout("File: <$configFileName> SHA1: $config->{CONFIGFILES}->{$configFileName}->{SHA}\n");
       foreach my $lnr (sort {lc($a) <=> lc($b)} keys %{$config->{CONFIGFILES}->{$configFileName}->{CONTENT}}) {
@@ -622,6 +620,9 @@ sub do_dump {
       }
       CertNanny::Logging->printout("\n");
     }
+  } else {
+    CertNanny::Logging->switchConsoleErr('STATUS', 1);
+    CertNanny::Logging->printerr("Missing Argument: --object cfg|data   specifies the object to be dumped\n");
   }
   
   CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "Dump");
