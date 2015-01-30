@@ -50,12 +50,12 @@ sub new {
   #  - Java executable
   #  - location
   #  - pin
-  $options->{keytool} = $config->get('cmd.keytool', 'FILE');
-  croak "cmd.keytool not found" unless (defined $options->{keytool} and -x $options->{keytool});
+  $options->{keytool} = $config->get('cmd.keytool', 'CMD');
+  croak "cmd.keytool not found" unless (defined $options->{keytool});
   
-  $options->{java}   = $config->get('cmd.java', 'FILE');
+  $options->{java}   = $config->get('cmd.java', 'CMD');
   $options->{java} ||= File::Spec->catfile($ENV{JAVA_HOME}, 'bin', 'java') if (defined $ENV{JAVA_HOME});
-  croak "cmd.java not found in config and JAVA_HOME not set"  unless (defined $options->{java} && -x $options->{java});
+  croak "cmd.java not found in config and JAVA_HOME not set"  unless (defined $options->{java});
 
   if (!defined $entry->{location}) {
     croak("keystore.$entryname.location not defined");
@@ -397,7 +397,7 @@ sub getKey {
     }
     unlink($tmpKeystore);
     
-    my $openssl = $config->get('cmd.openssl', 'FILE');
+    my $openssl = $config->get('cmd.openssl', 'CMD');
     if (!defined $openssl) {
       $rc = CertNanny::Logging->error("No openssl shell specified");
     }

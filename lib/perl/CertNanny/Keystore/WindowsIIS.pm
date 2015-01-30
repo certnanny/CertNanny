@@ -41,7 +41,7 @@ sub installCert {
   CertNanny::Logging->info("Creating prototype PKCS#12 from certfile $certfile, keyfile $keyfile, label $label");
 
   # create random PW via OpenSSL
-  my $openssl = $self->{OPTIONS}->{CONFIG}->get('cmd.openssl', 'FILE');
+  my $openssl = $self->{OPTIONS}->{CONFIG}->get('cmd.openssl', 'CMD');
 
   my $open_result = open(my $OPENSSL, "\"$openssl\" rand -base64 15 |");
   if (!$open_result) {

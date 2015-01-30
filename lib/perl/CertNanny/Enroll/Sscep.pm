@@ -59,12 +59,14 @@ sub new {
     return undef;
   }
   $self->{entryname}       = $entryname;
-  $self->{cmd}             = $config->get('cmd.sscep', 'FILE');
-  $self->{config_filename} = File::Spec->catfile($self->{certdir}, $self->{entryname} . "_sscep.cnf");
+  $self->{cmd}             = $config->get('cmd.sscep', 'CMD');
+  if (defined($self->{cmd})) {
+    $self->{config_filename} = File::Spec->catfile($self->{certdir}, $self->{entryname} . "_sscep.cnf");
 
-  if (defined $self->{OPTIONS}->{sscep}->{engine}) {
-    my $engine_section = $self->{OPTIONS}->{sscep}->{engine};
-    $self->{OPTIONS}->{$engine_section}->{engine_usage} = "both";
+    if (defined $self->{OPTIONS}->{sscep}->{engine}) {
+      my $engine_section = $self->{OPTIONS}->{sscep}->{engine};
+      $self->{OPTIONS}->{$engine_section}->{engine_usage} = "both";
+    }
   }
 
   return $self;

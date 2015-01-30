@@ -225,6 +225,7 @@ sub _get {
       return uc($value)                                         if ($mangle eq "UC");
       return lc($value)                                         if ($mangle eq "LC");
       return ucfirst($value)                                    if ($mangle eq "UCFIRST");
+      return undef                                              if ($mangle eq "CMD" && !-x $value);
       return $value;    # don't know how to handle this mangle option
     } ## end if ($value ne '')
   } ## end else [ if (!defined $arg) ]
@@ -461,8 +462,8 @@ sub _parse {
     _replaceVariables($self, $self->{CONFIG}, $_);
   }
 
-  my $openssl = $self->get('cmd.openssl', 'FILE');
-  if (defined $openssl) {
+  my $openssl = $self->get('cmd.openssl', 'CMD');
+  if (defined $openssl && -e $openssl) {
     # All the parsing is done, now check for double parsing
     if (exists($self->{CONFIGFILES})) {
       foreach (keys %{$self->{CONFIGFILES}}) {
@@ -498,7 +499,7 @@ sub _sha1_hex {
   return $self->{CONFIGFILES}{$file}{SHA} if ($self->{CONFIGFILES}{$file}{SHA});
   
   my $sha;
-  my $openssl = $self->get('cmd.openssl', 'FILE');
+  my $openssl = $self->get('cmd.openssl', 'CMD');
   if (defined($openssl)) {
     my @cmd = (qq("$openssl"), 'dgst', '-sha', qq("$file"));
     chomp($sha = CertNanny::Util->runCommand(\@cmd, WANTOUT => 1));

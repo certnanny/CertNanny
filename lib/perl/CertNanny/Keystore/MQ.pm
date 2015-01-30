@@ -53,19 +53,17 @@ sub new {
   # get keystore PIN
   $self->{PIN} = $self->_unStash($entry->{location} . ".sth");
 
-  $options->{gsk6cmd} = $config->get('cmd.gsk6cmd', 'FILE');
-  $options->{gskcmd} = $config->get('cmd.gskcmd', 'FILE');
+  $options->{gsk6cmd} = $config->get('cmd.gsk6cmd', 'CMD');
+  $options->{gskcmd} = $config->get('cmd.gskcmd', 'CMD');
 
 if(defined $options->{gsk6cmd}){
- 
-
   # on certain platforms we need cannot find the location of the
   #   GSKit library directory ourselves, in this case it must be configured.
   $options->{gsklibdir} = $config->get('path.gsklib', 'FILE');
   $options->{gsklibdir} = undef if ($options->{gsklibdir} eq '');
   croak "gsk6cmd not found" unless (defined $options->{gsk6cmd} and -x $options->{gsk6cmd});
 
-  $options->{JAVA} = $config->get('cmd.java', 'FILE');
+  $options->{JAVA} = $config->get('cmd.java', 'CMD');
   if (defined $ENV{JAVA_HOME}) {
     $options->{JAVA} ||= File::Spec->catfile($ENV{JAVA_HOME}, 'bin', 'java');
   }
@@ -604,7 +602,7 @@ sub getKey {
       return undef;
     }
   
-    my $openssl = $config->get('cmd.openssl', 'FILE');
+    my $openssl = $config->get('cmd.openssl', 'CMD');
     if (!defined $openssl) {
       CertNanny::Logging->error("No openssl shell specified");
       return undef;

@@ -431,51 +431,52 @@ sub callOpenSSL {
   my $rc = 0;
   my $info;
   # build commandstring
-  my $openssl = $self->{CONFIG}->get('cmd.openssl', 'FILE');
-  my @cmd = (qq("$openssl"), $command);
-  push(@cmd, ('-in', qq("$args{CERTFILE}")))       if (defined $args{CERTFILE});
-  push(@cmd, ('-inform', qq("$args{CERTFORMAT}"))) if (defined $args{CERTFORMAT});
-  foreach (@$params) {
-    push(@cmd, -$_);
-  }
-  my $outfile = CertNanny::Util->getTmpFile();
-  push(@cmd, ('>', qq("$outfile")));
+  my $openssl = $self->{CONFIG}->get('cmd.openssl', 'CMD');
   
-  
+  if (defined($openssl)){
+    my @cmd = (qq("$openssl"), $command);
+    push(@cmd, ('-in', qq("$args{CERTFILE}")))       if (defined $args{CERTFILE});
+    push(@cmd, ('-inform', qq("$args{CERTFORMAT}"))) if (defined $args{CERTFORMAT});
+    foreach (@$params) {
+      push(@cmd, -$_);
+    }
+    my $outfile = CertNanny::Util->getTmpFile();
+    push(@cmd, ('>', qq("$outfile")));
 
-  # export certificate to tempfile
-  CertNanny::Logging->debug("Execute: " . join(" ", @cmd));
+    # export certificate to tempfile
+    CertNanny::Logging->debug("Execute: " . join(" ", @cmd));
 
-  my $fh;
-  if (!open $fh, "| " . join(" ", @cmd)) {
-    $rc = CertNanny::Logging->error("callOpenSSL(): open error");
-    unlink $outfile;
-  }
-
-  if (!$rc) {
-    binmode $fh;
-    print $fh $args{CERTDATA} if (defined $args{CERTDATA});
-    close $fh;
-
-    if ($? != 0) {
-      $rc = CertNanny::Logging->error("callOpenSSL(): Error ASN.1 decoding certificate");
+    my $fh;
+    if (!open $fh, "| " . join(" ", @cmd)) {
+      $rc = CertNanny::Logging->error("callOpenSSL(): open error");
       unlink $outfile;
     }
 
     if (!$rc) {
-      # read certificate
-      open $fh, '<', $outfile;
-      if (!$fh) {
-        $rc = CertNanny::Logging->error("callOpenSSL(): Error analysing ASN.1 decoded certificate");
+      binmode $fh;
+      print $fh $args{CERTDATA} if (defined $args{CERTDATA});
+      close $fh;
+
+      if ($? != 0) {
+        $rc = CertNanny::Logging->error("callOpenSSL(): Error ASN.1 decoding certificate");
         unlink $outfile;
       }
-    }
-  }
 
-  if (!$rc) {
-    $info = CertNanny::Util->parseCertData(\$fh);
-    close $fh;
-    unlink $outfile;
+      if (!$rc) {
+        # read certificate
+        open $fh, '<', $outfile;
+        if (!$fh) {
+          $rc = CertNanny::Logging->error("callOpenSSL(): Error analysing ASN.1 decoded certificate");
+          unlink $outfile;
+        }
+      }
+    }
+
+    if (!$rc) {
+      $info = CertNanny::Util->parseCertData(\$fh);
+      close $fh;
+      unlink $outfile;
+    }
   }
   
   return $info;
@@ -516,7 +517,7 @@ sub _sha1_base64 {
   my $tmpfile = CertNanny::Util->getTmpFile();
   if (CertNanny::Util->writeFile(DSTFILE    => $tmpfile,
                                  SRCCONTENT => $data)) {
-    my $openssl =$self->{CONFIG}->get('cmd.openssl', 'FILE');
+    my $openssl =$self->{CONFIG}->get('cmd.openssl', 'CMD');
     if (defined($openssl)) {
       my @cmd = (qq("$openssl"), 'dgst', '-sha', qq("$tmpfile"));
       chomp($sha = CertNanny::Util->runCommand(\@cmd, WANTOUT => 1));
@@ -868,31 +869,34 @@ sub convertCert {
 
   my ($infile, $output);
 
-  my $openssl = $self->{CONFIG}->get('cmd.openssl', 'FILE');
-  my @cmd     = (qq("$openssl"), 'x509', '-in',);
+  my $openssl = $self->{CONFIG}->get('cmd.openssl', 'CMD');
+  
+  if (defined($openssl)) {
+    my @cmd     = (qq("$openssl"), 'x509', '-in',);
 
-  if (exists $args{CERTDATA}) {
-    $infile = CertNanny::Util->getTmpFile();
-    if (!CertNanny::Util->writeFile(DSTFILE    => $infile,
-                                    SRCCONTENT => $args{CERTDATA})) {
-      CertNanny::Logging->error("convertCert(): Could not write temporary file: $infile");
+    if (exists $args{CERTDATA}) {
+      $infile = CertNanny::Util->getTmpFile();
+      if (!CertNanny::Util->writeFile(DSTFILE    => $infile,
+                                      SRCCONTENT => $args{CERTDATA})) {
+        CertNanny::Logging->error("convertCert(): Could not write temporary file: $infile");
+        return undef;
+      }
+      push(@cmd, qq("$infile"));
+    } else {
+      push(@cmd, qq("$args{CERTFILE}"));
+    }
+
+    push(@cmd, ('-inform',  $args{CERTFORMAT}));
+    push(@cmd, ('-outform', $args{OUTFORMAT}));
+
+    $output->{CERTFORMAT} = $args{OUTFORMAT};
+    $output->{CERTDATA} = CertNanny::Util->runCommand(\@cmd, WANTOUT => 1);
+    unlink $infile if defined $infile;
+
+    if ($? != 0) {
+      CertNanny::Logging->error("convertCert(): Could not convert certificate");
       return undef;
     }
-    push(@cmd, qq("$infile"));
-  } else {
-    push(@cmd, qq("$args{CERTFILE}"));
-  }
-
-  push(@cmd, ('-inform',  $args{CERTFORMAT}));
-  push(@cmd, ('-outform', $args{OUTFORMAT}));
-
-  $output->{CERTFORMAT} = $args{OUTFORMAT};
-  $output->{CERTDATA} = CertNanny::Util->runCommand(\@cmd, WANTOUT => 1);
-  unlink $infile if defined $infile;
-
-  if ($? != 0) {
-    CertNanny::Logging->error("convertCert(): Could not convert certificate");
-    return undef;
   }
 
   return $output;
@@ -928,23 +932,27 @@ sub staticEngine {
     die;
   }
 
-  my $openssl = $self->{CONFIG}->get('cmd.openssl', 'FILE');
-  my @cmd = (qq("$openssl"));
-  push(@cmd, 'engine');
-  $engine_id =~ s/[^A-Za-z0-9]*//g;
-  push(@cmd, $engine_id);
-  push(@cmd, '-t');
+  my $openssl = $self->{CONFIG}->get('cmd.openssl', 'CMD');
+  
+  if (defined($openssl)) {
+    my @cmd = (qq("$openssl"));
+    push(@cmd, 'engine');
+    $engine_id =~ s/[^A-Za-z0-9]*//g;
+    push(@cmd, $engine_id);
+    push(@cmd, '-t');
 
-  CertNanny::Logging->debug("Execute: " . join(' ', @cmd));
-  my $output = "";
-  open FH, join(' ', @cmd) . " |" or die "Couldn't execute " . join(' ', @cmd) . ": $!\n";
-  while (defined(my $line = <FH>)) {
-    chomp($line);
-    $output .= $line;
+    CertNanny::Logging->debug("Execute: " . join(' ', @cmd));
+    my $output = "";
+    open FH, join(' ', @cmd) . " |" or die "Couldn't execute " . join(' ', @cmd) . ": $!\n";
+    while (defined(my $line = <FH>)) {
+      chomp($line);
+      $output .= $line;
+    }
+    close FH;
+    CertNanny::Logging->debug("Output is $output\n");
+    return $output =~ m/\(cs\).*\[ available \]/s;
   }
-  close FH;
-  CertNanny::Logging->debug("Output is $output\n");
-  return $output =~ m/\(cs\).*\[ available \]/s;
+  return undef;
 } ## end sub staticEngine
 
 
@@ -1089,13 +1097,14 @@ sub getMacAddresses {
   } elsif ($^O eq 'aix') {
     $command = "lsdev | egrep -w 'ent[0-9]+' | cut -d ' ' -f 1 | while read adapter; do entstat -d \$adapter | grep 'Hardware Address:'; done";
   } else {
-    my $ifconfig = $self->{CONFIG}->get('cmd.ifconfig', 'FILE');
-    if ($ifconfig and $ifconfig ne '') {
-      $command = "$ifconfig -a";
-    } else {
-      $command = "ifconfig -a";
+    my $ifconfig = $self->{CONFIG}->get('cmd.ifconfig', 'CMD');
+    if (defined($ifconfig)) {
+      if ($ifconfig and $ifconfig ne '') {
+        $command = "$ifconfig -a";
+      } else {
+        $command = "ifconfig -a";
+      }
     }
-    
   }
 
   #print "DEBUG: OS is $^O\n";

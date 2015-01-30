@@ -201,7 +201,7 @@ sub getCert {
     $derfile_tmp = $self->_certUtilWriteCerts((SERIAL => $serial));
   } ## end unless (defined($derfile_tmp...))
  
-  my $openssl = $config->get('cmd.openssl', 'FILE');
+  my $openssl = $config->get('cmd.openssl', 'CMD');
   my @cmd = (qq("$openssl"), 'x509', '-in', qq("$derfile_tmp"), '-inform', 'DER');
   $certdata = CertNanny::Util->runCommand(\@cmd, WANTOUT => 1);
   

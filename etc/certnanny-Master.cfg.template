@@ -79,8 +79,8 @@ cmd.ifconfig                     = /sbin/ifconfig
 
 
 ####Include keystore configuration files####
-# If you specify keystores CertNanny searches for configuration
-# files named Keystore-<keystorename>.cfg and includes them
+# If you specify keystores, CertNanny searches for configuration
+# files named Keystore-<keystorename>.cfg and includes them.
 # Within these files you don't need the prefix keystore.<keystorename>
 # but it is not an error when you use it. If you use it the keystorename
 # must be identical to the one specified here.

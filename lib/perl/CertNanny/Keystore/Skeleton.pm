@@ -391,7 +391,7 @@ sub selfSign {
   my $entryname = $options->{ENTRYNAME};
   my $config    = $options->{CONFIG};
 
-  my $openssl      = $config->get('cmd.openssl', 'FILE');
+  my $openssl      = $config->get('cmd.openssl', 'CMD');
   my $selfsigncert = $entryname . "-selfcert.pem";
   my $outfile      = File::Spec->catfile($entry->{statedir}, $selfsigncert);
   my $pin          = $self->{PIN} || $entry->{key}->{pin} || "";
@@ -554,7 +554,7 @@ sub _createPKCS12 {
     return undef;
   }
   
-  my $openssl = $config->get('cmd.openssl', 'FILE');
+  my $openssl = $config->get('cmd.openssl', 'CMD');
   if (!defined $openssl) {
     CertNanny::Logging->error("No openssl shell specified");
     return undef;

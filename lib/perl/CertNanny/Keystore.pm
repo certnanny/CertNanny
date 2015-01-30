@@ -77,15 +77,13 @@ sub new {
   # $self->{CONFIG} = $args{CONFIG};
   
   $self->{OPTIONS}->{'path.tmpdir'}  = $args{CONFIG}->get('path.tmpdir', 'FILE');
-  $self->{OPTIONS}->{'cmd.openssl'}  = $args{CONFIG}->get('cmd.openssl', 'FILE');
-  $self->{OPTIONS}->{'cmd.sscep'}    = $args{CONFIG}->get('cmd.sscep',   'FILE');
+  $self->{OPTIONS}->{'cmd.openssl'}  = $args{CONFIG}->get('cmd.openssl', 'CMD');
+  $self->{OPTIONS}->{'cmd.sscep'}    = $args{CONFIG}->get('cmd.sscep',   'CMD');
   $self->{OPTIONS}->{ENTRYNAME}      = $args{ENTRYNAME};
 
   croak "No tmp directory specified"            unless defined $self->{OPTIONS}->{'path.tmpdir'};
-  croak "No openssl binary configured or found" unless (defined $self->{OPTIONS}->{'cmd.openssl'}
-                                                        and -x $self->{OPTIONS}->{'cmd.openssl'});
-  croak "No sscep binary configured or found"   unless (defined $self->{OPTIONS}->{'cmd.sscep'}
-                                                        and -x $self->{OPTIONS}->{'cmd.sscep'});
+  croak "No openssl binary configured or found" unless (defined $self->{OPTIONS}->{'cmd.openssl'});
+  croak "No sscep binary configured or found"   unless (defined $self->{OPTIONS}->{'cmd.sscep'});
 
   # dynamically load keystore instance module
   eval "require CertNanny::Keystore::${type}";
@@ -685,7 +683,9 @@ sub k_convertKey {
 
   my $output;
 
-  my $openssl = $config->get('cmd.openssl', 'FILE');
+  my $openssl = $config->get('cmd.openssl', 'CMD');
+  
+  return undef if (!defined($openssl));
   my @cmd = (qq("$openssl"));
 
   # KEYTYPE OUTTYPE  CMD

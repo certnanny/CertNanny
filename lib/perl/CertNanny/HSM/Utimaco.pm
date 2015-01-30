@@ -363,7 +363,7 @@ sub checkKeySanity() {
 
   # 2: get modulus of each key by generating a csr and checking against it
   my $current_key_id;
-  my $openssl = $self->{CONFIG}->get('cmd.openssl', 'FILE');
+  my $openssl = $self->{CONFIG}->get('cmd.openssl', 'CMD');
   $self->{all_keys} = $self->loadKeyInfo();
   foreach my $id (keys %{$self->{all_keys}}) {
     my $label       = $self->{all_keys}->{$id};
@@ -426,7 +426,7 @@ sub checkKeySanity() {
 sub createDummyCSR() {
   my $self    = shift;
   my $keyid   = shift;
-  my $openssl = $self->{CONFIG}->get('cmd.openssl', 'FILE');
+  my $openssl = $self->{CONFIG}->get('cmd.openssl', 'CMD');
   CertNanny::Logging->debug("Creating dummy CSR for key ID $keyid to get its modulus");
   my $dummy_cfg = {
     openssl_conf => "openssl_def",
