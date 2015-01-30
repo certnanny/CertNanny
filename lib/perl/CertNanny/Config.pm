@@ -597,13 +597,13 @@ sub _parseFile {
         $var = $var->{$confPart};
       }
       if ($doDupCheck && defined($var->{$key})) {
-        CertNanny::Logging->printerr("Config file error: duplicate value definition in file $configFile line $lnr ($line)\n");
+        CertNanny::Logging->printerr("Config file $configFile ERROR: duplicate value definition in line $lnr ($line)\n");
       }
       
       while ($val =~ m{__ENV__(.*?)__}xms) {
         my $envvar = $1;
         if (! exists $ENV{$envvar}) {
-          CertNanny::Logging->info("Environment variable $envvar referenced in line $lnr does not exist");
+          CertNanny::Logging->info("Config file $configFile WARNING: Environment variable $envvar referenced in line $lnr does not exist");
         }
         my $myENVvar = $ENV{$envvar} || '';
         $val =~ s{__ENV_(.*?)__}{$myENVvar}xms;
@@ -612,7 +612,7 @@ sub _parseFile {
       $var->{$key} = $val;
     } else {
       if ($line !~ /^(include|keystores)\s+(.+)$/) {
-        CertNanny::Logging->printerr("Config file error: parse error in line $lnr ($line)\n");
+        CertNanny::Logging->printerr("Config file $configFile ERROR: parse error in line $lnr ($line)\n");
       }
     }
   }
