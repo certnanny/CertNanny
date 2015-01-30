@@ -1209,7 +1209,7 @@ sub _buildGskCmd {
   push(@cmd, -format    => qq("$entry->{format}"))    if ($entry->{format});
   push(@cmd, @_);
   @cmd;
-} ## end sub _buildKeytoolCmd
+}
 
 
 sub _getIBMJavaEnvironment {
