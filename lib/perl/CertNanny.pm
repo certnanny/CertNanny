@@ -619,6 +619,16 @@ sub do_dump {
       }
       CertNanny::Logging->printout("\n");
     }
+  } elsif ($self->{OPTION}->{object} eq 'keystores') {
+    my @keystores = (sort {lc($a) cmp lc($b)} split(/ /, $config->{CONFIG}->{'keystores'}));
+    CertNanny::Logging->printout("keystores = $config->{CONFIG}->{'keystores'}\n");
+    foreach my $keystore (@keystores) {
+      foreach my $configFileName (keys %{$config->{CONFIGFILES}}) {
+        if ($configFileName =~ /Keystore\-$keystore\.cfg/) {
+          CertNanny::Logging->printout("File: <$configFileName> SHA1: $config->{CONFIGFILES}->{$configFileName}->{SHA}\n");
+        }
+      }
+    }
   } else {
     CertNanny::Logging->switchConsoleErr('STATUS', 1);
     CertNanny::Logging->printerr("Missing Argument: --object cfg|data   specifies the object to be dumped\n");
