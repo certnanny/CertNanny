@@ -45,6 +45,9 @@ sub new {
   my $entryname = $options->{ENTRYNAME};
   my $config    = $options->{CONFIG};
 
+  my @cmd;
+  my @keys;
+
   # Needs at least
   #  - Keytool executable
   #  - Java executable
@@ -52,6 +55,14 @@ sub new {
   #  - pin
   $options->{keytool} = $config->get('cmd.keytool', 'CMD');
   croak "cmd.keytool not found" unless (defined $options->{keytool});
+  
+  @cmd = (qq("$options->{keytool}"), "2>&1");
+  @keys = CertNanny::Util->runCommand(\@cmd, WANTOUT => 1);
+  my $rightKeytoolVersion = 0;
+  foreach (@keys) {
+    $rightKeytoolVersion |= $_ =~ /-importkeystore/;
+  }  
+  croak "Wrong keytool version (<=1.5cmd): $options->{keytool}" unless $rightKeytoolVersion;
   
   $options->{java}   = $config->get('cmd.java', 'CMD');
   $options->{java} ||= File::Spec->catfile($ENV{JAVA_HOME}, 'bin', 'java') if (defined $ENV{JAVA_HOME});
@@ -91,8 +102,8 @@ sub new {
   
   # optional alias defaults to first key
   if (!defined $entry->{alias}) {
-    my @cmd = $self->_buildKeytoolCmd($entry->{location}, '-list');
-    my @keys = CertNanny::Util->runCommand(\@cmd, WANTOUT => 1);
+    @cmd = $self->_buildKeytoolCmd($entry->{location}, '-list');
+    @keys = CertNanny::Util->runCommand(\@cmd, WANTOUT => 1);
     @keys = grep m{, keyEntry,$}, @keys;
     if ($?) {
       croak("keystore $entry->{location} cannot be listed");
