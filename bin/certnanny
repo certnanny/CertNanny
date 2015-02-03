@@ -98,7 +98,6 @@ CertNanny::Util->getInstance(%cmdLineParam,
 # Logging
 CertNanny::Logging->getInstance(%cmdLineParam,
                                 CONFIG => CertNanny::Config->getInstance(%cmdLineParam));
-
 # At least one Command is mandatory
 if ($#ARGV < 0) {
   pod2usage(-msg => $msg, -verbose => 0)
@@ -345,8 +344,10 @@ certnanny [OPTIONS...] COMMAND [ARGUMENTS...]
   dump                  Dump the content of CertNanny Objects to STDOUT. The
                         Object to be dumped is given as an argument. Valid 
                         arguments are
-                          cfg : Dump content of the configuration file.
-                          data: Dump internal data strukture
+                          cfg :      Dump content of the configuration file.
+                          data:      Dump internal data strukture
+                          keystores: Dump defined keystores and related
+                                     configuration files
   executeHook --hook HOOK --keystore KEYSTORE [--define KEY=VALUE]
 
 Executes the hook HOOK for the keystore KEYSTORE. The --keystore option is mandatory.
@@ -379,15 +380,15 @@ Executes the hook HOOK for the keystore KEYSTORE. The --keystore option is manda
 
 =head1 ARGUMENTS
 
-  --challengepassword PWD  specify a challenge password to use for an
-                           initial enrollment (all keystores)
-  --win_user USER          specify alternative Windows username to run the 
-                           Windows Service
-  --win_password PWD       specify password corresponding to win_user
-  --hook HOOK              Execute the spezified hook
-  --define KEY=VALUE       Overwrite the KEY at Hook execution with the 
-                           given value
-  --object cfg|data        specifies the object to be dumped                
+  --challengepassword PWD     specify a challenge password to use for an
+                              initial enrollment (all keystores)
+  --win_user USER             specify alternative Windows username to run the 
+                              Windows Service
+  --win_password PWD          specify password corresponding to win_user
+  --hook HOOK                 Execute the spezified hook
+  --define KEY=VALUE          Overwrite the KEY at Hook execution with the 
+                              given value
+  --object cfg|data|keystores specifies the object to be dumped                
                         
                         
 =head1 DESCRIPTION
