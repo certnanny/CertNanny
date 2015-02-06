@@ -52,8 +52,9 @@ sub new {
     my $self = {};
     bless $self, $class;
     $INSTANCE = $self;
-
+    CertNanny::Logging->info("============================================================");
     CertNanny::Logging->info("CertNanny Version $VERSION Command(s) " . join('|', @ARGV));
+    CertNanny::Logging->info("============================================================");
     
     # Store singleton objects in CertNanny
     $self->{CONFIG}  = CertNanny::Config->getInstance(%args); return undef unless defined $self->{CONFIG};
