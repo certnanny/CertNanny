@@ -60,6 +60,21 @@ cmd.ifconfig                     = /sbin/ifconfig
 
 
 ####Include keystore configuration files####
+# If you specify keystores, CertNanny searches for configuration
+# files named Keystore-<keystorename>.cfg and includes them.
+# Within these files you don't need the prefix keystore.<keystorename>
+# but it is not an error when you use it. If you use it the keystorename
+# must be identical to the one specified here.
+# <keystorename> is case sensitive!
+# Example:
+# keystores = openssl java
+# includes the two cfg file Keystore-openssl.cfg and Keystore-java.cfg
+# In these cfg files you may specify values as
+# store.pin    =   123456 
+# or as (depricated)
+# keystore.java.store.pin    =   123456 
+keystores                        = openssl java
+
 # if you specify a directory all files in the directory will be included
 # include KeystoreConfigDirectory/
 # or specify several files by globbing to be included
@@ -69,6 +84,8 @@ cmd.ifconfig                     = /sbin/ifconfig
 # include certnanny-local.cfg
 
 include Keystore-DEFAULT.cfg
+
+# single Keystore include is depricated
 #include Keystore-Java.cfg
 #include Keystore-OpenSSL.cfg
 #include Keystore-Windows.cfg
