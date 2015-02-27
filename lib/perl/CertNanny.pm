@@ -621,12 +621,47 @@ sub do_dump {
       CertNanny::Logging->printout("\n");
     }
   } elsif ($self->{OPTION}->{object} eq 'keystores') {
-    my @keystores = (sort {lc($a) cmp lc($b)} split(/ /, $config->{CONFIG}->{'keystores'}));
-    CertNanny::Logging->printout("keystores = $config->{CONFIG}->{'keystores'}\n");
+    my @keystores = (sort {lc($a) cmp lc($b)} keys(%{$config->{CONFIG}->{'keystore'}}));
     foreach my $keystore (@keystores) {
+      CertNanny::Logging->printout("Keystore $keystore:\n");
       foreach my $configFileName (keys %{$config->{CONFIGFILES}}) {
-        if ($configFileName =~ /Keystore\-$keystore\.cfg/) {
-          CertNanny::Logging->printout("File: <$configFileName> SHA1: $config->{CONFIGFILES}->{$configFileName}->{SHA}\n");
+        foreach my $cfgFileKeystore (@{$config->{CONFIGFILES}->{$configFileName}->{KEYSTORE}}) {
+          if ($keystore eq $cfgFileKeystore) {
+            CertNanny::Logging->printout("  File: <$configFileName> SHA1: $config->{CONFIGFILES}->{$configFileName}->{SHA}\n");
+          }
+        }
+      }
+    }
+  } elsif ($self->{OPTION}->{object} =~ /cert.*/) {
+    my @keystores = (sort {lc($a) cmp lc($b)} keys(%{$config->{CONFIG}->{'keystore'}}));
+    foreach my $keystore (@keystores) {
+      CertNanny::Logging->printout("Keystore $keystore:\n");
+      foreach my $configFileName (keys %{$config->{CONFIGFILES}}) {
+        foreach my $cfgFileKeystore (@{$config->{CONFIGFILES}->{$configFileName}->{KEYSTORE}}) {
+          if ($keystore eq $cfgFileKeystore) {
+            CertNanny::Logging->printout("  File: <$configFileName> SHA1: $config->{CONFIGFILES}->{$configFileName}->{SHA}\n");
+          }
+        }
+      }
+      my $keystore = CertNanny::Keystore->new(CONFIG    => $self->{CONFIG},             # give it the whole configuration
+                                              ENTRY     => $self->{ITEMS}->{$keystore}, # all keystore parameters from configfile
+                                              ENTRYNAME => $keystore);                  # and the keystore name from configfile
+      if ($keystore) {
+        my $instance  = $keystore->{INSTANCE};
+        my $options   = $instance->{OPTIONS};
+        if ($options->{ENTRY}->{'location'} ne 'rootonly') {
+          $keystore->{CERT} = $instance->getCert();
+          if (defined($keystore->{CERT})) {
+            $keystore->{CERT}->{CERTINFO} = CertNanny::Util->getCertInfoHash(%{$keystore->{CERT}});
+            CertNanny::Logging->printout("  Subject:                  \n");
+            CertNanny::Logging->printout("  Subject alternative name: \n");
+            CertNanny::Logging->printout("  Fingerprint:              \n");
+            CertNanny::Logging->printout("  Validity from:            \n");
+            CertNanny::Logging->printout("  Validity to:              \n");
+            CertNanny::Logging->printout("  Serial:                   \n");
+            CertNanny::Logging->printout("  Location:                 \n");
+            CertNanny::Logging->printout("  Type:                     \n");
+          }
         }
       }
     }
