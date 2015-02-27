@@ -653,14 +653,14 @@ sub do_dump {
           $keystore->{CERT} = $instance->getCert();
           if (defined($keystore->{CERT})) {
             $keystore->{CERT}->{CERTINFO} = CertNanny::Util->getCertInfoHash(%{$keystore->{CERT}});
-            CertNanny::Logging->printout("  Subject:                  \n");
-            CertNanny::Logging->printout("  Subject alternative name: \n");
-            CertNanny::Logging->printout("  Fingerprint:              \n");
-            CertNanny::Logging->printout("  Validity from:            \n");
-            CertNanny::Logging->printout("  Validity to:              \n");
-            CertNanny::Logging->printout("  Serial:                   \n");
-            CertNanny::Logging->printout("  Location:                 \n");
-            CertNanny::Logging->printout("  Type:                     \n");
+            CertNanny::Logging->printout("  Subject:                  $keystore->{CERT}->{CERTINFO}->{'SubjectName'}\n");
+            CertNanny::Logging->printout("  Subject alternative name: $keystore->{CERT}->{CERTINFO}->{'SubjectAlternativeName'}\n");
+            CertNanny::Logging->printout("  Fingerprint:              $keystore->{CERT}->{CERTINFO}->{'CertificateFingerprint'}\n");
+            CertNanny::Logging->printout("  Validity from:            $keystore->{CERT}->{CERTINFO}->{'NotBefore'}\n");
+            CertNanny::Logging->printout("  Validity to:              $keystore->{CERT}->{CERTINFO}->{'NotAfter'}\n");
+            CertNanny::Logging->printout("  Serial:                   $keystore->{CERT}->{CERTINFO}->{'SerialNumber'}\n");
+            CertNanny::Logging->printout("  Location:                 $options->{ENTRY}->{'location'}\n");
+            CertNanny::Logging->printout("  Type:                     $options->{ENTRY}->{'type'}\n");
           }
         }
       }
