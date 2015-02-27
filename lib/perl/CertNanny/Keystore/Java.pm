@@ -45,17 +45,28 @@ sub new {
   my $entryname = $options->{ENTRYNAME};
   my $config    = $options->{CONFIG};
 
+  my @cmd;
+  my @keys;
+
   # Needs at least
   #  - Keytool executable
   #  - Java executable
   #  - location
   #  - pin
-  $options->{keytool} = $config->get('cmd.keytool', 'FILE');
-  croak "cmd.keytool not found" unless (defined $options->{keytool} and -x $options->{keytool});
+  $options->{keytool} = $config->get('cmd.keytool', 'CMD');
+  croak "cmd.keytool not found" unless (defined $options->{keytool});
   
-  $options->{java}   = $config->get('cmd.java', 'FILE');
+  @cmd = (qq("$options->{keytool}"), "2>&1");
+  @keys = CertNanny::Util->runCommand(\@cmd, WANTOUT => 1);
+  my $rightKeytoolVersion = 0;
+  foreach (@keys) {
+    $rightKeytoolVersion |= $_ =~ /-importkeystore/;
+  }  
+  croak "Wrong keytool version (<=1.5cmd): $options->{keytool}" unless $rightKeytoolVersion;
+  
+  $options->{java}   = $config->get('cmd.java', 'CMD');
   $options->{java} ||= File::Spec->catfile($ENV{JAVA_HOME}, 'bin', 'java') if (defined $ENV{JAVA_HOME});
-  croak "cmd.java not found in config and JAVA_HOME not set"  unless (defined $options->{java} && -x $options->{java});
+  croak "cmd.java not found in config and JAVA_HOME not set"  unless (defined $options->{java});
 
   if (!defined $entry->{location}) {
     croak("keystore.$entryname.location not defined");
@@ -91,11 +102,8 @@ sub new {
   
   # optional alias defaults to first key
   if (!defined $entry->{alias}) {
-    my @cmd = $self->_buildKeytoolCmd($entry->{location}, '-list');
-    # CertNanny::Logging->debug("Execute: " . CertNanny::Util->hidePin(join(' ', @cmd)));
-    # my @keys = `@cmd`;
-    # Todo pgk: Testen hidePin, runCommand
-    my @keys = CertNanny::Util->runCommand(\@cmd, WANTOUT => 1);
+    @cmd = $self->_buildKeytoolCmd($entry->{location}, '-list');
+    @keys = CertNanny::Util->runCommand(\@cmd, WANTOUT => 1);
     @keys = grep m{, keyEntry,$}, @keys;
     if ($?) {
       croak("keystore $entry->{location} cannot be listed");
@@ -130,7 +138,7 @@ sub new {
 
   # RETRIEVE AND STORE STATE
   # get previous renewal status
-  $self->k_retrieveState($entry->{selfhealing} || -1) || return undef;
+  $self->k_retrieveState() || return undef;
 
   # check if we can write to the file
   $self->k_storeState()    || croak "Could not write state file $self->{STATE}->{FILE}";
@@ -198,10 +206,6 @@ sub getCert {
     }
     if (!$rc) {
       my @cmd = $self->_buildKeytoolCmd($args{CERTFILE}, '-export', '-rfc', -alias => qq{"$entry->{alias}"});
-      # CertNanny::Logging->debug("Execute: " . join(' ', hidepin(@cmd)));
-      # Todo pgk: Testen hidePin
-      #CertNanny::Logging->debug("Execute: " . CertNanny::Util->hidePin(join(' ', @cmd)));
-      #$certData = `@cmd`;
       $certData = CertNanny::Util->runCommand(\@cmd, WANTOUT => 1, HIDEPWD => 1);
       if ($? || !defined $certData) {
         chomp($certData);
@@ -404,7 +408,7 @@ sub getKey {
     }
     unlink($tmpKeystore);
     
-    my $openssl = $config->get('cmd.openssl', 'FILE');
+    my $openssl = $config->get('cmd.openssl', 'CMD');
     if (!defined $openssl) {
       $rc = CertNanny::Logging->error("No openssl shell specified");
     }
@@ -649,8 +653,6 @@ sub generateKey {
   push(@cmd, '-list');
   
   @cmd = $self->_buildKeytoolCmd($location, @cmd);
-  # CertNanny::Logging->debug("Execute: " . join(' ', hidepin(@cmd)));
-  # Todo pgk: Testen hidePin
   if (CertNanny::Util->runCommand(\@cmd, HIDEPWD => 1) != 0) {
     # we need to generate a new one since we don't already have one
     CertNanny::Logging->info("generateKey(): Creating new key with alias $newalias and keysize $bits");
@@ -669,8 +671,6 @@ sub generateKey {
      
 
     @cmd = $self->_buildKeytoolCmd($location, @cmd);
-    # CertNanny::Logging->debug("Execute: " . join(' ', hidepin(@cmd)));
-    # Todo pgk: Testen hidePin
     if (CertNanny::Util->runCommand(\@cmd, HIDEPWD => 1) != 0) {
       CertNanny::Logging->error("generateKey(): Could not create the new key, see above output for details");
       return undef;
@@ -1007,8 +1007,6 @@ sub _importCert {
   my @cmd = $self->_buildKeytoolCmd($location, '-import', '-noprompt', -alias => qq{"$alias"}, -file => qq{"$certfile"});
   CertNanny::Logging->info("Importing certificate with alias $alias");
   
-  # CertNanny::Logging->debug("Execute: " . join(' ', hidepin(@cmd)));
-  # Todo pgk: Testen hidePin
   if (CertNanny::Util->runCommand(\@cmd, HIDEPWD => 1) == 0) {
     return 1;
   } else {
@@ -1029,8 +1027,6 @@ sub _changeAlias {
   push(@cmd, qq{"$destalias"});
   @cmd = $self->_buildKeytoolCmd($location, @cmd);
   
-  # CertNanny::Logging->debug("Execute: " . join(' ', hidepin(@cmd)));
-  # Todo pgk: Testen hidePin
   if (CertNanny::Util->runCommand(\@cmd, HIDEPWD => 1) != 0) {
     CertNanny::Logging->error("Could not change alias from $alias to $destalias");
     return undef;

@@ -104,11 +104,8 @@ sub new {
     } ## end foreach my $format (qw(FORMAT KEYFORMAT CACERTFORMAT ROOTCACERTFORMAT))
 
     # Keytype defaults to OpenSSL; valid is OpenSSL or PKCS8
-    
     $self->{KEYTYPE} = $entry->{key}->{type} || 'OpenSSL';
-    
 
-    
     if ($self->{KEYTYPE} !~ m{ \A (?: OpenSSL | PKCS8 ) \z }xms) {
       croak("Incorrect keystore type $self->{KEYTYPE}");
       return undef;
@@ -135,7 +132,7 @@ sub new {
       CertNanny::Logging->debug("Using HSM $hsmtype");
       eval "use CertNanny::HSM::$hsmtype";
       if ($@) {
-        print STDERR $@;
+        CertNanny::Logging->printerr($@);
         return undef;
       }
       eval "\$self->{HSM} = CertNanny::HSM::$hsmtype->new(\$entry, \$config, \$entryname)";
@@ -168,7 +165,7 @@ sub new {
 
     # RETRIEVE AND STORE STATE
     # get previous renewal status
-    $self->k_retrieveState($entry->{selfhealing) || return undef;
+    $self->k_retrieveState() || return undef;
 
     # check if we can write to the file
     $self->k_storeState()    || croak "Could not write state file $self->{STATE}->{FILE}";
@@ -297,7 +294,6 @@ sub installCert {
   my $entryname = $options->{ENTRYNAME};
   my $config    = $options->{CONFIG};
 
-  # Todo pgk: {KEYFILE} or {key}->{file} ?
   my $keyfile = $self->{STATE}->{DATA}->{RENEWAL}->{REQUEST}->{KEYFILE};
   my $pin = $self->{PIN} || $entry->{key}->{pin} || "";
 
@@ -645,7 +641,7 @@ sub createRequest {
     my $pin = $self->{PIN} || $entry->{key}->{pin} || "";
     CertNanny::Logging->debug("Creating new CSR with native OpenSSL functionality.");
 
-    my $openssl = $config->get('cmd.openssl', 'FILE');
+    my $openssl = $config->get('cmd.openssl', 'CMD');
     if (!defined $openssl) {
       CertNanny::Logging->error("No openssl shell specified");
       return undef;
@@ -764,7 +760,6 @@ sub createRequest {
     #CertNanny::Logging->debug("The following configuration was written to $tmpconfigfile:\n" . CertNanny::Util->readFile($tmpconfigfile));
 
     # generate request
-    # Todo pgk: Testen runCommand
     my @cmd = (qq("$openssl"), 'req', '-config', qq("$tmpconfigfile"), '-new', '-sha1', '-out', qq("$result->{REQUESTFILE}"), '-key', qq("$result->{KEYFILE}"),);
     push(@cmd, ('-passin', 'env:PIN')) unless $pin eq "";
     push(@cmd, @engine_cmd);
@@ -814,7 +809,7 @@ sub selfSign {
   my $entryname = $options->{ENTRYNAME};
   my $config    = $options->{CONFIG};
 
-  my $openssl      = $config->get('cmd.openssl', 'FILE');
+  my $openssl      = $config->get('cmd.openssl', 'CMD');
   my $selfsigncert = $entryname . "-selfcert.pem";
   my $outfile      = File::Spec->catfile($entry->{statedir}, $selfsigncert);
   my $pin          = $self->{PIN} || $entry->{key}->{pin} || "";
@@ -951,7 +946,7 @@ sub generateKey {
     } else {
       CertNanny::Logging->debug("Generating a new key using native OpenSSL functionality.");
       # Todo pgk: Testen $config->get
-      my $openssl = $config->get('cmd.openssl', 'FILE');
+      my $openssl = $config->get('cmd.openssl', 'CMD');
       if (!defined $openssl) {
         $rc = CertNanny::Logging->error("No openssl shell specified");
       }
@@ -1054,7 +1049,7 @@ sub createPKCS12 {
   # return undef;
   #}
   
-  my $openssl = $config->get('cmd.openssl', 'FILE');
+  my $openssl = $config->get('cmd.openssl', 'CMD');
   if (!defined $openssl)                 {$rc = CertNanny::Logging->error("No openssl shell specified")}
   if (!$rc && !defined $args{FILENAME})  {$rc = CertNanny::Logging->error("createpks12(): No output file name specified")}
   if (!$rc && !defined $args{CERTFILE})  {$rc = CertNanny::Logging->error("createpks12(): No certificate file specified")}
@@ -1529,7 +1524,7 @@ sub _createLocalCerts {
     @certFileList = @{CertNanny::Util->fetchFileList($certSourceGlob)};
 
     # Test if it's a certificate or just rubbish
-    $cmdTemplate = '"' . $self->{OPTIONS}->{CONFIG}->get('cmd.openssl', 'FILE') . '" x509 -subject_hash -subject_hash_old -noout -in "%s"';
+    $cmdTemplate = '"' . $self->{OPTIONS}->{CONFIG}->get('cmd.openssl', 'CMD') . '" x509 -subject_hash -subject_hash_old -noout -in "%s"';
 
     foreach $certFile (@certFileList) {
       chomp(@subject_hashs = CertNanny::Util->runCommand(sprintf($cmdTemplate, $certFile), WANTOUT => 1));

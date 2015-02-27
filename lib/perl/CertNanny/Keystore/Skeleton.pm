@@ -148,7 +148,7 @@ sub new {
 
   # RETRIEVE AND STORE STATE
   # get previous renewal status
-  $self->k_retrieveState($entry->{selfhealing) || return undef;
+  $self->k_retrieveState() || return undef;
 
   # check if we can write to the file
   $self->k_storeState()    || croak "Could not write state file $self->{STATE}->{FILE}";
@@ -391,7 +391,7 @@ sub selfSign {
   my $entryname = $options->{ENTRYNAME};
   my $config    = $options->{CONFIG};
 
-  my $openssl      = $config->get('cmd.openssl', 'FILE');
+  my $openssl      = $config->get('cmd.openssl', 'CMD');
   my $selfsigncert = $entryname . "-selfcert.pem";
   my $outfile      = File::Spec->catfile($entry->{statedir}, $selfsigncert);
   my $pin          = $self->{PIN} || $entry->{key}->{pin} || "";
@@ -443,7 +443,6 @@ sub selfSign {
   CertNanny::Logging->debug("The following configuration was written to $tmpconfigfile:\n" . CertNanny::Util->readFile($tmpconfigfile));
 
   # generate request
-  # Todo pgk: Testen runCommand
   my @cmd = (qq("$openssl"), 'req', '-config', qq("$tmpconfigfile"), '-x509', '-new', '-sha1', '-out', qq("$outfile"), '-key', qq("$entry->{keyfile}"),);
 
   push(@cmd, ('-passin', 'env:PIN')) unless $pin eq "";
@@ -555,7 +554,7 @@ sub _createPKCS12 {
     return undef;
   }
   
-  my $openssl = $config->get('cmd.openssl', 'FILE');
+  my $openssl = $config->get('cmd.openssl', 'CMD');
   if (!defined $openssl) {
     CertNanny::Logging->error("No openssl shell specified");
     return undef;
@@ -598,7 +597,6 @@ sub _createPKCS12 {
   if ($args{CERTFORMAT} eq "DER") {
     $certfile = CertNanny::Util->getTmpFile();
 
-    # Todo pgk: Testen runCommand
     @cmd = (qq("$openssl"), 'x509', '-in', qq("$args{CERTFILE}"), '-inform', qq("$args{CERTFORMAT}"), '-out', qq("$certfile"), '-outform', 'PEM',);
     if (CertNanny::Util->runCommand(\@cmd) != 0) {
       CertNanny::Logging->error("Certificate format conversion failed");

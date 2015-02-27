@@ -53,19 +53,17 @@ sub new {
   # get keystore PIN
   $self->{PIN} = $self->_unStash($entry->{location} . ".sth");
 
-  $options->{gsk6cmd} = $config->get('cmd.gsk6cmd', 'FILE');
-  $options->{gskcmd} = $config->get('cmd.gskcmd', 'FILE');
+  $options->{gsk6cmd} = $config->get('cmd.gsk6cmd', 'CMD');
+  $options->{gskcmd} = $config->get('cmd.gskcmd', 'CMD');
 
 if(defined $options->{gsk6cmd}){
- 
-
   # on certain platforms we need cannot find the location of the
   #   GSKit library directory ourselves, in this case it must be configured.
   $options->{gsklibdir} = $config->get('path.gsklib', 'FILE');
   $options->{gsklibdir} = undef if ($options->{gsklibdir} eq '');
   croak "gsk6cmd not found" unless (defined $options->{gsk6cmd} and -x $options->{gsk6cmd});
 
-  $options->{JAVA} = $config->get('cmd.java', 'FILE');
+  $options->{JAVA} = $config->get('cmd.java', 'CMD');
   if (defined $ENV{JAVA_HOME}) {
     $options->{JAVA} ||= File::Spec->catfile($ENV{JAVA_HOME}, 'bin', 'java');
   }
@@ -92,7 +90,7 @@ if(defined $options->{gsk6cmd}){
 
   # RETRIEVE AND STORE STATE
   # get previous renewal status
-  $self->k_retrieveState($entry->{selfhealing} || -1) || return undef;
+  $self->k_retrieveState() || return undef;
 
   # check if we can write to the file
   $self->k_storeState()    || croak "Could not write state file $self->{STATE}->{FILE}";
@@ -250,7 +248,6 @@ sub installCert {
     CertNanny::Logging->info("Creating MQ keystore (via PKCS#12)");
 
     # create prototype PKCS#12 file
-    # Todo pgk: {KEYFILE} oder {key}->{file}
     my $keyfile  = $self->{STATE}->{DATA}->{RENEWAL}->{REQUEST}->{KEYFILE};
     my $certfile = $args{CERTFILE};
     my $label    = $self->{CERT}->{LABEL};
@@ -605,7 +602,7 @@ sub getKey {
       return undef;
     }
   
-    my $openssl = $config->get('cmd.openssl', 'FILE');
+    my $openssl = $config->get('cmd.openssl', 'CMD');
     if (!defined $openssl) {
       CertNanny::Logging->error("No openssl shell specified");
       return undef;
@@ -1212,7 +1209,7 @@ sub _buildGskCmd {
   push(@cmd, -format    => qq("$entry->{format}"))    if ($entry->{format});
   push(@cmd, @_);
   @cmd;
-} ## end sub _buildKeytoolCmd
+}
 
 
 sub _getIBMJavaEnvironment {

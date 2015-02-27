@@ -52,8 +52,9 @@ sub new {
     my $self = {};
     bless $self, $class;
     $INSTANCE = $self;
-
+    CertNanny::Logging->info("============================================================");
     CertNanny::Logging->info("CertNanny Version $VERSION Command(s) " . join('|', @ARGV));
+    CertNanny::Logging->info("============================================================");
     
     # Store singleton objects in CertNanny
     $self->{CONFIG}  = CertNanny::Config->getInstance(%args); return undef unless defined $self->{CONFIG};
@@ -61,10 +62,9 @@ sub new {
     $self->{LOGGING} = CertNanny::Logging->getInstance(CONFIG => $self->{CONFIG});
 
     use Config;
-    use Perl::OSType ':all';
     use Sys::Hostname;
 
-    CertNanny::Logging->info("CertNanny running on " . os_type() . " ($Config{myuname}) under Perl $Config{version}");
+    CertNanny::Logging->info("CertNanny running on " . CertNanny::Util->os_type() . " ($Config{myuname}) under Perl $Config{version}");
     
     # set default library path
     my @dirs = File::Spec->splitdir($FindBin::Bin);
@@ -85,12 +85,6 @@ sub new {
     }
 
     $self->{ITEMS} = ${$self->{CONFIG}->getRef("keystore", 'ref')};
-
-    if (!defined $self->{ITEMS}) {
-      # fall back to legacy configuration (backward compatibility to
-      # CertMonitor)
-      $self->{ITEMS} = ${$self->{CONFIG}->getRef("certmonitor", 'ref')};
-    }
     delete $self->{ITEMS}->{DEFAULT};
   }
   return $INSTANCE;
@@ -99,8 +93,6 @@ sub new {
 
 sub DESTROY {
   # Windows apparently flushes file handles on close() and ignores autoflush...
-  close STDOUT;
-  close STDERR;
   $INSTANCE = undef;
 }
 
@@ -109,29 +101,30 @@ sub _iterate_entries {
   my $self   = (shift)->getInstance();
   my $action = shift;
 
-  my $loglevel = $self->{CONFIG}->get('loglevel') || 3;
+  my $loglevel = $self->{CONFIG}->get('log.level') || 3;
 
-  foreach my $entryName (keys %{$self->{ITEMS}}) {    # Instantiate every keystore, that is configured
-    CertNanny::Logging->debug("Checking keystore $entryName");
+  foreach my $entryname (keys %{$self->{ITEMS}}) {    # Instantiate every keystore, that is configured
+    CertNanny::Logging->debug("Checking keystore $entryname");
     my $keystore = CertNanny::Keystore->new(CONFIG    => $self->{CONFIG},              # give it the whole configuration
-                                            ENTRY     => $self->{ITEMS}->{$entryName}, # all keystore parameters from configfile
-                                            ENTRYNAME => $entryName);                  # and the keystore name from configfile
+                                            ENTRY     => $self->{ITEMS}->{$entryname}, # all keystore parameters from configfile
+                                            ENTRYNAME => $entryname);                  # and the keystore name from configfile
+    # Keystore exists -> normal Operation
     if ($keystore) {
-      $self->$action(ENTRYNAME => $entryName,
+      $self->$action(ENTRYNAME => $entryname,
                      KEYSTORE  => $keystore);
     } else {
-      CertNanny::Logging->error("Could not instantiate keystore $entryName");
+      # Keystore does not exists -> create new Keystore (enroll) no matter wether we did a renew or an enroll
+      CertNanny::Logging->error("Could not instantiate keystore $entryname");
       if ($action eq 'do_renew' or $action eq 'do_enroll') {
         CertNanny::Logging->info("Check for initial enrollment configuration.");
-        if ($self->{ITEMS}->{$entryName}->{initialenroll}->{auth}) {
-          CertNanny::Logging->info("Found initial enrollment configuration for " . $self->{ITEMS}->{$entryName}->{initialenroll}->{subject});
-          $self->do_enroll(ENTRY     => $self->{ITEMS}->{$entryName},
-                           ENTRYNAME => $entryName);
+        if ($self->{ITEMS}->{$entryname}->{initialenroll}->{auth}) {
+          CertNanny::Logging->info("Found initial enrollment configuration for " . $self->{ITEMS}->{$entryname}->{initialenroll}->{subject});
+          $self->do_enroll(ENTRY     => $self->{ITEMS}->{$entryname},
+                           ENTRYNAME => $entryname);
         }
       } ## end if ($action eq ' renew'...)
     } ## end else [ if ($keystore) ]
-   ## print "\n\n";
-  } ## end foreach my $entryName (keys %{$self...})
+  } ## end foreach my $entryname (keys %{$self...})
 
   return 1;
 } ## end sub _iterate_entries
@@ -149,10 +142,25 @@ sub setOption {
   my $key   = shift;
   my $value = shift;
 
-  $self->{$key} = $value;
+  $self->{OPTION}->{$key} = $value;
 
   CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "Key: $key  Value: $value");
   return 1;
+} ## end sub setOption
+
+
+sub getOption {
+  # CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3]);
+  my $self  = (shift)->getInstance();
+  my $key   = shift;
+
+  my $value;
+  if (defined($self->{OPTION}->{$key}) && ($self->{OPTION}->{$key} ne '')) {
+    $value = $self->{OPTION}->{$key};
+  }
+  
+  # CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "Key: $key  Value:", defined($value) ? $value : "undefined");
+  return $value;
 } ## end sub setOption
 
 
@@ -160,18 +168,25 @@ sub AUTOLOAD {
   my $self = (shift)->getInstance();
   my $attr = $AUTOLOAD;
   $attr =~ s/.*:://;
-  #print "atrt: " .  $attr ;
   return undef if $attr eq 'DESTROY';
 
   # automagically call
-  # Possible actions commandline options
-  if ($attr =~ /^(?:cfgdump|datadump|test)$/) {
-  #   print "atrt: " .  $attr ;
+  # Possible actions
+  #  do_check
+  #  do_renew
+  #  do_enroll
+  #  do_cleanup
+  #  do_updateRootCA
+  #  do_dump
+  #  do_executeHook
+  
+  #?do_sync
+  
+  if ($attr =~ /^(?:dump|test)$/) {
     my $action = "do_$attr";
     return $self->$action();
   }
-  if ($attr =~ /^(?:info|enroll|check|renew|sync|updateRootCA)$/) {
-  #   print "atrt: " .  $attr ;
+  if ($attr =~ /^(?:check|renew|enroll|cleanup|updateRootCA|executeHook)$/) {
     return $self->_iterate_entries("do_$attr");
   }
 } ## end sub AUTOLOAD
@@ -254,7 +269,7 @@ sub do_enroll {
       $entry->{certreq}       = $save{certreq}    if (exists $save{certreq});
 
       #reset the keystore configuration after the inital enrollment back to the .cfg file specified settings including engine
-      # $self->{ITEMS}->{$entryname} = $conf->{CONFIG}->{certmonitor}->{$entryname};
+      # $self->{ITEMS}->{$entryname} = $conf->{CONFIG}->{keystore}->{$entryname};
 
       # $conf->{CONFIG}->{ENTRY}->{INITIALENROLLEMNT} = 'yes';
       # $self->{CONFIG} = CertNanny::Config->popConf();
@@ -265,7 +280,7 @@ sub do_enroll {
                                                  ENTRYNAME => $entryname);
 
       if ($newkeystore) {
-        if (!$newkeystore->{INSTANCE}->k_retrieveState($entry->{selfhealing} || -1)) {
+        if (!$newkeystore->{INSTANCE}->k_retrieveState()) {
           CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "Enrollment");
           return undef;
         }
@@ -341,15 +356,13 @@ sub do_enroll {
       my $keystore = CertNanny::Keystore->new(CONFIG    => $self->{CONFIG},
                                               ENTRY     => $self->{ITEMS}->{$entryname},
                                               ENTRYNAME => $entryname);
-      $keystore->{INSTANCE}->k_retrieveState($entry->{selfhealing} || -1) || croak "Could not write state file $keystore->{STATE}->{FILE}";
+      $keystore->{INSTANCE}->k_retrieveState() || croak "Could not write state file $keystore->{STATE}->{FILE}";
       $keystore->{INSTANCE}->{ENTRY}->{INITIALENROLLEMNT} = 'yes';
 
       if ($self->{ITEMS}->{$entryname}->{initialenroll}->{auth}->{mode} eq 'password') {
         if (!defined $keystore->{INSTANCE}->{OPTIONS}->{ENTRY}->{initialenroll}->{auth}->{challengepassword}) {
           CertNanny::Logging->debug('Using commandline argument challangePassword for initial enrollment');
-          if (exists $self->{globalchallengepassword} && $self->{globalchallengepassword} ne '') {
-            $keystore->{INSTANCE}->{OPTIONS}->{ENTRY}->{initialenroll}->{auth}->{challengepassword} = $self->{globalchallengepassword};
-          }
+          $keystore->{INSTANCE}->{OPTIONS}->{ENTRY}->{initialenroll}->{auth}->{challengepassword} = $self->getOption('challengepassword');
         } ## end if (!defined $newkeystore...)
       } ## end if ($self->{ITEMS}->{$entryname...})
       
@@ -442,7 +455,7 @@ sub do_enroll {
         $entry->{certreq}       = $save{certreq}    if (exists $save{certreq});
     
         #reset the keystore configuration after the inital enrollment back to the .cfg file specified settings including engine
-        # $self->{ITEMS}->{$entryname} = $conf->{CONFIG}->{certmonitor}->{$entryname};
+        # $self->{ITEMS}->{$entryname} = $conf->{CONFIG}->{keystore}->{$entryname};
 
         # $conf->{CONFIG}->{ENTRY}->{INITIALENROLLEMNT} = 'yes';
         # $self->{CONFIG} = CertNanny::Config->popConf();
@@ -470,89 +483,196 @@ sub do_enroll {
 } ## end sub do_enroll
 
 
+sub do_cleanup {
+  CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "CleanUp");
+  my $self = (shift)->getInstance();
+  my %args = (@_);
+
+  my $keystore  = $args{KEYSTORE};
+  my $instance  = $keystore->{INSTANCE};
+  my $options   = $instance->{OPTIONS};
+  my $entryname = $options->{ENTRYNAME};
+  my $config    = $options->{CONFIG};
+
+  my $myKeystore  = $self->getOption('keystore');
+  if (!defined($myKeystore) || ($myKeystore eq $entryname)) {
+    $instance->k_checkclearState(1);
+  }
+
+  CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "CleanUp");
+  return 1;
+} ## end sub do_info
+
+
 sub do_info {
   CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "Info");
   my $self = (shift)->getInstance();
   my %args = (@_);
 
-  my $keystore = $args{KEYSTORE};
-  my $instance = $keystore->{INSTANCE};
+  my $keystore  = $args{KEYSTORE};
+  my $instance  = $keystore->{INSTANCE};
   my $options   = $instance->{OPTIONS};
   my $entryname = $options->{ENTRYNAME};
   my $config    = $options->{CONFIG};
 
   my $info = $instance->k_getInfo("SubjectName", "NotAfter");
-  print Dumper $info;
+  CertNanny::Logging->printout(Dumper $info);
 
   CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "Info");
   return 1;
 } ## end sub do_info
 
 
-sub do_cfgdump {
-  CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "Configuration Dump");
+sub do_executeHook {
+  CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "Info");
+  my $self = (shift)->getInstance();
+  my %args = (@_);
+
+  my $keystore  = $args{KEYSTORE};
+  my $instance  = $keystore->{INSTANCE};
+  my $options   = $instance->{OPTIONS};
+  my $entryname = $options->{ENTRYNAME};
+  my $config    = $options->{CONFIG};
+
+  my $myKeystore  = $self->getOption('keystore');
+  if (!defined($myKeystore) || ($myKeystore eq $entryname)) {
+    my $hook        = $self->getOption('hook');
+    my $definitions = $self->getOption('define');
+    my %args;
+    foreach (@{$definitions}) {
+      (my $key, my $value) = split('=');
+      $args{$key} = $value;
+    }
+  
+    if ($hook) {
+      my $hookdef = "keystore.$entryname.hook.$hook";
+      my $hookcmd = $config->get($hookdef);
+      if ($hookcmd) {
+        CertNanny::Logging->printout("Executing hook <$hookdef> with command <$hookcmd>\n");
+        $keystore->k_executeHook($hookcmd, %args);
+      } else {
+        CertNanny::Logging->printout("No command defined for hook <$hookdef>\n");
+      }
+    } else {
+      CertNanny::Logging->printout("No hook specified for execHook\n");
+    }
+  }
+  
+  CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "Info");
+  return 1;
+} ## end sub do_info
+
+
+sub _dumpValue {
+  my $self = shift;
+  my $cref = shift;
+  my $aref = shift;
+
+  # First handle all values
+  foreach my $key (sort {lc($a) cmp lc($b)} keys %{$cref}) {
+    if (ref($cref->{$key}) ne "HASH") {
+      next if ($key eq 'INHERIT');                  # We do not dump this INHERIT stuff since it does give no information
+      my $name  = '  ' x ($#$aref + 1) . $key . ' = ';
+      my $value = $name =~ /(pin|pw|target_pw|storepass|keypass|srcstorepass|deststorepass|srckeypass|destkeypass)/ ? "*HIDDEN*" : $cref->{$key};
+      my $fillup = ' ' x (100 - length($name) - length($value));
+      CertNanny::Logging->printout($name . $fillup . $value . "\n");
+    }
+  }
+  # Then handle all HASHs
+  # no $self->{keystore}              : print all
+  foreach my $key (sort {lc($a) cmp lc($b)} keys %{$cref}) {
+    if (ref($cref->{$key}) eq "HASH") {
+      my $target = $self->getOption('keystore');
+      next if (!defined($$aref[0]) && 
+               ($key eq 'keystore') && (uc($target) eq 'COMMON')); # print all but the keystores
+      next if (defined($$aref[0]) && !defined($$aref[1]) && $target &&
+              ($$aref[0] eq 'keystore') && ($key ne $target)); # $self->{keystore} = <keystore>: print all but the keystores plus <keystore>
+      push(@$aref, $key);
+      CertNanny::Logging->printout('  ' x $#$aref . "$key Start\n");
+      $self->_dumpValue(\%{$cref->{$key}}, $aref);
+      CertNanny::Logging->printout('  ' x $#$aref . "$key End\n");
+      pop(@$aref);
+    }
+  }
+}
+
+
+sub do_dump {
+  CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "Dump");
   my $self = (shift)->getInstance();
   my %args = (@_);
 
   my $config    = $self->{CONFIG};
 
-  foreach my $configFileName (keys %{$config->{CONFIGFILES}}) {
-    print "File: <$configFileName> SHA1: $config->{CONFIGFILES}->{$configFileName}->{SHA}\n";
-    while ((my $lnr, my $content) = each %{$config->{CONFIGFILES}->{$configFileName}->{CONTENT}}) {
-      printf("Line: %3s Content: <%s>\n", $lnr, $content);
+  if ($self->{OPTION}->{object} eq 'data') {
+    my @hashname;
+    $self->_dumpValue(\%{$config->{CONFIG}}, \@hashname);
+  } elsif ($self->{OPTION}->{object} eq 'cfg') {
+    foreach my $configFileName (sort {lc($a) cmp lc($b)} keys %{$config->{CONFIGFILES}}) {
+      CertNanny::Logging->printout("File: <$configFileName> SHA1: $config->{CONFIGFILES}->{$configFileName}->{SHA}\n");
+      foreach my $lnr (sort {lc($a) <=> lc($b)} keys %{$config->{CONFIGFILES}->{$configFileName}->{CONTENT}}) {
+        my $content = $config->{CONFIGFILES}->{$configFileName}->{CONTENT}->{$lnr};
+        my $name = (split('=', $content))[0];
+        if ($name =~ /(pin|pw|target_pw|storepass|keypass|srcstorepass|deststorepass|srckeypass|destkeypass)/) {
+          $content = "${name}= *HIDDEN*";
+        }
+        CertNanny::Logging->printout(sprintf("Line: %3s Content: <%s>\n", $lnr, $content));
+      }
+      CertNanny::Logging->printout("\n");
     }
-    print "\n";
+  } elsif ($self->{OPTION}->{object} eq 'keystores') {
+    my @keystores = (sort {lc($a) cmp lc($b)} keys(%{$config->{CONFIG}->{'keystore'}}));
+    foreach my $keystore (@keystores) {
+      CertNanny::Logging->printout("Keystore $keystore:\n");
+      foreach my $configFileName (keys %{$config->{CONFIGFILES}}) {
+        foreach my $cfgFileKeystore (@{$config->{CONFIGFILES}->{$configFileName}->{KEYSTORE}}) {
+          if ($keystore eq $cfgFileKeystore) {
+            CertNanny::Logging->printout("  File: <$configFileName> SHA1: $config->{CONFIGFILES}->{$configFileName}->{SHA}\n");
+          }
+        }
+      }
+    }
+  } elsif ($self->{OPTION}->{object} =~ /cert.*/) {
+    my @keystores = (sort {lc($a) cmp lc($b)} keys(%{$config->{CONFIG}->{'keystore'}}));
+    foreach my $keystore (@keystores) {
+      CertNanny::Logging->printout("Keystore $keystore:\n");
+      foreach my $configFileName (keys %{$config->{CONFIGFILES}}) {
+        foreach my $cfgFileKeystore (@{$config->{CONFIGFILES}->{$configFileName}->{KEYSTORE}}) {
+          if ($keystore eq $cfgFileKeystore) {
+            CertNanny::Logging->printout("  File: <$configFileName> SHA1: $config->{CONFIGFILES}->{$configFileName}->{SHA}\n");
+          }
+        }
+      }
+      my $keystore = CertNanny::Keystore->new(CONFIG    => $self->{CONFIG},             # give it the whole configuration
+                                              ENTRY     => $self->{ITEMS}->{$keystore}, # all keystore parameters from configfile
+                                              ENTRYNAME => $keystore);                  # and the keystore name from configfile
+      if ($keystore) {
+        my $instance  = $keystore->{INSTANCE};
+        my $options   = $instance->{OPTIONS};
+        if ($options->{ENTRY}->{'location'} ne 'rootonly') {
+          $keystore->{CERT} = $instance->getCert();
+          if (defined($keystore->{CERT})) {
+            $keystore->{CERT}->{CERTINFO} = CertNanny::Util->getCertInfoHash(%{$keystore->{CERT}});
+            CertNanny::Logging->printout("  Subject:                  \n");
+            CertNanny::Logging->printout("  Subject alternative name: \n");
+            CertNanny::Logging->printout("  Fingerprint:              \n");
+            CertNanny::Logging->printout("  Validity from:            \n");
+            CertNanny::Logging->printout("  Validity to:              \n");
+            CertNanny::Logging->printout("  Serial:                   \n");
+            CertNanny::Logging->printout("  Location:                 \n");
+            CertNanny::Logging->printout("  Type:                     \n");
+          }
+        }
+      }
+    }
+  } else {
+    CertNanny::Logging->switchConsoleErr('STATUS', 1);
+    CertNanny::Logging->printerr("Missing Argument: --object cfg|data   specifies the object to be dumped\n");
   }
   
-  CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "Configuration Dump");
+  CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "Dump");
   return 1;
 } ## end sub do_cfgdump
-
-
-sub do_datadump {
-  CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "Data Dump");
-  my $self = (shift)->getInstance();
-  my %args = (@_);
-
-  my $config    = $self->{CONFIG};
-  
-  my @hashname;
-  sub _dumpValue {
-    my $href = shift;
-
-    # First handle all values
-    foreach my $key (sort {lc($a) cmp lc($b)} keys %{$href}) {
-      if (ref($href->{$key}) ne "HASH") {
-        next if ($key eq 'INHERIT');                  # We do not dump this INHERIT stuff since it does give no information
-        my $dummy = '  ' x ($#hashname + 1) . $key . ' = ';
-        my $fillup = ' ' x (100 - length($dummy) - length($href->{$key}));
-        print($dummy . $fillup . $href->{$key} . "\n");
-      }
-    }
-    # Then handle all HASHs
-    # no $self->{keystore}              : print all
-    foreach my $key (sort {lc($a) cmp lc($b)} keys %{$href}) {
-      if (ref($href->{$key}) eq "HASH") {
-        next if (!defined($hashname[0]) && ($key eq 'certmonitor'));         # certmonitor is depricated:      don't print
-        next if (!defined($hashname[0]) && ($key eq 'keystore') && 
-                (uc($self->{keystore}) eq 'COMMON'));                        # $self->{keystore} = common:     print all but the keystores
-        next if (defined($hashname[0]) && ($hashname[0] eq 'keystore') && 
-                ($self->{keystore} ne '') && 
-                !defined($hashname[1]) && ($key ne $self->{keystore}));      # $self->{keystore} = <keystore>: print all but the keystores plus <keystore>
-        push(@hashname, $key);
-        print('  ' x $#hashname . "$key Start\n");
-        _dumpValue(\%{$href->{$key}});
-        print('  ' x $#hashname . "$key End\n");
-        pop(@hashname);
-      }
-    }
-  }
-
-  _dumpValue(\%{$config->{CONFIG}});
-
-  CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "Data Dump");
-  return 1;
-} ## end sub do_datadump
 
 
 sub do_check {
@@ -560,8 +680,8 @@ sub do_check {
   my $self = (shift)->getInstance();
   my %args = (@_);
 
-  my $keystore = $args{KEYSTORE};
-  my $instance = $keystore->{INSTANCE};
+  my $keystore  = $args{KEYSTORE};
+  my $instance  = $keystore->{INSTANCE};
   my $options   = $instance->{OPTIONS};
   my $entryname = $options->{ENTRYNAME};
   my $config    = $options->{CONFIG};
@@ -611,8 +731,8 @@ sub do_renew {
   my $self   = (shift)->getInstance();
   my %args = (@_);
 
-  my $keystore = $args{KEYSTORE};
-  my $instance = $keystore->{INSTANCE};
+  my $keystore  = $args{KEYSTORE};
+  my $instance  = $keystore->{INSTANCE};
   my $options   = $instance->{OPTIONS};
   my $entryname = $options->{ENTRYNAME};
   my $config    = $options->{CONFIG};
@@ -647,7 +767,7 @@ sub do_renew {
       CertNanny::Util->backoffTime($self->{CONFIG});
       $instance->k_renew();
     } else {
-      if ($self->{force}) {
+      if ($self->getOption('force')) {
         CertNanny::Logging->debug("Renewal forced (Certificate is still valid for more than $self->{ITEMS}->{ $entryname }->{warnexpiry_days} days)");
         # schedule automatic renewal
         CertNanny::Util->backoffTime($self->{CONFIG});
@@ -658,7 +778,7 @@ sub do_renew {
     }
 
     if (!$instance->k_checkValidity($self->{ITEMS}->{$entryname}->{warnexpiry_days})) {
-      if ($self->{force}) {
+      if ($self->getOption('force')) {
         CertNanny::Logging->notice("Renewal forced (Certificate is valid for less than $self->{ITEMS}->{ $entryname }->{warnexpiry_days} days)");
       } else {
         CertNanny::Logging->notice("Certificate is valid for less than $self->{ITEMS}->{ $entryname }->{warnexpiry_days} days");
@@ -678,8 +798,8 @@ sub do_sync {
   my $self = (shift)->getInstance();
   my %args = (@_);
 
-  my $keystore = $args{KEYSTORE};
-  my $instance = $keystore->{INSTANCE};
+  my $keystore  = $args{KEYSTORE};
+  my $instance  = $keystore->{INSTANCE};
   my $options   = $instance->{OPTIONS};
   my $entryname = $options->{ENTRYNAME};
   my $config    = $options->{CONFIG};
@@ -718,7 +838,7 @@ sub do_test {
   # my $a1  = shift(@ARGV);
   # my $a2  = shift(@ARGV);
 
-  CertNanny::Logging->log2Console(); 
+  CertNanny::Logging->switchConsoleLog('STATUS', 1); 
   my $ret = $args{KEYSTORE}->{INSTANCE}->$cmd(@ARGV);
 
   CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "Test");
@@ -731,8 +851,8 @@ sub do_updateRootCA {
   my $self = (shift)->getInstance();
   my %args = (@_);
 
-  my $keystore = $args{KEYSTORE};
-  my $instance = $keystore->{INSTANCE};
+  my $keystore  = $args{KEYSTORE};
+  my $instance  = $keystore->{INSTANCE};
   my $options   = $instance->{OPTIONS};
   my $entryname = $options->{ENTRYNAME};
   my $config    = $options->{CONFIG};

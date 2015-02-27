@@ -28,10 +28,6 @@
 #
 # keystore.<instance>.<var>
 #
-#
-# Note: for backward compatibility with the old 'CertMonitor' release
-# it is also possible to use certmonitor.* instead of keystore.*
-#
 
 package CertNanny::Config;
 
@@ -77,7 +73,7 @@ sub new {
     $INSTANCE = $self;
     $INSTANCESTACKIDX = -1;
 
-    $self->{CONFIGFILE} = $args{CONFIG} || 'certnanny.cfg';
+    $self->{CONFIGFILE} = $args{config};
     $self->{CONFIGPATH} = (fileparse($self->{CONFIGFILE}))[1];
 
     CertNanny::Logging->info("CertNanny started with configfile <$self->{CONFIGFILE}>");
@@ -229,6 +225,7 @@ sub _get {
       return uc($value)                                         if ($mangle eq "UC");
       return lc($value)                                         if ($mangle eq "LC");
       return ucfirst($value)                                    if ($mangle eq "UCFIRST");
+      return undef                                              if ($mangle eq "CMD" && !-x $value);
       return $value;    # don't know how to handle this mangle option
     } ## end if ($value ne '')
   } ## end else [ if (!defined $arg) ]
@@ -465,8 +462,8 @@ sub _parse {
     _replaceVariables($self, $self->{CONFIG}, $_);
   }
 
-  my $openssl = $self->get('cmd.openssl', 'FILE');
-  if (defined $openssl) {
+  my $openssl = $self->get('cmd.openssl', 'CMD');
+  if (defined $openssl && -e $openssl) {
     # All the parsing is done, now check for double parsing
     if (exists($self->{CONFIGFILES})) {
       foreach (keys %{$self->{CONFIGFILES}}) {
@@ -483,10 +480,8 @@ sub _parse {
     } ## end else [ if (exists($self->{CONFIGFILES...}))]
 
     # postprocess sub-ca settings (configuration inheritance)
-    foreach my $toplevel (qw(certmonitor keystore)) {
-      foreach my $entry (keys(%{$self->{CONFIG}->{$toplevel}})) {
-        $self->_inheritConfig($self->{CONFIG}->{$toplevel}, $entry);
-      }
+    foreach my $entry (keys(%{$self->{CONFIG}->{keystore}})) {
+      $self->_inheritConfig($self->{CONFIG}->{keystore}, $entry);
     }
   } else {
     CertNanny::Logging->error("No openssl shell specified");
@@ -504,7 +499,7 @@ sub _sha1_hex {
   return $self->{CONFIGFILES}{$file}{SHA} if ($self->{CONFIGFILES}{$file}{SHA});
   
   my $sha;
-  my $openssl = $self->get('cmd.openssl', 'FILE');
+  my $openssl = $self->get('cmd.openssl', 'CMD');
   if (defined($openssl)) {
     my @cmd = (qq("$openssl"), 'dgst', '-sha', qq("$file"));
     chomp($sha = CertNanny::Util->runCommand(\@cmd, WANTOUT => 1));
@@ -517,10 +512,12 @@ sub _sha1_hex {
 
 
 sub _parseFile {
-  my $self       = (shift)->getInstance();
-  my $configPath = shift || $self->{CONFIGPATH};
-  my $configFile = shift || $self->{CONFIGFILE};
-
+  my $self         = (shift)->getInstance();
+  my $configPath   = shift || $self->{CONFIGPATH};
+  my $configFile   = shift || $self->{CONFIGFILE};
+  my $configPrefix = shift;
+  
+  # CertNanny::Logging->printout(sprintf("Parsing <%s> in dir <%s> with prefix <%s>\n", $configFile, $configPath, $configPrefix));
   # Parsing is done in the following steps
   #  - initialize datastructures (only done once)
   #  - read all lines
@@ -547,9 +544,6 @@ sub _parseFile {
                                                  type             => 'none',
                                                  scepsignaturekey => 'new',},},};
     $self->{CFGFLAG} = {};
-
-    # backward compatibility
-    $self->{CONFIG}->{certmonitor} = $self->{CONFIG}->{keystore};
   } ## end if (!exists($self->{CONFIGFILES...}))
 
   CertNanny::Logging->debug("reading $configFile");
@@ -568,9 +562,18 @@ sub _parseFile {
   $handle->close();
   
   #  - evaluate all lines
+  my %keystore;
+  my @prefix = split(/\./, $configPrefix);
   while (($lnr, $line) = each(%lines)) {
     if ($line =~ /^(.+?)\s*=\s*(\S.*?)\s*(\s#\s.*)?$/ || /^(\S.*?)\s*=?\s*(\s#\s.*)?$/) {
       my @path = split(/\./, $1);
+      for (my $i=0; $i<=$#prefix; $i++) {
+        if ($prefix[$i] ne $path[$i]) {
+          @path = (@prefix, @path); 
+          last;
+        }
+      }
+      $keystore{$path[1]} = 1 if (lc($path[0]) eq 'keystore');
       my ($val, $var);
       if (defined($2) && $2 !~ /^\s*#\s.*$/) {
         $val = $2;
@@ -596,13 +599,13 @@ sub _parseFile {
         $var = $var->{$confPart};
       }
       if ($doDupCheck && defined($var->{$key})) {
-        print STDERR "Config file error: duplicate value definition in file $configFile line $lnr ($line)\n";
+        CertNanny::Logging->printerr("Config file $configFile ERROR: duplicate value definition in line $lnr ($line)\n");
       }
       
       while ($val =~ m{__ENV__(.*?)__}xms) {
         my $envvar = $1;
         if (! exists $ENV{$envvar}) {
-          CertNanny::Logging->info("Environment variable $envvar referenced in line $lnr does not exist");
+          CertNanny::Logging->info("Config file $configFile WARNING: Environment variable $envvar referenced in line $lnr does not exist");
         }
         my $myENVvar = $ENV{$envvar} || '';
         $val =~ s{__ENV_(.*?)__}{$myENVvar}xms;
@@ -610,8 +613,8 @@ sub _parseFile {
 
       $var->{$key} = $val;
     } else {
-      if ($line !~ /^include\s+(.+)$/) {
-        print STDERR "Config file error: parse error in line $lnr ($line)\n";
+      if ($line !~ /^(include|keystores)\s+(.+)$/) {
+        CertNanny::Logging->printerr("Config file $configFile ERROR: parse error in line $lnr ($line)\n");
       }
     }
   }
@@ -624,21 +627,38 @@ sub _parseFile {
   #  - store content for operation 'status'
   $self->{CONFIGFILES}{$configFile}{CONTENT} = \%lines;
 
+  #  - store keystores, that are defined by this configfile
+  my @dummy;
+  foreach (keys(%keystore)) {push (@dummy, $_)}
+  $self->{CONFIGFILES}{$configFile}{KEYSTORE} = \@dummy;
+
   #  - recursive execute _parsefile for all includes
   while (($lnr, $line) = each(%lines)) {
-    if ($line =~ /^\s*include\s+(.+)\s*$/) {
-      my $configFileGlob = $1;
-      my @configFileList;
+    # CertNanny::Logging->printerr("Line: $line\n");
+    if ($line =~ /^\s*(include|keystores)[\s=]+(.+)\s*$/) {
+      my $includeType = $1;
+      my @includeList = split(' ', $2);
+      foreach my $item (@includeList) {
+        my $prefix;
+        my $configFileGlob;
+        my @configFileList;
+        if ($includeType eq 'keystores') {
+          $configFileGlob = 'Keystore-'.$item.'.cfg';
+          $prefix         = 'keystore.' . $item;
+        } else {
+          $configFileGlob = $item;
+        }
 
-      # Test if $configFileGlob contains regular files
-      @configFileList = @{CertNanny::Util->fetchFileList($configFileGlob)};
-   
-      if (!@configFileList) {
-        $configFileGlob = $configPath . $configFileGlob;
+        # Test if $configFileGlob contains regular files
         @configFileList = @{CertNanny::Util->fetchFileList($configFileGlob)};
-      }
-      foreach (@configFileList) {
-        $self->_parseFile((fileparse($_))[1], $_);
+   
+        if (!@configFileList) {
+          $configFileGlob = $configPath . $configFileGlob;
+          @configFileList = @{CertNanny::Util->fetchFileList($configFileGlob)};
+        }
+        foreach my $file (@configFileList) {
+          $self->_parseFile((fileparse($file))[1], $file, $prefix);
+        }
       }
     }
   }

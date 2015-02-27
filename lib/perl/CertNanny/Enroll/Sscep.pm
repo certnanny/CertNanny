@@ -34,12 +34,12 @@ sub new {
   # type is determined, now delete it so only sections will be scanned.
   delete $entry_options->{enroll}->{type};
   ##if monitorsysinfo is not set we set it to be enabled by default
-  if (!exists $config->{CONFIG}->{certmonitor}->{$entryname}->{enroll}->{sscep}->{monitorSysInfo}) {
-    $config->{CONFIG}->{certmonitor}->{$entryname}->{enroll}->{sscep}->{monitorSysInfo} = 'yes';
+  if (!exists $config->{CONFIG}->{keystore}->{$entryname}->{enroll}->{sscep}->{monitorSysInfo}) {
+    $config->{CONFIG}->{keystore}->{$entryname}->{enroll}->{sscep}->{monitorSysInfo} = 'yes';
   }
 
-  #print ' $entryname sscep self is:' .Dumper($config) . $config->{CONFIG}->{certmonitor}->{$entryname}->{enroll}->{sscep}->{monitorsysinfo};
-  $self->{OPTIONS} = $self->defaultOptions($config->{CONFIG}->{certmonitor}->{$entryname}->{enroll}->{sscep}->{monitorSysInfo}, $config, $entryname);
+  #CertNanny::Logging->printout(' $entryname sscep self is:' .Dumper($config) . $config->{CONFIG}->{keystore}->{$entryname}->{enroll}->{sscep}->{monitorsysinfo});
+  $self->{OPTIONS} = $self->defaultOptions($config->{CONFIG}->{keystore}->{$entryname}->{enroll}->{sscep}->{monitorSysInfo}, $config, $entryname);
   $self->readConfig($entry_options->{enroll});
   #CertNanny::Logging->debug("enroll sscep self" .Dumper($self));
 
@@ -50,8 +50,8 @@ sub new {
     return undef;
   }
 
-  $self->{OPTIONS}->{sscep}->{Verbose} = "true" if $config->get("loglevel") >= 5;
-  $self->{OPTIONS}->{sscep}->{Debug}   = "true" if $config->get("loglevel") >= 6;
+  $self->{OPTIONS}->{sscep}->{Verbose} = "true" if $config->get('log.level') >= 5;
+  $self->{OPTIONS}->{sscep}->{Debug}   = "true" if $config->get('log.level') >= 6;
 
   $self->{certdir} = $entry_options->{scepcertdir};
   if (!defined $self->{certdir}) {
@@ -59,12 +59,14 @@ sub new {
     return undef;
   }
   $self->{entryname}       = $entryname;
-  $self->{cmd}             = $config->get('cmd.sscep', 'FILE');
-  $self->{config_filename} = File::Spec->catfile($self->{certdir}, $self->{entryname} . "_sscep.cnf");
+  $self->{cmd}             = $config->get('cmd.sscep', 'CMD');
+  if (defined($self->{cmd})) {
+    $self->{config_filename} = File::Spec->catfile($self->{certdir}, $self->{entryname} . "_sscep.cnf");
 
-  if (defined $self->{OPTIONS}->{sscep}->{engine}) {
-    my $engine_section = $self->{OPTIONS}->{sscep}->{engine};
-    $self->{OPTIONS}->{$engine_section}->{engine_usage} = "both";
+    if (defined $self->{OPTIONS}->{sscep}->{engine}) {
+      my $engine_section = $self->{OPTIONS}->{sscep}->{engine};
+      $self->{OPTIONS}->{$engine_section}->{engine_usage} = "both";
+    }
   }
 
   return $self;
@@ -112,7 +114,7 @@ sub execute {
   open FH, "$cmd |" or die "Couldn't execute $cmd: $!\n";
   while (defined(my $line = <FH>)) {
     chomp($line);
-    print "$line\n";
+    CertNanny::Logging->printout("$line\n");
   }
   close FH;
   my $exitval = $? >> 8;
@@ -142,7 +144,7 @@ sub enroll {
 
   CertNanny::Logging->info("Sending request");
 
-  #print Dumper $self->{STATE}->{DATA};
+  #CertNanny::Logging->printout(Dumper $self->{STATE}->{DATA});
 
   my %certs = $self->getCA();
   if (!%certs) {
@@ -406,7 +408,7 @@ sub defaultOptions {
   # keystore.DEFAULT.enroll.sscep.meta.myarg = bar
   # keystore.DEFAULT.enroll.sscep.meta.foo = sub { return 'bar' }
   # keystore.DEFAULT.enroll.sscep.meta.blah = `whoami`
-  my $userconfig = $config->{CONFIG}->{certmonitor}->{$entryname}->{enroll}->{sscep}->{meta};
+  my $userconfig = $config->{CONFIG}->{keystore}->{$entryname}->{enroll}->{sscep}->{meta};
 
   my %custmetadata;
 

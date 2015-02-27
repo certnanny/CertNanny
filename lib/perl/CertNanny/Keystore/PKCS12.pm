@@ -47,7 +47,7 @@ sub new {
   my $config    = $options->{CONFIG};
 
   # plausi check
-  if (!$config->get('cmd.openssl', 'FILE')) {
+  if (!$config->get('cmd.openssl', 'CMD')) {
     CertNanny::Logging->error("No openssl shell specified");
     return undef;
   }
@@ -67,7 +67,7 @@ sub new {
 
   # RETRIEVE AND STORE STATE
   # get previous renewal status
-  $self->k_retrieveState($entry->{selfhealing) || return undef;
+  $self->k_retrieveState() || return undef;
 
   # check if we can write to the file
   $self->k_storeState()    || croak "Could not write state file $self->{STATE}->{FILE}";
@@ -778,7 +778,7 @@ sub _buildOpenSSLPKCS12Cmd {
 
   my $rc = 0;
   
-  my $openssl    = $config->get('cmd.openssl', 'FILE');
+  my $openssl    = $config->get('cmd.openssl', 'CMD');
   $args{-in}       ||= '"'.$config->get("keystore.$entryname.location", 'FILE').'"';
   $ENV{PASSWORD} = $args{-password} || $self->_getPin();
   $ENV{PASSOUT}  = $args{-passout}  || $self->_getPin();

@@ -24,11 +24,30 @@ path.tmpdir                      = $(prefix)tmp/
 # NOTE: Set the desired log level here. For common usage 2 or 3 should
 #       be OK.
 # 0: fatal, 1: error, 2: notice, 3: info, 4: debug, 5: scep verbose, 6: scep debug
-loglevel                         = 3
+log.level                        = 3
+
+# depricated
+#loglevel                        = 3
+
+# Log Detail settings
+# 0: Timestamp, Level, PID, text       i.E.: 2015-01-29 21:47:15 : [debug] [64726] Start CertNanny::do_dump Dump
+# 1: 0 + direct calling proc           i.E.: 2015-01-29 21:47:48 : [debug] [64747] [CertNanny::do_dump(601)] Start CertNanny::do_dump Dump
+# 2: 1 + chain of all calling procs    i.E.: 2015-01-29 21:48:40 : [debug] [64781] [CertNanny::AUTOLOAD(187)->CertNanny::do_dump(601)] Start CertNanny::do_dump Dump
+# 3: 2 + getInstance and Logging procs i.E.: 2015-01-29 21:49:47 : [debug] [64820] [CertNanny::AUTOLOAD(187)->CertNanny::do_dump(601)->CertNanny::Logging::debug(451)->CertNanny::Logging::log(415)] Start CertNanny::do_dump Dump
+log.detail                       = 3
 
 #Name and destination of the certnanny logfile
+log.out.console                  = 1
+log.out.file                     = $(prefix)logs/certnanny.log
+log.out.filelast                 = $(prefix)logs/certnanny.last.log
+#log.out.syslog                   = tcp://localhost:2486
+log.err.console                  = 1
+log.err.file                     = $(prefix)logs/certnanny.err
+log.err.filelast                 = $(prefix)logs/certnanny.last.err
+#log.err.syslog                   = tcp://localhost:2486
 
-logfile                          = $(prefix)logs/certnanny.log
+#depricated
+#logfile                          = $(prefix)logs/certnanny.log
 
 #randomWait if this is set there will be a random backoff time while renewing a certificate to ease the stress 
 #on the PKI (e.g. 1000 servers run certanny with the same config for a cron job)
@@ -92,7 +111,17 @@ include Keystore-DEFAULT.cfg
 #include Keystore-MQ.cfg
 #include Keystore-OpenSSL-PKCS8.cfg
 #include Keystore-PKCS12.cfg
-
+#
+# Alternative syntax to include keystores
+# keystores                   = <keystorename> <keystorename> ...
+# i.E.: keystores                     = java openssl
+# A file named Keystore-<keystorename>.cfg is expected
+# In the file  Keystore-<keystorename>.cfg the keystore must be named <keystorename>
+# <keystorename> is case sensitiv
+# In the file Keystore-<keystorename>.cfg keys can be specified without the prefix keystore.<keystorename>
+# i.E.:       type                = Java
+# instead of: keystore.java.type  = Java
+# if <keystorename> is java 
 
 ####Include system specific configuration files####
 # Do not edit or delete
