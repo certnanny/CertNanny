@@ -94,7 +94,6 @@ cmd.ifconfig                     = /sbin/ifconfig
 # keystore.java.store.pin    =   123456 
 keystores                        = openssl java
 
-# depricated
 # if you specify a directory all files in the directory will be included
 # include KeystoreConfigDirectory/
 # or specify several files by globbing to be included
@@ -105,6 +104,7 @@ keystores                        = openssl java
 
 include Keystore-DEFAULT.cfg
 
+# single Keystore include is depricated
 #include Keystore-Java.cfg
 #include Keystore-OpenSSL.cfg
 #include Keystore-Windows.cfg
