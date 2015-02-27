@@ -562,6 +562,7 @@ sub _parseFile {
   $handle->close();
   
   #  - evaluate all lines
+  my %keystore;
   my @prefix = split(/\./, $configPrefix);
   while (($lnr, $line) = each(%lines)) {
     if ($line =~ /^(.+?)\s*=\s*(\S.*?)\s*(\s#\s.*)?$/ || /^(\S.*?)\s*=?\s*(\s#\s.*)?$/) {
@@ -572,6 +573,7 @@ sub _parseFile {
           last;
         }
       }
+      $keystore{$path[1]} = 1 if (lc($path[0]) eq 'keystore');
       my ($val, $var);
       if (defined($2) && $2 !~ /^\s*#\s.*$/) {
         $val = $2;
@@ -624,6 +626,11 @@ sub _parseFile {
 
   #  - store content for operation 'status'
   $self->{CONFIGFILES}{$configFile}{CONTENT} = \%lines;
+
+  #  - store keystores, that are defined by this configfile
+  my @dummy;
+  foreach (keys(%keystore)) {push (@dummy, $_)}
+  $self->{CONFIGFILES}{$configFile}{KEYSTORE} = \@dummy;
 
   #  - recursive execute _parsefile for all includes
   while (($lnr, $line) = each(%lines)) {
