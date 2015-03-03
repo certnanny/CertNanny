@@ -370,7 +370,7 @@ sub expandstring {
   }
   
   # delete unresolved placeholders
-  $input =~ s/__[^_]*__//g;
+  $input =~ s/__(?:(?!__).)*__//g;
   
   return $input;
 } ## end sub expandDate
