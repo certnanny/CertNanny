@@ -21,6 +21,8 @@ use warnings;
 use English;
 use utf8;
 
+use CertNanny::Util;
+
 use vars qw(@ISA @EXPORT @EXPORT_OK %EXPORT_TAGS $VERSION);
 
 @EXPORT = qw(printerr printout 
@@ -114,6 +116,8 @@ sub new {
     my $self = {};
     bless $self, $class;
     $INSTANCE = $self;
+    $self->setVariable('NAME',  'KEYSTORE', 
+                       'VALUE', 'Common');
   }
   return $INSTANCE;
 } ## end sub new
@@ -134,14 +138,18 @@ sub DESTROY {
 
 
 sub _print {
-  my $self   = (shift)->getInstance();
-  my $target = shift;
-  my $str    = join('', @_);
+  my $self = (shift)->getInstance();
+  my %args = (@_);
+  
+  my $target = $args{TARGET};
+  my $str    = $args{STR};
   
   my $myOut;
   my $myOutStd;
   my $myFile     = defined($self->{CONFIG}) ? $self->{CONFIG}->get('log.'.lc($target).'.file', "FILE")     :  undef;
+  $myFile        = CertNanny::Util->expandstring($myFile, %args);
   my $myLastFile = defined($self->{CONFIG}) ? $self->{CONFIG}->get('log.'.lc($target).'.filelast', "FILE") :  undef;
+  $myLastFile    = CertNanny::Util->expandstring($myLastFile, %args);
   my $buffer     = ($target eq 'Err') ? \@errBuffer : \@outBuffer;
   push(@$buffer, $str);
   
@@ -154,33 +162,37 @@ sub _print {
       $str = shift(@$buffer);
       # Log to file
       if ($logTarget{$target.'File'}) {
-        if (defined($myFile)) {
+        if (defined($myFile) && ($myFile ne '')) {
           if ($target eq 'Err') {
             $| = 1;
-            open STDERR, ">>", $myFile || die "Could not redirect STDERR. Stopped";
+            open STDERR, ">>", $myFile || die "Could not redirect STDERR to <$myFile>. Stopped";
             print STDERR $str;
             close STDERR;
           } else {
-            open STDOUT, ">>", $myFile || die "Could not redirect STDOUT. Stopped";
+            open STDOUT, ">>", $myFile || die "Could not redirect STDOUT to <$myFile>. Stopped";
             print STDOUT $str;
             close STDOUT;
           }
         }
-        if (defined($myLastFile)) {
+        if (defined($myLastFile) && ($myLastFile ne '')) {
           $| = 1;
           if ($target eq 'Err') {
-            if (!$logTargetOpen{$target.'File.Last'}) {
-              open STDERR, ">", $myLastFile || die "Could not redirect STDERR. Stopped";
-              $logTargetOpen{$target.'File.Last'} = 1;
+            # if (!$logTargetOpen{$target.'File.Last'}) {
+            if (!$logTargetOpen{$myLastFile}) {
+              open STDERR, ">", $myLastFile || die "Could not redirect STDERR to <$myLastFile>. Stopped";
+              # $logTargetOpen{$target.'File.Last'} = 1;
+              $logTargetOpen{$myLastFile} = 1;
             } else {
-              open STDERR, ">>", $myLastFile || die "Could not redirect STDERR. Stopped";
+              open STDERR, ">>", $myLastFile || die "Could not redirect STDERR to <$myLastFile>. Stopped";
             }
             print STDERR $str;
             close STDERR;
           } else {
-            if (!$logTargetOpen{$target.'File.Last'}) {
+            # if (!$logTargetOpen{$target.'File.Last'}) {
+            if (!$logTargetOpen{$myLastFile}) {
               open STDOUT, ">", $myLastFile || die "Could not redirect STDOUT. Stopped";
-              $logTargetOpen{$target.'File.Last'} = 1;
+              # $logTargetOpen{$target.'File.Last'} = 1;
+              $logTargetOpen{$myLastFile} = 1;
             } else {
               open STDOUT, ">>", $myLastFile || die "Could not redirect STDOUT. Stopped";
             }
@@ -208,21 +220,25 @@ sub _print {
     }
   }
   return 1;
-} ## end sub printerr
+} ## end sub _print
 
 
 sub printerr {
   my $self = (shift)->getInstance();
-  $self->_print('Err', @_);
+  $self->_print('TARGET', 'Err', 
+                'STR', '',
+                @_);
   return 1;
 } ## end sub printerr
 
 
 sub printout {
   my $self = (shift)->getInstance();
-  $self->_print('Out', @_);
+  $self->_print('TARGET', 'Out',
+                'STR', '',
+                @_);
   return 1;
-} ## end sub logLevel
+} ## end sub printout
 
 
 sub logLevel {
@@ -245,10 +261,10 @@ sub _Off {
       $logTarget{$target.'SysLog'}  != 0) {
     $| = 1;
     if ($target eq 'Err') {
-      $self->debug('Error Logging is disabled');
+      $self->debug('MSG', 'Error Logging is disabled');
       open STDERR, ">", "/dev/null";
     } else {
-      $self->debug('Logging is disabled');
+      $self->debug('MSG', 'Logging is disabled');
       open STDOUT, ">", "/dev/null";
     }  
     $logTarget{$target.'Console'} = 0;
@@ -264,14 +280,14 @@ sub errOff {
   my $self = (shift)->getInstance();
   $self->Off('Err');
   return 1;
-} ## end sub logOff
+} ## end sub errOff
 
 
 sub outOff {
   my $self = (shift)->getInstance();
   $self->Off('Out');
   return 1;
-} ## end sub logOff
+} ## end sub outOff
 
 
 sub switchLogging {
@@ -294,7 +310,7 @@ sub switchLogging {
     }
     if (!$logTarget{$args{TARGET}}) {
       $type = ($type eq 'Err') ? 'Errorlogging to ' : 'Logging to ';
-      $self->debug($type . $target . ' enabled')
+      $self->debug('MSG', $type . $target . ' enabled')
     }
     $logTarget{$args{TARGET}} = 1;
   } else {
@@ -308,7 +324,7 @@ sub switchLogging {
     }
     if ($logTarget{$args{TARGET}})  {
       $type = ($type eq 'Err') ? 'Errorlogging to ' : 'Logging to ';
-      $self->debug($type . $target . ' disabled')
+      $self->debug('MSG', $type . $target . ' disabled')
     }
     $logTarget{$args{TARGET}} = 0;
   }
@@ -321,7 +337,7 @@ sub switchConsoleErr {
   my $self  = (shift)->getInstance();
   $self->switchLogging('TARGET', 'ErrConsole',
                        'STATUS', !$logTarget{'ErrConsole'},
-                       'MESSAGE', 'Console Error Logging',
+#                       'MESSAGE', 'Console Error Logging',
                        @_);
   return 1;
 } ## end sub switchConsoleErr
@@ -331,7 +347,7 @@ sub switchFileErr {
   my $self = (shift)->getInstance();
   $self->switchLogging('TARGET',   'ErrFile',
                        'STATUS',   !$logTarget{'ErrFile'},
-                       'MESSAGE',  "File Error Logging to " . $self->{CONFIG}->get('log.err.file') || '',
+#                       'MESSAGE',  "File Error Logging to " . $self->{CONFIG}->get('log.err.file') || '',
                        'FILE',     $self->{CONFIG}->get('log.err.file', "FILE"),
                        'FILELAST', $self->{CONFIG}->get('log.err.filelast', "FILE"),
                        'CLEAR',    undef,
@@ -344,7 +360,7 @@ sub switchSysLogErr {
   my $self  = (shift)->getInstance();
   $self->switchLogging('TARGET', 'ErrSysLog',
                        'STATUS', !$logTarget{'ErrSysLog'},
-                       'MESSAGE', 'SysLog Error Logging',
+#                       'MESSAGE', 'SysLog Error Logging',
                        @_);
   return 1;
 } ## end sub switchSysLogErr
@@ -354,7 +370,7 @@ sub switchConsoleOut {
   my $self  = (shift)->getInstance();
   $self->switchLogging('TARGET', 'OutConsole',
                        'STATUS', !$logTarget{'OutConsole'},
-                       'MESSAGE', 'Console Logging',
+#                       'MESSAGE', 'Console Logging',
                        @_);
   return 1;
 } ## end sub switchConsoleOut
@@ -364,7 +380,7 @@ sub switchFileOut {
   my $self = (shift)->getInstance();
   $self->switchLogging('TARGET',   'OutFile',
                        'STATUS',   !$logTarget{'OutFile'},
-                       'MESSAGE',  "File Logging to " . $self->{CONFIG}->get('log.out.file') || '',
+#                       'MESSAGE',  "File Logging to " . $self->{CONFIG}->get('log.out.file') || '',
                        'FILE',     $self->{CONFIG}->get('log.out.file', "FILE"),
                        'FILELAST', $self->{CONFIG}->get('log.out.filelast', "FILE"),
                        'CLEAR',    undef,
@@ -377,7 +393,7 @@ sub switchSysLogOut {
   my $self  = (shift)->getInstance();
   $self->switchLogging('TARGET', 'OutSysLog',
                        'STATUS', !$logTarget{'OutSysLog'},
-                       'MESSAGE', 'SysLog Logging',
+#                       'MESSAGE', 'SysLog Logging',
                        @_);
   return 1;
 } ## end sub switchSysLogOut
@@ -385,11 +401,11 @@ sub switchSysLogOut {
 
 sub log {
   my $self = (shift)->getInstance();
-  my $arg  = shift;
+  my %args = (@_);
 
-  confess "Not a hash ref" unless (ref($arg) eq "HASH");
-  return undef unless (defined $arg->{MSG});
-  my $prio = lc($arg->{PRIO} || "info");
+  # confess "Not a hash ref" unless (ref($arg) eq "HASH");
+  return undef unless (defined $args{MSG});
+  my $prio = lc($args{PRIO} || "info");
 
   my %level = ('debug'  => 4,
                'info'   => 3,
@@ -424,20 +440,20 @@ sub log {
         }
       }
     }
- #   if (!utf8::is_utf8($arg->{MSG}) and ($arg->{MSG} !~ m/\A [[:ascii:]]* \Z/xms)) {
- #    $arg->{MSG} = '---Binary Data---';
+ #   if (!utf8::is_utf8($args{MSG}) and ($args{MSG} !~ m/\A [[:ascii:]]* \Z/xms)) {
+ #    $args{MSG} = '---Binary Data---';
  #  }
     if ($subroutine) {
-      $logStr = "$year-$mon-$mday $hour:$min:$sec : [$prio] [$$] [$subroutine] $arg->{MSG}\n";
+      $logStr = "$year-$mon-$mday $hour:$min:$sec : [$prio] [$$] [$subroutine] $args{MSG}\n";
     } else {
-      $logStr = "$year-$mon-$mday $hour:$min:$sec : [$prio] [$$] $arg->{MSG}\n";
+      $logStr = "$year-$mon-$mday $hour:$min:$sec : [$prio] [$$] $args{MSG}\n";
     }
-    $self->printout($logStr);
+    $self->printout('STR', $logStr, %args);
 
     # call hook
     #$self->executehook($self->{INSTANCE}->{OPTIONS}->{ENTRY}->{hook}->{log},
     #			   '__PRIORITY__' => $prio,
-    #			   '__MESSAGE__' => $arg->{MSG});
+    #			   '__MESSAGE__' => $args{MSG});
   } ## end if ($level{$prio} <= $self...)
 
   return 1;
@@ -446,10 +462,9 @@ sub log {
 
 sub debug {
   my $self = (shift)->getInstance();
-  my $arg  = join(' ', @_);
+  my %args = (@_);
 
-  $self->log({MSG  => $arg,
-              PRIO => 'debug'});
+  $self->log(PRIO => 'debug', %args);
   
   return 0
 } ## end sub debug
@@ -457,10 +472,9 @@ sub debug {
 
 sub info {
   my $self = (shift)->getInstance();
-  my $arg  = join(' ', @_);
+  my %args = (@_);
 
-  $self->log({MSG  => $arg,
-              PRIO => 'info'});
+  $self->log(PRIO => 'info', %args);
   
   return 0
 } ## end sub info
@@ -468,10 +482,9 @@ sub info {
 
 sub notice {
   my $self = (shift)->getInstance();
-  my $arg  = join(' ', @_);
+  my %args = (@_);
 
-  $self->log({MSG  => $arg,
-              PRIO => 'notice'});
+  $self->log(PRIO => 'notice', %args);
   
   return 0
 } ## end sub notice
@@ -479,10 +492,9 @@ sub notice {
 
 sub error {
   my $self = (shift)->getInstance();
-  my $arg  = join(' ', @_);
+  my %args = (@_);
   
-  $self->log({MSG  => $arg,
-              PRIO => 'error'});
+  $self->log(PRIO => 'error', %args);
   
   return 1
 } ## end sub error
@@ -490,10 +502,9 @@ sub error {
 
 sub fatal {
   my $self = (shift)->getInstance();
-  my $arg  = join(' ', @_);
+  my %args = (@_);
 
-  $self->log({MSG  => $arg,
-              PRIO => 'fatal'});
+  $self->log(PRIO => 'fatal', %args);
   
   return 1
 } ## end sub fatal

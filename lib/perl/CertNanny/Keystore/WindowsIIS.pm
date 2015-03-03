@@ -38,14 +38,14 @@ sub installCert {
   my $certfile = $args{CERTFILE};
   my $label    = $self->{CERT}->{LABEL};
 
-  CertNanny::Logging->info("Creating prototype PKCS#12 from certfile $certfile, keyfile $keyfile, label $label");
+  CertNanny::Logging->info('MSG', "Creating prototype PKCS#12 from certfile $certfile, keyfile $keyfile, label $label");
 
   # create random PW via OpenSSL
   my $openssl = $self->{OPTIONS}->{CONFIG}->get('cmd.openssl', 'CMD');
 
   my $open_result = open(my $OPENSSL, "\"$openssl\" rand -base64 15 |");
   if (!$open_result) {
-    CertNanny::Logging->error("Could not open OpenSSL for random PIN generation");
+    CertNanny::Logging->error('MSG', "Could not open OpenSSL for random PIN generation");
     return;
   }
 
@@ -58,7 +58,7 @@ sub installCert {
   close($OPENSSL);
 
   if (!$randpin) {
-    CertNanny::Logging->error("No random PIN generated");
+    CertNanny::Logging->error('MSG', "No random PIN generated");
   }
 
   $self->{PIN} = $randpin;
@@ -69,15 +69,15 @@ sub installCert {
                                        CACHAIN   => undef)->{FILENAME};
 
   if (!defined $pkcs12file) {
-    CertNanny::Logging->error("Could not create prototype PKCS#12 from received certificate");
+    CertNanny::Logging->error('MSG', "Could not create prototype PKCS#12 from received certificate");
     return;
   }
-  CertNanny::Logging->info("Created prototype PKCS#12 file $pkcs12file");
+  CertNanny::Logging->info('MSG', "Created prototype PKCS#12 file $pkcs12file");
 
   # initialize IIS.CertObj
   my $certobj = Win32::OLE->new('IIS.CertObj');
   if (!defined $certobj) {
-    CertNanny::Logging->error("Could not create IIS.CertObj");
+    CertNanny::Logging->error('MSG', "Could not create IIS.CertObj");
     return;
   }
 
@@ -91,7 +91,7 @@ sub installCert {
   # go through all instances using the same certificate
   foreach $instanceidentifier (@instanceidentifier_array) {
     $certobj->SetProperty('InstanceName', 'w3svc/' . $instanceidentifier);
-    CertNanny::Logging->info("Using InstanceName w3svc/$instanceidentifier");
+    CertNanny::Logging->info('MSG', "Using InstanceName w3svc/$instanceidentifier");
 
     if ($result == 1) {
 
@@ -123,16 +123,16 @@ sub installCert {
   my $old_thumbprint = $self->{CERT}->{CERTINFO}->{CertificateFingerprint};
   $old_thumbprint =~ s/://g;
 
-  CertNanny::Logging->info("Thumbprint of old certificate: $old_thumbprint");
+  CertNanny::Logging->info('MSG', "Thumbprint of old certificate: $old_thumbprint");
 
   my $new_cert = $self->getcertobject($self->{STORE});
 
   my $new_thumbprint = $new_cert->thumbprint();
 
-  CertNanny::Logging->info("Thumbprint of new certificate: $new_thumbprint");
+  CertNanny::Logging->info('MSG', "Thumbprint of new certificate: $new_thumbprint");
 
   if ($old_thumbprint eq $new_thumbprint) {
-    CertNanny::Logging->error("Installation failed, old certificate is still in place.");
+    CertNanny::Logging->error('MSG', "Installation failed, old certificate is still in place.");
     return;
   }
 

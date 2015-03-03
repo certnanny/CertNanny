@@ -20,8 +20,10 @@ use IO::File;
 use File::Glob qw(:globally :nocase);
 use File::Spec;
 use File::Temp;
+use FindBin qw($Bin $Script $RealBin $RealScript);
 
 use Time::Local;
+use Time::HiRes qw(gettimeofday);
 
 use MIME::Base64;
 
@@ -30,15 +32,17 @@ use Data::Dumper;
 use vars qw(@ISA @EXPORT @EXPORT_OK %EXPORT_TAGS $VERSION);
 use Exporter;
 
-@EXPORT = qw(runCommand timeStamp isoDateToEpoch epochToIsoDate 
+@EXPORT = qw(runCommand timeStamp isoDateToEpoch epochToIsoDate expandString 
              expandDate printableIsoDate readFile writeFile getCertSHA1
              getCertFormat getCertInfoHash getCSRInfoHash parseCertData 
              getTmpFile staticEngine encodeBMPString writeOpenSSLConfig 
              getDefaultOpenSSLConfig backoffTime getMacAddresses 
-             fetchFileList callOpenSSL os_type is_os_type);    # Symbols to autoexport (:DEFAULT tag)
+             fetchFileList callOpenSSL os_type is_os_type setVariable
+             unsetVariable);    # Symbols to autoexport (:DEFAULT tag)
 
 # This variable stores arbitrary data like created temporary files
 my $INSTANCE;
+my %variable;
 
 
 sub getInstance() {
@@ -79,6 +83,23 @@ sub DESTROY {
 } ## end sub DESTROY
 
 
+sub setVariable() {
+  my $self    = (shift)->getInstance();
+  my %args   = (NAME  => '',
+                VALUE => '',
+                @_);
+  $variable{$args{'NAME'}} = $args{'VALUE'} if ($args{'NAME'} ne '');
+}
+
+
+sub unsetVariable() {
+  my $self    = (shift)->getInstance();
+  my %args   = (NAME  => '',
+                @_);
+  eval(undef($variable{$args{'NAME'}})) if ($args{'NAME'} ne '');
+}
+
+
 sub hidePin() {
   my $self    = (shift)->getInstance();
   my @cmd = @_;
@@ -109,7 +130,7 @@ sub runCommand {
   }
   my $logCmd = $args{HIDEPWD} ? $self->hidePin(@cmdarr) : join(' ' , @cmdarr);
 
-  CertNanny::Logging->debug("Execute: $logCmd");
+  CertNanny::Logging->debug('MSG', "Execute: $logCmd");
 
   open my $PROGRAM, join(' ' , @cmdarr) . "|" or die "could not execute $logCmd";
   my ($output, @outputArr);
@@ -119,7 +140,7 @@ sub runCommand {
       <$PROGRAM>;
     };
     close($PROGRAM);
-    #CertNanny::Logging->debug("@outputArr") if (@outputArr);
+    #CertNanny::Logging->debug('MSG', "@outputArr") if (@outputArr);
   } else {
     $output = do {
       local $/;
@@ -128,9 +149,9 @@ sub runCommand {
     close($PROGRAM);
     
     if (($output =~ m/\A [[:ascii:]]* \Z/xms)) {
-     	#CertNanny::Logging->debug("$output") if ($output);
+     	#CertNanny::Logging->debug('MSG', "$output") if ($output);
     } else {
-      #CertNanny::Logging->debug("---Binary Data---") if ($output);
+      #CertNanny::Logging->debug('MSG', "---Binary Data---") if ($output);
     }
   }
     
@@ -199,7 +220,7 @@ sub epochToIsoDate {
 
   } else {
     my ($seconds, $minutes, $hours, $day_of_month, $month, $year, $wday, $yday, $isdst) = localtime($epoch);
-    CertNanny::Logging->debug("Localtime daylightsaving $isdst");
+    CertNanny::Logging->debug('MSG', "Localtime daylightsaving $isdst");
 
     return sprintf("%04d%02d%02d%02d%02d%02d", $year + 1900, $month + 1, $day_of_month, $hours, $minutes, $seconds);
 
@@ -234,6 +255,127 @@ sub expandDate {
 } ## end sub expandDate
 
 
+sub expandstring {
+  #################################################################
+  # Expands a string by replacing placeholders with values
+  #
+  #  __YEAR__       : Year        4-digit
+  #  __YY__         : Year        2-digit
+  #  __MONTH__      : Monthnumber 2-digit
+  #  __DAY__        : daynumber   2-digit
+  #  __HOUR__       : Hour        2-digit 24h-format
+  #  __MINUTE__     : Minute      3-digit
+  #  __SECOND__     : Second      2-digit
+  #  __TS4__        : Timestamp format JJJJMMTT_hhmmss
+  #  __TS2__        : Timestamp format JJMMTT_hhmmss
+  #
+  #  __PID__        : Prozess-Id
+  #  __PRG__        : Program name
+  #  __PRGEXT__     : Program name with extension
+  #  __EXT__        : Program name extension only
+  #
+  #  __\##__        : Char(##)
+  #
+  #  __ENV(var)__   : Environment variable var
+  #  __EXEC(prg)__  : Output of program prg
+  #
+  #  __BIN__        : $Bin
+  #  __SCRIPT__     : $Script
+  #  __REALBIN__    : $Bin $RealBin
+  #  __REALSCRIPT__ : $RealScript
+  #
+  #  Beliebige weitere Werte koennen uebergeben werden in der Form
+  #  Name|Inhalt|Name|Inhalt|Name|Inhalt....
+  #  Bei der Referenzierung im String koennen diese benutzerdefinierten Variablen in sprintf-Manier
+  #  formatiert werden. Dazu ist an den Variablennamen durch % getrennt der formatstring anzuhaengen
+  #
+  #  Bsp.
+  #  Aufruf: extendString("MT940.$MANDANT%03s$.$TEST$.$JAHR$$MONAT$$TAG$.$STUNDE$$MINUTE$$SEKUNDE$", "MANDANT|1|TEST|234234")
+  #
+  #  Ausgabe (um 13:51:30 am 1.8.2010): MT940.001.234234.20100801.135130
+  #
+
+  my $self   = (shift)->getInstance();
+  my $input  = shift || '';
+  my %args   = (@_);
+  
+  # Replace HEX values, Environment Variables and Program Outputs
+  $input =~ s:__\\x([0-9A-Fa-f]{2})__:chr hex $1:ge;
+  $input =~ s:__ENV\(([^\)]*?)\)__:$ENV{$1}:g;
+  $input =~ s:__EXEC\(([^\)]*?)\)__:`$1`:ge;
+
+  # Replace date, time, etc.
+  my ($n, $s, $m, $S, $D, $M, $Y, $WD, $YD, $isdst);
+  $n = substr( (gettimeofday)[1], 0, 4 );
+  ($s, $m, $S, $D, $M, $Y, $WD, $YD, $isdst) = localtime(time);
+  $M++;
+  my $YY = $Y - 100;
+  $Y += 1900;
+
+  $M  = sprintf('%02d', $M);
+  $D  = sprintf('%02d', $D);
+  $WD = sprintf('%01d', $WD);
+  $YD = sprintf('%03d', $YD);
+  $S  = sprintf('%02d', $S);
+  $m  = sprintf('%02d', $m);
+  $s  = sprintf('%02d', $s);
+  $n  = sprintf('%04d', $n);
+  
+  $args{'__YEAR__'}   = $Y                           if (!exists($args{'__YEAR__'}));
+  $args{'__YY__'}     = $YY                          if (!exists($args{'__YY__'}));
+  $args{'__MONTH__'}  = $M                           if (!exists($args{'__MONTH__'}));
+  $args{'__DAY__'}    = $D                           if (!exists($args{'__DAY__'}));
+  $args{'__WDAY__'}   = $WD                          if (!exists($args{'__WDAY__'}));
+  $args{'__JDAY__'}   = $YD                          if (!exists($args{'__JDAY__'}));
+  $args{'__HOUR__'}   = $S                           if (!exists($args{'__HOUR__'}));
+  $args{'__MINUTE__'} = $m                           if (!exists($args{'__MINUTE__'}));
+  $args{'__SECOND__'} = $s                           if (!exists($args{'__SECOND__'}));
+  $args{'__NANO__'}   = $n                           if (!exists($args{'__NANO__'}));
+  $args{'__TS4__'}    = "${Y}${M}${D}_${S}${m}${s}"  if (!exists($args{'__TS4__'}));
+  $args{'__TS2__'}    = "${YY}${M}${D}_${S}${m}${s}" if (!exists($args{'__TS2__'}));
+
+  # Replace Process ID
+  $args{'__PID__'} = $$ if (!exists($args{'__PID__'}));
+
+  # Replace Programm Name
+  my ($name, $ext) = split(/\./, $Script);
+  $args{'__PRG__'}    = $name   if (!exists($args{'__PRG__'}));
+  $args{'__PRGEXT__'} = $Script if (!exists($args{'__PRGEXT__'}));
+  $args{'__EXT__'}    = $ext    if (!exists($args{'__EXT__'}));
+
+  $args{'__BIN__'}        = $Bin        if (!exists($args{'__BIN__'}));
+  $args{'__SCRIPT__'}     = $Script     if (!exists($args{'__SCRIPT__'}));
+  $args{'__REALBIN__'}    = $RealBin    if (!exists($args{'__REALBIN__'}));
+  $args{'__REALSCRIPT__'} = $RealScript if (!exists($args{'__REALSCRIPT__'}));
+  
+  # add global variables
+  while (my ($key, $value) = each %variable) {
+    $args{"__${key}__"} = $value if (!exists($args{"__${key}__"}));
+  }
+  
+  # replace values passed to this function
+  while (my ($key, $value) = each %args) {
+    if ($key =~ /^__.*__$/) {
+      $value ||= "";
+      $key =~ s/^__|__$//g;
+      while ($input =~ /__($key)(%[^\$]+)?__/g) {
+        if ($2) {
+          $value = sprintf($2, $value);
+          $input =~ s:__$1$2__:$value:;
+        } else {
+          $input =~ s:__$1__:$value:;
+        }
+      }
+    }
+  }
+  
+  # delete unresolved placeholders
+  $input =~ s/__[^_]*__//g;
+  
+  return $input;
+} ## end sub expandDate
+
+
 sub printableIsoDate {
   # return a printable represantation of a compacted ISO date
   # arg: ISO Date, format YYYYMMDDHHMMSS
@@ -248,24 +390,24 @@ sub printableIsoDate {
 sub readFile {
   # read (slurp) file from disk
   # Example: $self->readFile($filename);
-  CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "write file/content to disk");
+  CertNanny::Logging->debug('MSG', eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "write file/content to disk");
   my $self = (shift)->getInstance();
   my $filename = shift;
 
   my $result = 1;
   if (!-e $filename) {
-    $result = CertNanny::Logging->error("readFile(): file does not exist: $filename");
+    $result = CertNanny::Logging->error('MSG', "readFile(): file does not exist: $filename");
   }
 
   if ($result && !-r $filename) {
-    CertNanny::Logging->error("readFile(): file is not readable: $filename");
+    CertNanny::Logging->error('MSG', "readFile(): file is not readable: $filename");
   }
 
   if ($result) {
     $result = do {
       open my $fh, '<', $filename;
       if (!$fh) {
-        $result = CertNanny::Logging->error("readFile(): file open failed: $filename");
+        $result = CertNanny::Logging->error('MSG', "readFile(): file open failed: $filename");
       }
       if ($result) {
         binmode $fh;
@@ -275,7 +417,7 @@ sub readFile {
     }
   }
 
-  CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "write file/content to disk");
+  CertNanny::Logging->debug('MSG', eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "write file/content to disk");
   return $result;
 } ## end sub readFile
 
@@ -305,18 +447,18 @@ sub writeFile {
   #
   # Example: $self->writeFile(DSTFILE => $filename, SRCCONTENT => $data, FORCE => 1);
   #
-  #CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "write file/content to disk");
+  #CertNanny::Logging->debug('MSG', eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "write file/content to disk");
   my $self = (shift)->getInstance();
   my %args = (@_);
 
   my $rc = 0;
   
   if ((!defined $args{SRCFILE} && !defined $args{SRCCONTENT}) || (defined $args{SRCFILE} && defined $args{SRCCONTENT})) {
-    $rc = CertNanny::Logging->error("writeFile(): Either SRCFILE or SRCCONTENT must be defined.");
+    $rc = CertNanny::Logging->error('MSG', "writeFile(): Either SRCFILE or SRCCONTENT must be defined.");
   }
   
   if (!$rc && !defined $args{DSTFILE}) {
-    $rc = CertNanny::Logging->error("writeFile(): Destination File DSTFILE must be defined.");
+    $rc = CertNanny::Logging->error('MSG', "writeFile(): Destination File DSTFILE must be defined.");
   }
 
   my $srcfile    = $args{SRCFILE};
@@ -324,7 +466,7 @@ sub writeFile {
   my $dstfile    = $args{DSTFILE};
 
   if (!$rc && (-e $dstfile) && (!$args{FORCE}) && (!$args{APPEND})) {
-    $rc = CertNanny::Logging->error("writeFile(): output file already exists");
+    $rc = CertNanny::Logging->error('MSG', "writeFile(): output file already exists");
   }
 
   if (!$rc && defined($srccontent)) {
@@ -339,7 +481,7 @@ sub writeFile {
 
     my $fh;
     if (not sysopen($fh, $dstfile, $mode)) {
-      $rc = CertNanny::Logging->error("writeFile(): output file open failed");
+      $rc = CertNanny::Logging->error('MSG', "writeFile(): output file open failed");
     }
     binmode $fh;
     print {$fh} $srccontent;
@@ -349,16 +491,16 @@ sub writeFile {
   if (!$rc && defined($srcfile)) {
     if ($args{APPEND}) {
       if (!open OUT, '>>'.$dstfile) {
-        $rc = CertNanny::Logging->error("writeFile(): output file open failed");
+        $rc = CertNanny::Logging->error('MSG', "writeFile(): output file open failed");
       }
     } else {
       if (!open OUT, '>'.$dstfile) {
-        $rc = CertNanny::Logging->error("writeFile(): output file open failed");
+        $rc = CertNanny::Logging->error('MSG', "writeFile(): output file open failed");
       }
     }
     if (!$rc) {
       if (!open IN, $srcfile) {
-        $rc = CertNanny::Logging->error("writeFile(): input file open failed");
+        $rc = CertNanny::Logging->error('MSG', "writeFile(): input file open failed");
       }
       if (!$rc) {
         binmode IN;
@@ -371,7 +513,7 @@ sub writeFile {
       }
     }
   }
-  #CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "write file/content to disk");
+  #CertNanny::Logging->debug('MSG', eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "write file/content to disk");
   return !$rc;
 } ## end sub writeFile
 
@@ -444,11 +586,11 @@ sub callOpenSSL {
     push(@cmd, ('>', qq("$outfile")));
 
     # export certificate to tempfile
-    CertNanny::Logging->debug("Execute: " . join(" ", @cmd));
+    CertNanny::Logging->debug('MSG', "Execute: " . join(" ", @cmd));
 
     my $fh;
     if (!open $fh, "| " . join(" ", @cmd)) {
-      $rc = CertNanny::Logging->error("callOpenSSL(): open error");
+      $rc = CertNanny::Logging->error('MSG', "callOpenSSL(): open error");
       unlink $outfile;
     }
 
@@ -458,7 +600,7 @@ sub callOpenSSL {
       close $fh;
 
       if ($? != 0) {
-        $rc = CertNanny::Logging->error("callOpenSSL(): Error ASN.1 decoding certificate");
+        $rc = CertNanny::Logging->error('MSG', "callOpenSSL(): Error ASN.1 decoding certificate");
         unlink $outfile;
       }
 
@@ -466,7 +608,7 @@ sub callOpenSSL {
         # read certificate
         open $fh, '<', $outfile;
         if (!$fh) {
-          $rc = CertNanny::Logging->error("callOpenSSL(): Error analysing ASN.1 decoded certificate");
+          $rc = CertNanny::Logging->error('MSG', "callOpenSSL(): Error analysing ASN.1 decoded certificate");
           unlink $outfile;
         }
       }
@@ -496,9 +638,9 @@ sub _sanityCheckIn {
   my $rc = 0;
   # eather CERTFILE or CERTDATA must be provided
   if (!(defined $args{CERTFILE} or defined $args{CERTDATA})) {
-    CertNanny::Logging->error($proc . "(): No input data specified");
+    CertNanny::Logging->error('MSG', $proc . "(): No input data specified");
   } elsif ((defined $args{CERTFILE} and defined $args{CERTDATA})) {
-    CertNanny::Logging->error($proc . "(): Ambigous input data specified");
+    CertNanny::Logging->error('MSG', $proc . "(): Ambigous input data specified");
   } elsif (defined $args{CERTFILE}) {
     $rc = 'CERTFILE';
   } elsif (defined $args{CERTDATA}) {
@@ -574,9 +716,9 @@ sub getCertSHA1 {
     }
   }
   if (defined($rc)) {
-    CertNanny::Logging->debug("SHA1 calculated as <$rc->{CERTSHA1}>\n");
+    CertNanny::Logging->debug('MSG', "SHA1 calculated as <$rc->{CERTSHA1}>\n");
   } else {
-    CertNanny::Logging->debug("No SHA1 calculated\n");
+    CertNanny::Logging->debug('MSG', "No SHA1 calculated\n");
   } 
   
 
@@ -644,7 +786,7 @@ sub getCertInfoHash {
     my ($mon, $day, $hh, $mm, $ss, $year, $tz) = $info->{$var} =~ /(\S+)\s+(\d+)\s+(\d+):(\d+):(\d+)\s+(\d+)\s*(\S*)/;
     my $dmon = $month{$mon};
     if (!defined $dmon) {
-      CertNanny::Logging->error("getCertInfoHash(): could not parse month '$mon' in date '$info->{$var}' returned by OpenSSL");
+      CertNanny::Logging->error('MSG', "getCertInfoHash(): could not parse month '$mon' in date '$info->{$var}' returned by OpenSSL");
       return undef;
     }
 
@@ -654,7 +796,7 @@ sub getCertInfoHash {
   # sanity checks
   foreach my $var (qw(Version SerialNumber SubjectName IssuerName NotBefore NotAfter CertificateFingerprint Modulus)) {
     if (!exists $info->{$var}) {
-      CertNanny::Logging->error("getCertInfoHash(): Could not determine field '$var' from X.509 certificate");
+      CertNanny::Logging->error('MSG', "getCertInfoHash(): Could not determine field '$var' from X.509 certificate");
       return undef;
     }
   }
@@ -697,7 +839,7 @@ sub getCSRInfoHash {
   # sanity checks
   foreach my $var (qw(Version SubjectName Modulus)) {
     if (!exists $info->{$var}) {
-      CertNanny::Logging->error("getCSRInfoHash(): Could not determine field '$var' from certificate signing request.");
+      CertNanny::Logging->error('MSG', "getCSRInfoHash(): Could not determine field '$var' from certificate signing request.");
       return undef;
     }
   }
@@ -862,7 +1004,7 @@ sub convertCert {
   # sanity checks
   foreach my $key (qw( CERTFORMAT OUTFORMAT )) {
     if ($args{$key} !~ m{ \A (?: DER | PEM ) \z }xms) {
-      CertNanny::Logging->error("convertCert(): Incorrect $key: $args{$key}");
+      CertNanny::Logging->error('MSG', "convertCert(): Incorrect $key: $args{$key}");
       return undef;
     }
   }
@@ -878,7 +1020,7 @@ sub convertCert {
       $infile = CertNanny::Util->getTmpFile();
       if (!CertNanny::Util->writeFile(DSTFILE    => $infile,
                                       SRCCONTENT => $args{CERTDATA})) {
-        CertNanny::Logging->error("convertCert(): Could not write temporary file: $infile");
+        CertNanny::Logging->error('MSG', "convertCert(): Could not write temporary file: $infile");
         return undef;
       }
       push(@cmd, qq("$infile"));
@@ -894,7 +1036,7 @@ sub convertCert {
     unlink $infile if defined $infile;
 
     if ($? != 0) {
-      CertNanny::Logging->error("convertCert(): Could not convert certificate");
+      CertNanny::Logging->error('MSG', "convertCert(): Could not convert certificate");
       return undef;
     }
   }
@@ -907,7 +1049,7 @@ sub getTmpFile {
   # NOTE: this is UNSAFE (beware of race conditions). We cannot use a file
   # handle here because we are calling external programs to use these
   # temporary files.
-  #CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "get a tmp file");
+  #CertNanny::Logging->debug('MSG', eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "get a tmp file");
   my $self = (shift)->getInstance();
   
   my $tmpdir = $self->{CONFIG}->get('path.tmpdir', 'FILE');
@@ -918,7 +1060,7 @@ sub getTmpFile {
   my $tmpfile = mktemp($template);
 
   push(@{$self->{TMPFILE}}, $tmpfile);
-  # CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "get a tmp file");
+  # CertNanny::Logging->debug('MSG', eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "get a tmp file");
   return $tmpfile;
 } ## end sub getTmpFile
 
@@ -928,7 +1070,7 @@ sub staticEngine {
   my $engine_id = shift;
 
   unless (defined $engine_id) {
-    CertNanny::Logging->error("No engine_id passed to staticEngine() as first argument!");
+    CertNanny::Logging->error('MSG', "No engine_id passed to staticEngine() as first argument!");
     die;
   }
 
@@ -941,7 +1083,7 @@ sub staticEngine {
     push(@cmd, $engine_id);
     push(@cmd, '-t');
 
-    CertNanny::Logging->debug("Execute: " . join(' ', @cmd));
+    CertNanny::Logging->debug('MSG', "Execute: " . join(' ', @cmd));
     my $output = "";
     open FH, join(' ', @cmd) . " |" or die "Couldn't execute " . join(' ', @cmd) . ": $!\n";
     while (defined(my $line = <FH>)) {
@@ -949,7 +1091,7 @@ sub staticEngine {
       $output .= $line;
     }
     close FH;
-    CertNanny::Logging->debug("Output is $output\n");
+    CertNanny::Logging->debug('MSG', "Output is $output\n");
     return $output =~ m/\(cs\).*\[ available \]/s;
   }
   return undef;
@@ -1029,47 +1171,47 @@ sub backoffTime {
   my $self   = (shift)->getInstance();
   my $config = shift;
 
-  CertNanny::Logging->debug("CertNanny::Util::backoffTime");
+  CertNanny::Logging->debug('MSG', "CertNanny::Util::backoffTime");
 
   if (exists $config->{CONFIG}->{conditionalwait}->{time}) {
-    CertNanny::Logging->debug("Conditional delay between 0 and " . $config->{CONFIG}->{conditionalwait}->{time} . " seconds");
+    CertNanny::Logging->debug('MSG', "Conditional delay between 0 and " . $config->{CONFIG}->{conditionalwait}->{time} . " seconds");
 
     my $date = $self->epochToIsoDate(time(), 1);
     my $currentDate = substr($date, 0, 8);
     my $now = time();
 
-    CertNanny::Logging->debug("$now currentDate:  $date");
+    CertNanny::Logging->debug('MSG', "$now currentDate:  $date");
     my $startTime = CertNanny::Util->isoDateToEpoch($currentDate . $config->{CONFIG}->{conditionalwait}->{start}, 1);
     my $endTime   = CertNanny::Util->isoDateToEpoch($currentDate . $config->{CONFIG}->{conditionalwait}->{end},   1);
-    CertNanny::Logging->debug("$startTime startISO: " . $currentDate . $config->{CONFIG}->{conditionalwait}->{start});
-    CertNanny::Logging->debug("$endTime endISO: " . $currentDate . $config->{CONFIG}->{conditionalwait}->{end});
+    CertNanny::Logging->debug('MSG', "$startTime startISO: " . $currentDate . $config->{CONFIG}->{conditionalwait}->{start});
+    CertNanny::Logging->debug('MSG', "$endTime endISO: " . $currentDate . $config->{CONFIG}->{conditionalwait}->{end});
 
     if ($startTime > $endTime) {
 
       #if the end time is greater then the end time we assume the start time started the day before.
       $startTime -= 24 * 60 * 60;
-      CertNanny::Logging->debug("new starttime $startTime in ISO" . CertNanny::Util::epochToIsoDate($startTime, 1));
+      CertNanny::Logging->debug('MSG', "new starttime $startTime in ISO" . CertNanny::Util::epochToIsoDate($startTime, 1));
     }
 
     if ($now > $startTime and $now < $endTime) {
       my $rndwaittime =
         int(rand($config->{CONFIG}->{conditionalwait}->{time}));
-      CertNanny::Logging->debug("Inside the conditional time frame, start extended backoff time of $rndwaittime seconds");
+      CertNanny::Logging->debug('MSG', "Inside the conditional time frame, start extended backoff time of $rndwaittime seconds");
       sleep $rndwaittime;
     } else {
-      CertNanny::Logging->debug("Outside the conditional time, no backoff");
+      CertNanny::Logging->debug('MSG', "Outside the conditional time, no backoff");
       if (exists $config->{CONFIG}->{randomwait}) {
-        CertNanny::Logging->debug("Random delay between 0 and " . $config->{CONFIG}->{randomwait} . " seconds");
+        CertNanny::Logging->debug('MSG', "Random delay between 0 and " . $config->{CONFIG}->{randomwait} . " seconds");
         my $rndwaittime = int(rand($config->{CONFIG}->{randomwait}));
-        CertNanny::Logging->info("Scheduling renewal but randomly waiting $rndwaittime seconds to reduce load on the PKI");
+        CertNanny::Logging->info('MSG', "Scheduling renewal but randomly waiting $rndwaittime seconds to reduce load on the PKI");
         sleep $rndwaittime;
       }
     }
   } else {
     if (exists $config->{CONFIG}->{randomwait}) {
-      CertNanny::Logging->debug("Random delay between 0 and " . $config->{CONFIG}->{randomwait} . " seconds");
+      CertNanny::Logging->debug('MSG', "Random delay between 0 and " . $config->{CONFIG}->{randomwait} . " seconds");
       my $rndwaittime = int(rand($config->{CONFIG}->{randomwait}));
-      CertNanny::Logging->info("Scheduling renewal but randomly waiting $rndwaittime seconds to reduce load on the PKI");
+      CertNanny::Logging->info('MSG', "Scheduling renewal but randomly waiting $rndwaittime seconds to reduce load on the PKI");
       sleep $rndwaittime;
     }
   }
@@ -1124,7 +1266,7 @@ sub getMacAddresses {
       push @result, $mac;
     }
   } else {
-    CertNanny::Logging->info(" unable to determine MAC addresses - ifconfig not available ? ");
+    CertNanny::Logging->info('MSG', " unable to determine MAC addresses - ifconfig not available ? ");
   }
 
   return @result ;
@@ -1132,7 +1274,7 @@ sub getMacAddresses {
 
 
 sub fetchFileList {
-  CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "fetch a file list");
+  CertNanny::Logging->debug('MSG', eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "fetch a file list");
   my $self   = (shift)->getInstance();
   my $myGlob = shift;
   
@@ -1142,31 +1284,31 @@ sub fetchFileList {
   foreach my $item (@myList) {
     $item =~ s/^["']*|["']*$//g;
     $item = File::Spec->canonpath($item);
-    CertNanny::Logging->debug("cannonpath file: $item");
+    CertNanny::Logging->debug('MSG', "cannonpath file: $item");
     if (-f $item) {
-      CertNanny::Logging->debug("Found file: $item");
+      CertNanny::Logging->debug('MSG', "Found file: $item");
       push(@tmpList, $item);
     } else {
       if (-d $item) {
-       CertNanny::Logging->debug("Found directory: $item");
+       CertNanny::Logging->debug('MSG', "Found directory: $item");
         if (opendir(DIR, $item)) {
           while (defined(my $file = readdir(DIR))) {
             my $osFileName = File::Spec->catfile($item, $file);
             if (-f $osFileName) {
-              CertNanny::Logging->debug("Found file: $osFileName");
+              CertNanny::Logging->debug('MSG', "Found file: $osFileName");
               push(@tmpList, $osFileName);
             } else {
-              CertNanny::Logging->debug("Found non-file: $osFileName");
+              CertNanny::Logging->debug('MSG', "Found non-file: $osFileName");
             }
           }
           closedir(DIR);
         }
       } else {
-        CertNanny::Logging->debug("Item is empty, does not exist or is binary (possible misconfiguration): $item");
+        CertNanny::Logging->debug('MSG', "Item is empty, does not exist or is binary (possible misconfiguration): $item");
       }
     }
   } ## end foreach my $item (@myList)
-  CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "fetch a file list");
+  CertNanny::Logging->debug('MSG', eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "fetch a file list");
   return \@tmpList;
 } ## end sub fetchFileList
 

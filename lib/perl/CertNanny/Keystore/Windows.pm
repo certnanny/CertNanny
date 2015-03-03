@@ -49,7 +49,7 @@ sub new {
   my $config    = $options->{CONFIG};
 
   # SANITY CHECKS
-  CertNanny::Logging->debug("new(): Windows Keystore.\n");
+  CertNanny::Logging->debug('MSG', "new(): Windows Keystore.\n");
 
   # Througout this class you will be able to access entry configuration
   # settings via
@@ -89,7 +89,7 @@ sub new {
   $entry->{enroll}->{$engine_section}->{dynamic_path} = $entry->{hsm}->{dynamic_path};
 
   if (!$self->_certReqReadTemplate()) {
-    CertNanny::Logging->error("new(): Could not read template file for certreq.");
+    CertNanny::Logging->error('MSG', "new(): Could not read template file for certreq.");
     return undef;
   }
   
@@ -143,7 +143,7 @@ sub getCert {
   # Gets the first certificate found either in CERTDATA or in CERTFILE and 
   # returns it in CERTDATA. 
   # If there is a rest in the input, it is returned in CERTREST
-  CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "Get main certificate from keystore");
+  CertNanny::Logging->debug('MSG', eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "Get main certificate from keystore");
   my $self     = shift;
   
   my $options   = $self->{OPTIONS};
@@ -163,7 +163,7 @@ sub getCert {
   my $derfile_tmp = $self->_certUtilWriteCerts((SERIAL => $serial));
   
   unless (defined($derfile_tmp)) {
-    CertNanny::Logging->debug("No serial was defined before so all certs were dumped and are now parsed");
+    CertNanny::Logging->debug('MSG', "No serial was defined before so all certs were dumped and are now parsed");
     my $olddir = getcwd();
     chdir $entry->{statedir};
     my @certs = glob "Blob*.crt";
@@ -171,30 +171,30 @@ sub getCert {
  
     foreach my $certfilename (@certs) {
       my $certinfo = CertNanny::Util->getCertInfoHash(CERTFILE => $certfilename);
-      CertNanny::Logging->debug("Parsing certificate with filname $certfilename and subjectname $certinfo->{SubjectName}");
+      CertNanny::Logging->debug('MSG', "Parsing certificate with filname $certfilename and subjectname $certinfo->{SubjectName}");
       my $notbefore = CertNanny::Util->isoDateToEpoch($certinfo->{NotBefore});
       my $notafter  = CertNanny::Util->isoDateToEpoch($certinfo->{NotAfter});
       my $now       = time;
-      CertNanny::Logging->debug("Searching for " . $entry->{location} . " in $certinfo->{SubjectName} and NotAfter $notafter where current time is $now");
-      CertNanny::Logging->debug("Result of index: " . index($certinfo->{SubjectName}, $entry->{location}));
+      CertNanny::Logging->debug('MSG', "Searching for " . $entry->{location} . " in $certinfo->{SubjectName} and NotAfter $notafter where current time is $now");
+      CertNanny::Logging->debug('MSG', "Result of index: " . index($certinfo->{SubjectName}, $entry->{location}));
  
       if (index($certinfo->{SubjectName}, $entry->{location}) != -1 && $notafter > $now) {
-        CertNanny::Logging->debug("Found something!");
+        CertNanny::Logging->debug('MSG', "Found something!");
         my $active_notafter = CertNanny::Util->isoDateToEpoch($active_cert->{NotAfter}) if (defined($active_cert));
  
         if (!defined($active_cert) || $active_notafter < $notafter) {
           $active_cert = $certinfo;
           $serial      = $certinfo->{SerialNumber};
           $serial =~ s/://g;
-          CertNanny::Logging->debug("The current certificate is the newest and thus will be used from hereon");
+          CertNanny::Logging->debug('MSG', "The current certificate is the newest and thus will be used from hereon");
         }
       } ## end if (index($certinfo->{...}))
     } ## end foreach my $certfilename (@certs)
  
     chdir $olddir;
     if (!defined($serial)) {
-      CertNanny::Logging->error("Could not retrieve a valid certificate from the keystore");
-      CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "Get main certificate from keystore");
+      CertNanny::Logging->error('MSG', "Could not retrieve a valid certificate from the keystore");
+      CertNanny::Logging->debug('MSG', eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "Get main certificate from keystore");
       return undef;
     }
  
@@ -205,7 +205,7 @@ sub getCert {
   my @cmd = (qq("$openssl"), 'x509', '-in', qq("$derfile_tmp"), '-inform', 'DER');
   $certdata = CertNanny::Util->runCommand(\@cmd, WANTOUT => 1);
   
-  CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "Get main certificate from keystore");
+  CertNanny::Logging->debug('MSG', eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "Get main certificate from keystore");
   return {CERTDATA   => $certdata,
           CERTFORMAT => 'PEM'};
 } ## end sub getCert
@@ -238,7 +238,7 @@ sub installCert {
   my $config    = $options->{CONFIG};
 
   my $ret = 1;
-  CertNanny::Logging->debug("enter sub installCert in widnows.pm \n");
+  CertNanny::Logging->debug('MSG', "enter sub installCert in widnows.pm \n");
   $self->_installCertchain();
 
   #my $keyfile = $self->{STATE}->{DATA}->{RENEWAL}->{REQUEST}->{KEYFILE};
@@ -246,7 +246,7 @@ sub installCert {
 
   my @cmd      = ('certreq', '-accept', qq("$certfile"));
   if (CertNanny::Util->runCommand(\@cmd, HIDEPWD => 1)) {
-    CertNanny::Logging->error("installCert(): Certificate could not be imported.");
+    CertNanny::Logging->error('MSG', "installCert(): Certificate could not be imported.");
     return undef;
   }
 
@@ -256,7 +256,7 @@ sub installCert {
   # delete request, otherwise certnanny thinks we have a pending request...
   if (-e $requestfile) {
     unless (unlink $requestfile) {
-      CertNanny::Logging->error("installCert(): Could not delete the old csr. Since the certificate was already installed, this is *critical*. Delete it manually or the next renewal will fail.");
+      CertNanny::Logging->error('MSG', "installCert(): Could not delete the old csr. Since the certificate was already installed, this is *critical*. Delete it manually or the next renewal will fail.");
     }
   }
   
@@ -268,13 +268,13 @@ sub installCert {
    
   if((POSIX::uname())[2] ne "5.2"){
     if(defined $entry->{iis} && defined $entry->{iis}->{ipport}){
-    CertNanny::Logging->debug("found app configuration for IIS 7 $entry->{iis}->{appid} try to bind  certificate to port ". $entry->{iis}->{ipport});
+    CertNanny::Logging->debug('MSG', "found app configuration for IIS 7 $entry->{iis}->{appid} try to bind  certificate to port ". $entry->{iis}->{ipport});
   	my @netshdel 	= ('netsh','http', 'delete','sslcert', 'ipport='.$entry->{iis}->{ipport});
   	my $netshdel    = join(" ", @netshdel);
-  	CertNanny::Logging->debug("netsh cmd: $netshdel");
+  	CertNanny::Logging->debug('MSG', "netsh cmd: $netshdel");
        
     if (CertNanny::Util->runCommand(\@netshdel)) {
-      CertNanny::Logging->error("installCert(): failed to unbind https certificate for IIS7.");
+      CertNanny::Logging->error('MSG', "installCert(): failed to unbind https certificate for IIS7.");
       #return undef;
     }
 
@@ -284,25 +284,25 @@ sub installCert {
   	
   	my @netsh      = ('netsh','http', 'add','sslcert', 'ipport='.$entry->{iis}->{ipport},'certhash="'. $hash. '"','appid="{' . $entry->{iis}->{appid} . '}"'); 
       my $netsh      = join(" ", @netsh);
-      CertNanny::Logging->debug("netsh cmd: $netsh");
+      CertNanny::Logging->debug('MSG', "netsh cmd: $netsh");
        
     	if (CertNanny::Util->runCommand(\@netsh)) {
-      	CertNanny::Logging->error("installCert(): failed to register https certificate for IIS 7.");
+      	CertNanny::Logging->error('MSG', "installCert(): failed to register https certificate for IIS 7.");
       	#return undef;
     	}
     } 
     }else{
       if(defined $entry->{iis} && defined $entry->{iis}->{ipport}){
-      CertNanny::Logging->debug("found app configuration for IIS6  $entry->{iis}->{appid} try to bind  certificate to port ". $entry->{iis}->{ipport});
+      CertNanny::Logging->debug('MSG', "found app configuration for IIS6  $entry->{iis}->{appid} try to bind  certificate to port ". $entry->{iis}->{ipport});
       #my @netshdel  = ('netsh','http', 'delete','sslcert', 'ipport='.$entry->{iis}->{ipport});
       # httpcfg delete ssl -i 0.0.0.0:443     
       my @netshdel  = ('httpcfg','delete','ssl', '-i' , '"'.$entry->{iis}->{ipport}.'"');
       
       my $netshdel    = join(" ", @netshdel);
-      CertNanny::Logging->debug("httpcfg cmd: $netshdel");
+      CertNanny::Logging->debug('MSG', "httpcfg cmd: $netshdel");
          
       if (CertNanny::Util->runCommand(\@netshdel)) {
-        CertNanny::Logging->error("installCert(): failed to unbind https certificate on IIS 6.");
+        CertNanny::Logging->error('MSG', "installCert(): failed to unbind https certificate on IIS 6.");
         #return undef;
       }
   
@@ -314,10 +314,10 @@ sub installCert {
       my @netsh  = ('httpcfg','set', 'ssl','-i', '"'.$entry->{iis}->{ipport}.'"' ,'-h', '"'. $hash.'"','-g',  '"{'. $entry->{iis}->{appid}. '}"'); 
     
         my $netsh      = join(" ", @netsh);
-        CertNanny::Logging->debug("httpcfg cmd: $netsh");
+        CertNanny::Logging->debug('MSG', "httpcfg cmd: $netsh");
          
         if (CertNanny::Util->runCommand(\@netsh)) {
-          CertNanny::Logging->error("installCert(): failed to register https certificate on IIS 6.");
+          CertNanny::Logging->error('MSG', "installCert(): failed to register https certificate on IIS 6.");
           #return undef;
         }
     } 
@@ -396,7 +396,7 @@ sub createRequest() {
   $result->{KEYFILE}     = $entry->{location};
 
   unless ($self->_checkRequestSanity()) {
-    CertNanny::Logging->error("createRequest(): Sanitycheck could not resolve all problems. Please fix manually.");
+    CertNanny::Logging->error('MSG', "createRequest(): Sanitycheck could not resolve all problems. Please fix manually.");
     return undef;
   }
 
@@ -404,16 +404,16 @@ sub createRequest() {
   unless (-e $result->{REQUESTFILE}) {
     my @cmd = ('certreq', '-new', qq("$inf_file_out"), qq("$result->{REQUESTFILE}"));
     # my $cmd = join(' ', @cmd);
-    # CertNanny::Logging->debug("Execute: $cmd");
+    # CertNanny::Logging->debug('MSG', "Execute: $cmd");
     # `$cmd`;
     # if ($? != 0) {
-    #   CertNanny::Logging->error("createRequest(): Executing certreq cmd error: $cmd");
+    #   CertNanny::Logging->error('MSG', "createRequest(): Executing certreq cmd error: $cmd");
     #   return undef;
     # }
     
     my $rc = CertNanny::Util->runCommand(\@cmd);
     if ($rc != 0) {
-      CertNanny::Logging->error("createRequest(): Executing certreq cmd: " . join(' ', @cmd) . " error: " . $rc);
+      CertNanny::Logging->error('MSG', "createRequest(): Executing certreq cmd: " . join(' ', @cmd) . " error: " . $rc);
       return undef;
     }
   } ## end unless (-e $result->{REQUESTFILE...})
@@ -559,10 +559,10 @@ sub importP12 {
   my @cmd;
   push(@cmd, 'certutil');
 
-  CertNanny::Logging->debug("storelocation:" . $entry->{storelocation});
+  CertNanny::Logging->debug('MSG', "storelocation:" . $entry->{storelocation});
   
   if ($entry->{storelocation} eq 'user') {
-    CertNanny::Logging->debug("Store location for import is user");
+    CertNanny::Logging->debug('MSG', "Store location for import is user");
     push(@cmd, '-user');
   }
 
@@ -575,7 +575,7 @@ sub importP12 {
   my $cmd_output = CertNanny::Util->runCommand(\@cmd, WANTOUT => 1);
 
   #chdir $olddir;
-  CertNanny::Logging->debug("Dumping output of above command:\n $cmd_output");
+  CertNanny::Logging->debug('MSG', "Dumping output of above command:\n $cmd_output");
   return 1;
 } ## end sub importP12
 
@@ -708,7 +708,7 @@ sub _certUtilWriteCerts() {
   $args{COMMAND} = '-store';
   my $tmpfile = CertNanny::Util->getTmpFile();
   $args{OUTFILE} = qq($tmpfile) if defined $args{SERIAL};
-  CertNanny::Logging->debug("Calling certutil.exe to retrieve certificates.");
+  CertNanny::Logging->debug('MSG', "Calling certutil.exe to retrieve certificates.");
   my $outfile_tmp = $self->_certUtilWriteCertsCmd(%args);
   return $outfile_tmp;
 } ## end sub _certUtilWriteCerts
@@ -724,10 +724,10 @@ sub _certUtilWriteCertsDeleteCert() {
 
   #	my $store = $args{STORE} || "My";
   unless ($serial) {
-    CertNanny::Logging->error("A deletion was requested, no serial.");
+    CertNanny::Logging->error('MSG', "A deletion was requested, no serial.");
     return undef;
   }
-  CertNanny::Logging->debug("Deleting ceritifcate with serial $serial from store $self->{OPTIONS}->{ENTRY}->{storelocation}");
+  CertNanny::Logging->debug('MSG', "Deleting ceritifcate with serial $serial from store $self->{OPTIONS}->{ENTRY}->{storelocation}");
   $self->_certUtilWriteCertsCmd(%args);
   return !$?;
 } ## end sub _certUtilWriteCertsDeleteCert
@@ -740,7 +740,7 @@ sub _certUtilWriteCertsCmd() {
   my $store       = $args{STORE} || "My";
   my $outfile_tmp = $args{OUTFILE} if defined $args{OUTFILE};
 
-  CertNanny::Logging->debug("Serial is $serial.") if defined($serial);
+  CertNanny::Logging->debug('MSG', "Serial is $serial.") if defined($serial);
 
   my @cmd;
   push(@cmd, 'certutil');
@@ -759,11 +759,11 @@ sub _certUtilWriteCertsCmd() {
   foreach my $cert (@certs) {
     unlink $cert;
   }
-  CertNanny::Logging->debug("Execute: $cmd.");
+  CertNanny::Logging->debug('MSG', "Execute: $cmd.");
   my $cmd_output = `$cmd`;
   chdir $olddir;
-  CertNanny::Logging->debug("Dumping output of above command:\n $cmd_output");
-  CertNanny::Logging->debug("Output was written to $outfile_tmp") if defined($outfile_tmp);
+  CertNanny::Logging->debug('MSG', "Dumping output of above command:\n $cmd_output");
+  CertNanny::Logging->debug('MSG', "Output was written to $outfile_tmp") if defined($outfile_tmp);
   return $outfile_tmp;
 } ## end sub _certUtilWriteCertsCmd
 
@@ -804,11 +804,11 @@ sub _certReqReadTemplate() {
 
   my $inf_file_in = $self->{OPTIONS}->{ENTRY}->{certreqinf};
   if (!$inf_file_in or !-e $inf_file_in) {
-    CertNanny::Logging->error("_certReqReadTemplate(): Could not find certreq template file in the following path: $inf_file_in, please check your certreqinf setting for the keystore!");
+    CertNanny::Logging->error('MSG', "_certReqReadTemplate(): Could not find certreq template file in the following path: $inf_file_in, please check your certreqinf setting for the keystore!");
     return undef;
   }
   open INF_FILE_IN, "<", $inf_file_in
-    or CertNanny::Logging->error("_certReqReadTemplate(): Could not open input file: $inf_file_in");
+    or CertNanny::Logging->error('MSG', "_certReqReadTemplate(): Could not open input file: $inf_file_in");
   my $section;
   while (<INF_FILE_IN>) {
     chomp;
@@ -858,7 +858,7 @@ sub _checkRequestSanity() {
   my $self = shift;
 
   # Steps:
-  CertNanny::Logging->debug("Checking request sanity.");
+  CertNanny::Logging->debug('MSG', "Checking request sanity.");
 
   # 1. read all keys from REQUEST store
   my @certs = $self->_getStoreCerts("REQUEST");
@@ -868,7 +868,7 @@ sub _checkRequestSanity() {
 
   # 3. if csr does not exist
   unless (-e $csrfile) {
-    CertNanny::Logging->debug("No CSR was found under $csrfile for keystore " . $self->{OPTIONS}->{ENTRYNAME} . ". Checking if there is a pending request in keystore that matched Certificate subject " . $self->{OPTIONS}->{ENTRY}->{SubjectName} . ".");
+    CertNanny::Logging->debug('MSG', "No CSR was found under $csrfile for keystore " . $self->{OPTIONS}->{ENTRYNAME} . ". Checking if there is a pending request in keystore that matched Certificate subject " . $self->{OPTIONS}->{ENTRY}->{SubjectName} . ".");
 
     # 3.1. if object with same subject name as current cert exists
     my @delete_certs;
@@ -881,12 +881,12 @@ sub _checkRequestSanity() {
     if (@delete_certs) {
 
       # 3.1.1 delete the objects
-      CertNanny::Logging->info("There is at least one old pending request in the keystore although no CSR was found for it. All pending requests that have the same subject as the current ceritficate will be deleted.");
+      CertNanny::Logging->info('MSG', "There is at least one old pending request in the keystore although no CSR was found for it. All pending requests that have the same subject as the current ceritficate will be deleted.");
       foreach my $cert (@delete_certs) {
         my $serial = $cert->{SerialNumber};
         $serial =~ s/://g;
         unless ($self->_certUtilWriteCertsDeleteCert((SERIAL => $serial, STORE => "REQUEST"))) {
-          CertNanny::Logging->error("Could not delete certificate with serial $serial from store REQUEST");
+          CertNanny::Logging->error('MSG', "Could not delete certificate with serial $serial from store REQUEST");
           return undef;
         }
       }
@@ -901,11 +901,11 @@ sub _checkRequestSanity() {
 
     # 4.1 if no key in REQUEST
     unless (@certs) {
-      CertNanny::Logging->info("There is no pending request in the keystore so the current csr will be deleted.");
+      CertNanny::Logging->info('MSG', "There is no pending request in the keystore so the current csr will be deleted.");
 
       # 4.1.1 delete the csr
       unless (unlink $csrfile) {
-        CertNanny::Logging->error("Could not delete csr $csrfile. Please remove manually.");
+        CertNanny::Logging->error('MSG', "Could not delete csr $csrfile. Please remove manually.");
         return undef;
       }
       return 1;
@@ -927,13 +927,13 @@ sub _checkRequestSanity() {
 
     unless ($request_key) {
       my $subject = $csr->{SubjectName};
-      CertNanny::Logging->info("The existing csr does not match any currently pending request in the keystore so the csr and all pending requests with subject $subject will be deleted.");
+      CertNanny::Logging->info('MSG', "The existing csr does not match any currently pending request in the keystore so the csr and all pending requests with subject $subject will be deleted.");
     }
     unless (defined $request_key) {
 
       # 4.2.1 delete the csr
       unless (unlink $csrfile) {
-        CertNanny::Logging->error("Could not delete csr $csrfile. Please remove manually.");
+        CertNanny::Logging->error('MSG', "Could not delete csr $csrfile. Please remove manually.");
         return undef;
       }
     }
@@ -942,9 +942,9 @@ sub _checkRequestSanity() {
     foreach my $cert (@delete_certs) {
       my $serial = $cert->{SerialNumber};
       $serial =~ s/://g;
-      CertNanny::Logging->debug("Deleting certificate with serial $serial");
+      CertNanny::Logging->debug('MSG', "Deleting certificate with serial $serial");
       unless ($self->_certUtilWriteCertsDeleteCert((SERIAL => $serial, STORE => "REQUEST"))) {
-        CertNanny::Logging->error("Could not delete certificate with serial $serial from store REQUEST");
+        CertNanny::Logging->error('MSG', "Could not delete certificate with serial $serial from store REQUEST");
         return undef;
       }
     }
@@ -962,68 +962,68 @@ sub _installCertchain() {
              );
   my $ret = 1;
 
-  CertNanny::Logging->debug("write certificate chain: \n");
+  CertNanny::Logging->debug('MSG', "write certificate chain: \n");
 
   # list of chain certificates
   my @certchain = @{$self->{STATE}->{DATA}->{CERTCHAIN}};
 
   foreach my $chaincert (@certchain) {
 
-    CertNanny::Logging->debug("certificate subject:" . $chaincert->{CERTINFO}->{SubjectName});
+    CertNanny::Logging->debug('MSG', "certificate subject:" . $chaincert->{CERTINFO}->{SubjectName});
 
     if ($chaincert->{CERTINFO}->{SubjectName} eq $chaincert->{CERTINFO}->{IssuerName}) {
 
       my $rootToInstall = CertNanny::Util->getTmpFile();
-      CertNanny::Logging->debug("Root Cert to install: $rootToInstall");
+      CertNanny::Logging->debug('MSG', "Root Cert to install: $rootToInstall");
 
       if (!CertNanny::Util->writeFile(DSTFILE    => $rootToInstall,
                                       SRCCONTENT => $chaincert->{CERTINFO}->{Certificate},
                                       FORCE      => 1,)
         ) {
-        CertNanny::Logging->error("Could not write root cert to install to temp file");
+        CertNanny::Logging->error('MSG', "Could not write root cert to install to temp file");
         return undef;
       }
 
       my @cmd = ('certutil', '-addstore', 'root', qq("$rootToInstall"));
       my $cmd = join(" ", @cmd);
 
-      CertNanny::Logging->debug("Execute: $cmd");
+      CertNanny::Logging->debug('MSG', "Execute: $cmd");
       my $cmd_output = `$cmd`;
-      CertNanny::Logging->debug("certreq output:\n$cmd_output");
+      CertNanny::Logging->debug('MSG', "certreq output:\n$cmd_output");
       if ($? != 0) {
-        CertNanny::Logging->error("_installCertchain(): Root Certificate could not be imported. Output of command $cmd was:\n$cmd_output");
+        CertNanny::Logging->error('MSG', "_installCertchain(): Root Certificate could not be imported. Output of command $cmd was:\n$cmd_output");
         return undef;
       }
 
       unless (unlink $rootToInstall) {
-        CertNanny::Logging->error("_installCertchain(): Could not delete root tmp file. Since the certificate was already installed no worries.");
+        CertNanny::Logging->error('MSG', "_installCertchain(): Could not delete root tmp file. Since the certificate was already installed no worries.");
       }
     } else {
 
       my $CAToInstall = CertNanny::Util->getTmpFile();
-      CertNanny::Logging->debug("Root Cert to install: $CAToInstall");
+      CertNanny::Logging->debug('MSG', "Root Cert to install: $CAToInstall");
 
       if (!CertNanny::Util->writeFile(DSTFILE    => $CAToInstall,
                                       SRCCONTENT => $chaincert->{CERTINFO}->{Certificate},
                                       FORCE      => 1,)
         ) {
-        CertNanny::Logging->error("Could not write CA cert to install to temp file");
+        CertNanny::Logging->error('MSG', "Could not write CA cert to install to temp file");
         return undef;
       }
 
       my @cmd = ('certutil', '-addstore', 'CA', qq("$CAToInstall"));
       my $cmd = join(" ", @cmd);
 
-      CertNanny::Logging->debug("Execute: $cmd");
+      CertNanny::Logging->debug('MSG', "Execute: $cmd");
       my $cmd_output = `$cmd`;
-      CertNanny::Logging->debug("certreq output:\n$cmd_output");
+      CertNanny::Logging->debug('MSG', "certreq output:\n$cmd_output");
       if ($? != 0) {
-        CertNanny::Logging->error("_installCertchain(): Root Certificate could not be imported. Output of command $cmd was:\n$cmd_output");
+        CertNanny::Logging->error('MSG', "_installCertchain(): Root Certificate could not be imported. Output of command $cmd was:\n$cmd_output");
         return undef;
       }
 
       unless (unlink $CAToInstall) {
-        CertNanny::Logging->error("_installCertchain(): Could not delete CA tmp file. Since the certificate was already installed no worries.");
+        CertNanny::Logging->error('MSG', "_installCertchain(): Could not delete CA tmp file. Since the certificate was already installed no worries.");
       }
     } ## end else [ if ($chaincert->{CERTINFO...})]
   } ## end foreach my $chaincert (@certchain)
@@ -1039,7 +1039,7 @@ sub _deleteOldCerts() {
   my $ret          = 1;
   my $newcert_info = CertNanny::Util->getCertInfoHash((CERTFILE   => $certfile, 
                                                    CERTFORMAT => 'PEM'));
-  CertNanny::Logging->info("Deleting old certificate from keystore");
+  CertNanny::Logging->info('MSG', "Deleting old certificate from keystore");
   my @store_certs = $self->_getStoreCerts();
   foreach my $storecert (@store_certs) {
     my $newcert_subject   = $newcert_info->{SubjectName};
@@ -1049,9 +1049,9 @@ sub _deleteOldCerts() {
     if ($storecert_subject eq $newcert_subject && $storecert_serial ne $newcert_serial) {
       my $delserial = $storecert_serial;
       $delserial =~ s/://g;
-      CertNanny::Logging->debug("Deleting certificate with serial $delserial");
+      CertNanny::Logging->debug('MSG', "Deleting certificate with serial $delserial");
       unless ($self->_certUtilWriteCertsDeleteCert((SERIAL => $delserial))) {
-        CertNanny::Logging->error("Could not delete the old certificate. The next update will fail if this is not fixed!");
+        CertNanny::Logging->error('MSG', "Could not delete the old certificate. The next update will fail if this is not fixed!");
         $ret = undef;
       }
     }
