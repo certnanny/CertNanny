@@ -57,7 +57,7 @@ my %cmdLineParam;
 GetOptions(\%cmdLineParam, qw(help|?
                               man
                               config|cfg|cfgfile|conf=s
-                              debug:i
+                              debug=s
                               verbose
                               keystore|key=s
                               force
@@ -81,13 +81,6 @@ $cmdLineParam{config} = 'certnanny.cfg' if !defined $cmdLineParam{config};
 $cmdLineParam{sleep}    = 300           if !defined $cmdLineParam{sleep};
 $cmdLineParam{force}    = 0             if !defined $cmdLineParam{force};
 $cmdLineParam{keystore} = ''            if !defined $cmdLineParam{keystore};
-
-# Determining Debug Level
-# Prio 0: Default : 3
-# Prio 1: Take the value from the config file
-# Prio 2: If a commandline parameter debug is without value, take 4
-# Prio 3: If a commandline parameter debug is with value, take the value of debug
-# Prio 4: If a commandline parameter verbose is with value, take the value, take 6
 
 # Instantiate dependend singleton objects
 # Config
@@ -361,13 +354,17 @@ Executes the hook HOOK for the keystore KEYSTORE. The --keystore option is manda
 
   --config FILE         specify config file to use
   --debug [LEVEL]       Override loglevel in CertNanny configuration file. 
-                        LEVEL is optional and can be one of the acceptable 
-                        values for the loglevel directive in the configuration 
-                        file. If LEVEL is not specified a default of 6 will be 
-                        used (SCEP Debug).
+                        LEVEL is optional.
+                        If LEVEL is a number between 1-6 (i.E.: --debug 5) the
+                        output to all possible debug target is set identically
+                        to LEVEL.
+                        If LEVEL is set to a string (i.E. --debug C1F5S2),
+                        there will be different debug levels for targets
+                        console (C1 -> level 1), file (f5 -> level5) and
+                        syslog (s2-> level 2).
   --verbose             Generate more information about the operations perfor-
-                        med by CertNanny. The verbose information will be writ-
-                        ten to STDERR. 
+                        med by CertNanny (equal debug level 6). The verbose 
+                        information will be written to STDERR. 
   --keystore KEYSTORE   Optional. Limit specified CertNanny command to keystore 
                         KEYSTORE. 
                         Default: all configured keystores

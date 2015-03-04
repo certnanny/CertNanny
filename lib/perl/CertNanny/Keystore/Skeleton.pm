@@ -43,7 +43,7 @@ sub nuts_and_bolts {
 # Some useful code snippets
 #
 # Log debug information:
-# CertNanny::Logging->debug('MSG', "My debug level is " . CertNanny::Logging->logLevel());
+# CertNanny::Logging->debug('MSG', "My debug level is " . CertNanny::Logging->logLevel('TARGET', 'File'));
 #
 # Log informational message:
 # CertNanny::Logging->info('MSG', "Some informational message");

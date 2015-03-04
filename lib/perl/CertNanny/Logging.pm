@@ -63,21 +63,42 @@ sub getInstance {
 
       # Determining Debug Level
       # Downward compatibility
-      if (!defined($args{CONFIG}->get('log.level')))    {$args{CONFIG}->set('log.level',    $args{CONFIG}->get('loglevel'))}
-      if (!defined($args{CONFIG}->get('log.out.file'))) {$args{CONFIG}->set('log.out.file', $args{CONFIG}->get('logfile'))}
-      if (!defined($args{CONFIG}->get('log.err.file'))) {$args{CONFIG}->set('log.err.file', $args{CONFIG}->get('logfile'))}
+      if (!defined($args{CONFIG}->get('log.out.file')))      {$args{CONFIG}->set('log.out.file',      $args{CONFIG}->get('logfile'))}
+      if (!defined($args{CONFIG}->get('log.err.file')))      {$args{CONFIG}->set('log.err.file',      $args{CONFIG}->get('logfile'))}
+      
+      foreach my $target ('console', 'file', 'syslog') {
+        # Downward compatibility
+        if (!defined($args{CONFIG}->get('log.level.'.$target))) {$args{CONFIG}->set('log.level.'.$target, $args{CONFIG}->get('loglevel'))}
 
-      # Prio 0: Default : 3
-      my $logLevel = 3;
-      # Prio 1: If a config file value is given, take this
-      if (defined($args{CONFIG}->get('log.level')))     {$logLevel = $args{CONFIG}->get('log.level')}
-      # Prio 2: If a commandline parameter debug is given without value, take 4
-      if (defined($args{debug}) && ($args{debug} == 0)) {$logLevel = 4}
-      # Prio 3: If a commandline parameter debug is given with value, take the value of debug
-      if (defined($args{debug}) && ($args{debug} != 0)) {$logLevel = $args{debug}}
-      # Prio 4: If a commandline parameter verbose is given, take 6
-      if (defined($args{verbose}))                      {$logLevel = 6} 
-      $INSTANCE->logLevel($logLevel);
+        # Debug Level is determined in 5 Steps (highest Prio wins)
+        # Prio 0: Default : 3
+        my $logLevel = 3;
+        # Prio 1: If a config file value is given, take this
+        if (defined($args{CONFIG}->get('log.level.'.$target))) {$logLevel = $args{CONFIG}->get('log.level.'.$target)}
+        if (defined($args{debug})) {
+          my $debug = lc($args{debug});
+          if ($debug eq '') {
+            # Prio 2: If a commandline parameter debug is given without value, take 4
+            $logLevel = 4
+          } else {
+            # Prio 3: If a commandline parameter debug is given with value, take the value of debug
+            # Commandline format:
+            #   Option 1: # : Take the given Level for console, file and syslog
+            if ($debug =~/^\d$/) {
+              $logLevel = $args{debug}
+            }
+            if ($debug =~/^([cfs]\d){1,3}$/) {
+              my %debugLevel = split(//, $debug);
+              $logLevel = $debugLevel{substr($target, 0, 1)} if defined($debugLevel{substr($target, 0, 1)});
+            }
+          }
+        }
+        # Prio 4: If a commandline parameter verbose is given, take 6
+        if (defined($args{verbose})) {$logLevel = 6} 
+
+        # set Loglevel
+        $INSTANCE->logLevel('TARGET', $target, 'LEVEL', $logLevel);
+      }
 
       # Determine Logtargets
       $INSTANCE->switchFileOut   ('STATUS', defined($args{CONFIG}->get('log.out.file')) && ($args{CONFIG}->get('log.out.file') ne ''));
@@ -140,82 +161,106 @@ sub DESTROY {
 sub _print {
   my $self = (shift)->getInstance();
   my %args = (@_);
+
+  my $target    = $args{TARGET};
+  my $str       = $args{STR};
+  my $dbg       = 0;
+  my $buffer;
   
-  my $target = $args{TARGET};
-  my $str    = $args{STR};
+  my $myFile     = defined($self->{CONFIG}) ? CertNanny::Util->expandstring($self->{CONFIG}->get('log.'.lc($target).'.file', "FILE"), %args)     :  undef;
+  my $myLastFile = defined($self->{CONFIG}) ? CertNanny::Util->expandstring($self->{CONFIG}->get('log.'.lc($target).'.filelast', "FILE"), %args) :  undef;
+
+  my $fileTarget     = $logTarget{$target.'file'} && defined($myFile) && ($myFile ne '');
+  my $lastFileTarget = $logTarget{$target.'file'} && defined($myLastFile) && ($myLastFile ne '');
+  my $consoleTarget  = $logTarget{$target.'console'};
+  my $sysLogTarget   = $logTarget{$target.'syslog'};
   
-  my $myOut;
-  my $myOutStd;
-  my $myFile     = defined($self->{CONFIG}) ? $self->{CONFIG}->get('log.'.lc($target).'.file', "FILE")     :  undef;
-  $myFile        = CertNanny::Util->expandstring($myFile, %args);
-  my $myLastFile = defined($self->{CONFIG}) ? $self->{CONFIG}->get('log.'.lc($target).'.filelast', "FILE") :  undef;
-  $myLastFile    = CertNanny::Util->expandstring($myLastFile, %args);
-  my $buffer     = ($target eq 'Err') ? \@errBuffer : \@outBuffer;
-  push(@$buffer, $str);
+  if ($target eq 'out') {
+    my $prio = lc($args{PRIO} || "info");
+    my %level = ('debug'  => 4,
+                 'info'   => 3,
+                 'notice' => 2,
+                 'error'  => 1,
+                 'fatal'  => 0);
+    $buffer     = \@outBuffer;
+
+    if (exists $level{$prio}) {
+      $dbg = $level{$prio};
+    } else {
+      push @$buffer, "${dbg}:WARNING: log called with undefined priority '$prio'" unless exists $level{$prio};
+    }
+  }
+
+  if ($target eq 'err') {
+    $buffer     = \@errBuffer;
+  }
   
-  #if ($logTarget{$target.'Console'} ||
-  #   ($logTarget{$target.'File'} && defined($myFile)) ||
-  #   ($logTarget{$target.'File'} && defined($myLastFile)) ||
-  #    $logTarget{$target.'SysLog'}) {
+  push(@$buffer, "${dbg}:${str}");
+  
   if (!$bufferOut) {
     while (@$buffer) {
       $str = shift(@$buffer);
+      if ($str =~ /^([^:]):(.*)$/s) {
+        $dbg = $1;
+        $str = $2;
+      }
       # Log to file
-      if ($logTarget{$target.'File'}) {
-        if (defined($myFile) && ($myFile ne '')) {
-          if ($target eq 'Err') {
-            $| = 1;
-            open STDERR, ">>", $myFile || die "Could not redirect STDERR to <$myFile>. Stopped";
-            print STDERR $str;
-            close STDERR;
-          } else {
-            open STDOUT, ">>", $myFile || die "Could not redirect STDOUT to <$myFile>. Stopped";
-            print STDOUT $str;
-            close STDOUT;
-          }
-        }
-        if (defined($myLastFile) && ($myLastFile ne '')) {
-          $| = 1;
-          if ($target eq 'Err') {
-            # if (!$logTargetOpen{$target.'File.Last'}) {
-            if (!$logTargetOpen{$myLastFile}) {
-              open STDERR, ">", $myLastFile || die "Could not redirect STDERR to <$myLastFile>. Stopped";
-              # $logTargetOpen{$target.'File.Last'} = 1;
-              $logTargetOpen{$myLastFile} = 1;
-            } else {
-              open STDERR, ">>", $myLastFile || die "Could not redirect STDERR to <$myLastFile>. Stopped";
-            }
-            print STDERR $str;
-            close STDERR;
-          } else {
-            # if (!$logTargetOpen{$target.'File.Last'}) {
-            if (!$logTargetOpen{$myLastFile}) {
-              open STDOUT, ">", $myLastFile || die "Could not redirect STDOUT. Stopped";
-              # $logTargetOpen{$target.'File.Last'} = 1;
-              $logTargetOpen{$myLastFile} = 1;
-            } else {
-              open STDOUT, ">>", $myLastFile || die "Could not redirect STDOUT. Stopped";
-            }
-            print STDOUT $str;
-            close STDOUT;
-          }
-        }
-      }
-      # Log to console
-      if ($logTarget{$target.'Console'}) {
+      if ($fileTarget && ($target eq 'err') && ($dbg <= $self->logLevel('TARGET', 'file'))) {
         $| = 1;
-        if ($target eq 'Err') {
-          open STDERR, ">&", $stdErrFake;
-          print STDERR $str;
-          close STDERR;
-        } else {
-          open STDOUT, ">&", $stdOutFake;
-          print STDOUT $str;
-          close STDOUT;
-        }
+        open STDERR, ">>", $myFile || die "Could not redirect STDERR to <$myFile>. Stopped";
+        print STDERR $str;
+        close STDERR;
       }
+      if ($fileTarget && ($target eq 'out') && ($dbg <= $self->logLevel('TARGET', 'file'))) {
+        open STDOUT, ">>", $myFile || die "Could not redirect STDOUT to <$myFile>. Stopped";
+        print STDOUT $str;
+        close STDOUT;
+      }
+      
+      #Log to LastFile
+      if ($lastFileTarget && ($target eq 'err') && ($dbg <= $self->logLevel('TARGET', 'file'))) {
+        $| = 1;
+        if (!$logTargetOpen{$myLastFile}) {
+          open STDERR, ">", $myLastFile || die "Could not redirect STDERR to <$myLastFile>. Stopped";
+          $logTargetOpen{$myLastFile} = 1;
+        } else {
+          open STDERR, ">>", $myLastFile || die "Could not redirect STDERR to <$myLastFile>. Stopped";
+        }
+        print STDERR $str;
+        close STDERR;
+      }
+      if ($lastFileTarget && ($target eq 'out') && ($dbg <= $self->logLevel('TARGET', 'file'))) {
+        $| = 1;
+        if (!$logTargetOpen{$myLastFile}) {
+          open STDOUT, ">", $myLastFile || die "Could not redirect STDOUT. Stopped";
+          $logTargetOpen{$myLastFile} = 1;
+        } else {
+          open STDOUT, ">>", $myLastFile || die "Could not redirect STDOUT. Stopped";
+        }
+        print STDOUT $str;
+        close STDOUT;
+      }
+      
+      # Log to console
+      if ($consoleTarget && ($target eq 'err') && ($dbg <= $self->logLevel('TARGET', 'console'))) {
+        $| = 1;
+        open STDERR, ">&", $stdErrFake;
+        print STDERR $str;
+        close STDERR;
+      }
+      if ($consoleTarget && ($target eq 'out') && ($dbg <= $self->logLevel('TARGET', 'console'))) {
+        $| = 1;
+        open STDOUT, ">&", $stdOutFake;
+        print STDOUT $str;
+        close STDOUT;
+      }
+      
       # Log to syslog
-      if ($logTarget{$target.'SysLog'}) {
+      if ($sysLogTarget && ($target eq 'err') && ($dbg <= $self->logLevel('TARGET', 'syslog'))) {
+        $| = 1;
+      }
+      if ($sysLogTarget && ($target eq 'out') && ($dbg <= $self->logLevel('TARGET', 'syslog'))) {
+        $| = 1;
       }
     }
   }
@@ -225,7 +270,7 @@ sub _print {
 
 sub printerr {
   my $self = (shift)->getInstance();
-  $self->_print('TARGET', 'Err', 
+  $self->_print('TARGET', 'err', 
                 'STR', '',
                 @_);
   return 1;
@@ -234,7 +279,7 @@ sub printerr {
 
 sub printout {
   my $self = (shift)->getInstance();
-  $self->_print('TARGET', 'Out',
+  $self->_print('TARGET', 'out',
                 'STR', '',
                 @_);
   return 1;
@@ -243,12 +288,15 @@ sub printout {
 
 sub logLevel {
   my $self = (shift)->getInstance();
-  $self->{OPTIONS}->{LOGLEVEL} = shift if (@_);
+  my %args = ('TARGET', 'console',
+              @_);
+              
+  $self->{OPTIONS}->{LOGLEVEL}->{$args{TARGET}} = $args{LEVEL} if defined($args{LEVEL});
 
-  if (!defined $self->{OPTIONS}->{LOGLEVEL}) {
-    return 3;
+  if (!defined($self->{OPTIONS}->{LOGLEVEL}->{$args{TARGET}})) {
+    $self->{OPTIONS}->{LOGLEVEL}->{$args{TARGET}} = 3;
   }
-  return $self->{OPTIONS}->{LOGLEVEL};
+  return $self->{OPTIONS}->{LOGLEVEL}->{$args{TARGET}};
 } ## end sub logLevel
 
 
@@ -256,20 +304,20 @@ sub _Off {
   my $self = (shift)->getInstance();
   my $target = shift;
 
-  if ($logTarget{$target.'Console'} != 0 ||
-      $logTarget{$target.'File'}    != 0 ||
-      $logTarget{$target.'SysLog'}  != 0) {
+  if ($logTarget{$target.'console'} != 0 ||
+      $logTarget{$target.'file'}    != 0 ||
+      $logTarget{$target.'syslog'}  != 0) {
     $| = 1;
-    if ($target eq 'Err') {
+    if ($target eq 'err') {
       $self->debug('MSG', 'Error Logging is disabled');
       open STDERR, ">", "/dev/null";
     } else {
       $self->debug('MSG', 'Logging is disabled');
       open STDOUT, ">", "/dev/null";
     }  
-    $logTarget{$target.'Console'} = 0;
-    $logTarget{$target.'File'}    = 0;
-    $logTarget{$target.'SysLog'}  = 0;
+    $logTarget{$target.'console'} = 0;
+    $logTarget{$target.'file'}    = 0;
+    $logTarget{$target.'syslog'}  = 0;
   } ## end $logTarget{$target.'Cons ... 
 
   return 1;
@@ -278,14 +326,14 @@ sub _Off {
 
 sub errOff {
   my $self = (shift)->getInstance();
-  $self->Off('Err');
+  $self->_Off('err');
   return 1;
 } ## end sub errOff
 
 
 sub outOff {
   my $self = (shift)->getInstance();
-  $self->Off('Out');
+  $self->_Off('out');
   return 1;
 } ## end sub outOff
 
@@ -309,7 +357,7 @@ sub switchLogging {
       $target .= " (last):$args{FILELAST}";
     }
     if (!$logTarget{$args{TARGET}}) {
-      $type = ($type eq 'Err') ? 'Errorlogging to ' : 'Logging to ';
+      $type = ($type eq 'err') ? 'Errorlogging to ' : 'Logging to ';
       $self->debug('MSG', $type . $target . ' enabled')
     }
     $logTarget{$args{TARGET}} = 1;
@@ -323,7 +371,7 @@ sub switchLogging {
       $target .= " (last): $args{FILELAST}";
     }
     if ($logTarget{$args{TARGET}})  {
-      $type = ($type eq 'Err') ? 'Errorlogging to ' : 'Logging to ';
+      $type = ($type eq 'err') ? 'Errorlogging to ' : 'Logging to ';
       $self->debug('MSG', $type . $target . ' disabled')
     }
     $logTarget{$args{TARGET}} = 0;
@@ -335,8 +383,8 @@ sub switchLogging {
 
 sub switchConsoleErr {
   my $self  = (shift)->getInstance();
-  $self->switchLogging('TARGET', 'ErrConsole',
-                       'STATUS', !$logTarget{'ErrConsole'},
+  $self->switchLogging('TARGET', 'errconsole',
+                       'STATUS', !$logTarget{'errconsole'},
 #                       'MESSAGE', 'Console Error Logging',
                        @_);
   return 1;
@@ -345,8 +393,8 @@ sub switchConsoleErr {
 
 sub switchFileErr {
   my $self = (shift)->getInstance();
-  $self->switchLogging('TARGET',   'ErrFile',
-                       'STATUS',   !$logTarget{'ErrFile'},
+  $self->switchLogging('TARGET',   'errfile',
+                       'STATUS',   !$logTarget{'errfile'},
 #                       'MESSAGE',  "File Error Logging to " . $self->{CONFIG}->get('log.err.file') || '',
                        'FILE',     $self->{CONFIG}->get('log.err.file', "FILE"),
                        'FILELAST', $self->{CONFIG}->get('log.err.filelast', "FILE"),
@@ -358,8 +406,8 @@ sub switchFileErr {
 
 sub switchSysLogErr {
   my $self  = (shift)->getInstance();
-  $self->switchLogging('TARGET', 'ErrSysLog',
-                       'STATUS', !$logTarget{'ErrSysLog'},
+  $self->switchLogging('TARGET', 'errsyslog',
+                       'STATUS', !$logTarget{'errsyslog'},
 #                       'MESSAGE', 'SysLog Error Logging',
                        @_);
   return 1;
@@ -368,8 +416,8 @@ sub switchSysLogErr {
 
 sub switchConsoleOut {
   my $self  = (shift)->getInstance();
-  $self->switchLogging('TARGET', 'OutConsole',
-                       'STATUS', !$logTarget{'OutConsole'},
+  $self->switchLogging('TARGET', 'outconsole',
+                       'STATUS', !$logTarget{'outconsole'},
 #                       'MESSAGE', 'Console Logging',
                        @_);
   return 1;
@@ -378,8 +426,8 @@ sub switchConsoleOut {
 
 sub switchFileOut {
   my $self = (shift)->getInstance();
-  $self->switchLogging('TARGET',   'OutFile',
-                       'STATUS',   !$logTarget{'OutFile'},
+  $self->switchLogging('TARGET',   'outfile',
+                       'STATUS',   !$logTarget{'outfile'},
 #                       'MESSAGE',  "File Logging to " . $self->{CONFIG}->get('log.out.file') || '',
                        'FILE',     $self->{CONFIG}->get('log.out.file', "FILE"),
                        'FILELAST', $self->{CONFIG}->get('log.out.filelast', "FILE"),
@@ -391,8 +439,8 @@ sub switchFileOut {
 
 sub switchSysLogOut {
   my $self  = (shift)->getInstance();
-  $self->switchLogging('TARGET', 'OutSysLog',
-                       'STATUS', !$logTarget{'OutSysLog'},
+  $self->switchLogging('TARGET', 'outsyslog',
+                       'STATUS', !$logTarget{'outsyslog'},
 #                       'MESSAGE', 'SysLog Logging',
                        @_);
   return 1;
@@ -405,56 +453,34 @@ sub log {
 
   # confess "Not a hash ref" unless (ref($arg) eq "HASH");
   return undef unless (defined $args{MSG});
-  my $prio = lc($args{PRIO} || "info");
-
-  my %level = ('debug'  => 4,
-               'info'   => 3,
-               'notice' => 2,
-               'error'  => 1,
-               'fatal'  => 0);
-
-  push @outBuffer, "WARNING: log called with undefined priority '$prio'" unless exists $level{$prio};
 
   my $logStr = '';
-  if ($level{$prio} <= $self->logLevel()) {
-    (my $sec, my $min, my $hour, my $mday, my $mon, my $year, my $wday, my $yday, my $isdst) = localtime(time);
-    $year = sprintf("%04d", $year + 1900);
-    $mon  = sprintf("%02d", $mon + 1);
-    $mday = sprintf("%02d", $mday);
-    $hour = sprintf("%02d", $hour);
-    $min  = sprintf("%02d", $min);
-    $sec  = sprintf("%02d", $sec);
-
-    my ($subroutine, $i, $line) = ('', 0, 0);
-    while (defined(caller($i))) {
-      $logStr = (caller($i))[3];
-      $line = $line ? (caller($i-1))[2] : __LINE__;
-      $i++;
-      if ($dbgInfo > 0) {
-        if ((($dbgInfo <= 2) && ($logStr !~ /getInstance|Logging/)) || ($dbgInfo >= 3)) {
-          if ($dbgInfo == 1) {
-            $subroutine = "$logStr($line)" if (!$subroutine);  
-          } else {
-            $subroutine = $subroutine ? "$logStr($line)->$subroutine" : "$logStr($line)";  
-          }
+  my ($subroutine, $i, $line) = ('', 0, 0);
+  while (defined(caller($i))) {
+    $logStr = (caller($i))[3];
+    $line = $line ? (caller($i-1))[2] : __LINE__;
+    $i++;
+    if ($dbgInfo > 0) {
+      if ((($dbgInfo <= 2) && ($logStr !~ /getInstance|Logging/)) || ($dbgInfo >= 3)) {
+        if ($dbgInfo == 1) {
+          $subroutine = "$logStr($line)" if (!$subroutine);  
+        } else {
+          $subroutine = $subroutine ? "$logStr($line)->$subroutine" : "$logStr($line)";  
         }
       }
     }
- #   if (!utf8::is_utf8($args{MSG}) and ($args{MSG} !~ m/\A [[:ascii:]]* \Z/xms)) {
- #    $args{MSG} = '---Binary Data---';
- #  }
-    if ($subroutine) {
-      $logStr = "$year-$mon-$mday $hour:$min:$sec : [$prio] [$$] [$subroutine] $args{MSG}\n";
-    } else {
-      $logStr = "$year-$mon-$mday $hour:$min:$sec : [$prio] [$$] $args{MSG}\n";
-    }
-    $self->printout('STR', $logStr, %args);
+  }
+  $subroutine = "[$subroutine] " if ($subroutine);
+  $logStr = CertNanny::Util->expandstring("__YEAR__-__MONTH__-__DAY__ __HOUR__:__MINUTE__:__SECOND__ : [__PRIO__] [__PID__] __SUB____MSG__\n", 
+                                          '__PRIO__', lc($args{PRIO} || "info"),
+                                          '__SUB__',  $subroutine,
+                                          '__MSG__',  $args{MSG});
+  $self->printout('STR', $logStr, %args);
 
-    # call hook
-    #$self->executehook($self->{INSTANCE}->{OPTIONS}->{ENTRY}->{hook}->{log},
-    #			   '__PRIORITY__' => $prio,
-    #			   '__MESSAGE__' => $args{MSG});
-  } ## end if ($level{$prio} <= $self...)
+  # call hook
+  #$self->executehook($self->{INSTANCE}->{OPTIONS}->{ENTRY}->{hook}->{log},
+  #			   '__PRIORITY__' => $prio,
+  #			   '__MESSAGE__' => $args{MSG});
 
   return 1;
 } ## end sub log
