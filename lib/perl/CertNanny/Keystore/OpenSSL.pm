@@ -132,7 +132,7 @@ sub new {
       CertNanny::Logging->debug('MSG', "Using HSM $hsmtype");
       eval "use CertNanny::HSM::$hsmtype";
       if ($@) {
-        CertNanny::Logging->printerr('STR', join('', $@));
+        CertNanny::Logging->Err('STR', join('', $@));
         return undef;
       }
       eval "\$self->{HSM} = CertNanny::HSM::$hsmtype->new(\$entry, \$config, \$entryname)";
@@ -760,7 +760,7 @@ sub createRequest {
     #CertNanny::Logging->debug('MSG', "The following configuration was written to $tmpconfigfile:\n" . CertNanny::Util->readFile($tmpconfigfile));
 
     # generate request
-    my @cmd = (qq("$openssl"), 'req', '-config', qq("$tmpconfigfile"), '-new', '-sha1', '-out', qq("$result->{REQUESTFILE}"), '-key', qq("$result->{KEYFILE}"),);
+    my @cmd = (CertNanny::Util->osq("$openssl"), 'req', '-config', CertNanny::Util->osq("$tmpconfigfile"), '-new', '-sha1', '-out', CertNanny::Util->osq("$result->{REQUESTFILE}"), '-key', CertNanny::Util->osq("$result->{KEYFILE}"),);
     push(@cmd, ('-passin', 'env:PIN')) unless $pin eq "";
     push(@cmd, @engine_cmd);
     $ENV{PIN} = $pin;
@@ -861,7 +861,7 @@ sub selfSign {
   CertNanny::Logging->debug('MSG', "The following configuration was written to $tmpconfigfile:\n" . CertNanny::Util->readFile($tmpconfigfile));
 
   # generate request
-  my @cmd = (qq("$openssl"), 'req', '-config', qq("$tmpconfigfile"), '-x509', '-new', '-sha1', '-out', qq("$outfile"), '-key', qq("$entry->{key}->{file}"),);
+  my @cmd = (CertNanny::Util->osq("$openssl"), 'req', '-config', CertNanny::Util->osq("$tmpconfigfile"), '-x509', '-new', '-sha1', '-out', CertNanny::Util->osq("$outfile"), '-key', CertNanny::Util->osq("$entry->{key}->{file}"),);
 
   push(@cmd, ('-passin', 'env:PIN')) unless $pin eq "";
   $ENV{PIN} = $pin;
@@ -966,7 +966,7 @@ sub generateKey {
         }
 
         # generate key
-        my @cmd = (qq("$openssl"), 'genrsa', '-out', qq("$outfile"), @passout, @engine_cmd, $bits);
+        my @cmd = (CertNanny::Util->osq("$openssl"), 'genrsa', '-out', CertNanny::Util->osq("$outfile"), @passout, @engine_cmd, $bits);
         $ENV{PIN} = $pin;
         if (CertNanny::Util->runCommand(\@cmd) != 0) {
           delete $ENV{PIN};
@@ -1072,7 +1072,7 @@ sub createPKCS12 {
       $certfile = CertNanny::Util->getTmpFile();
 
       # Todo pgk: Testen runCommand
-      @cmd = (qq("$openssl"), 'x509', '-in', qq("$args{CERTFILE}"), '-inform', qq("$args{CERTFORMAT}"), '-out', qq("$certfile"), '-outform', 'PEM',);
+      @cmd = (CertNanny::Util->osq("$openssl"), 'x509', '-in', CertNanny::Util->osq("$args{CERTFILE}"), '-inform', CertNanny::Util->osq("$args{CERTFORMAT}"), '-out', CertNanny::Util->osq("$certfile"), '-outform', 'PEM',);
       if (CertNanny::Util->runCommand(\@cmd) != 0) {
         $rc = CertNanny::Logging->error('MSG', "Certificate format conversion failed")
       }
@@ -1096,7 +1096,7 @@ sub createPKCS12 {
 
       my @name = ();
       if (defined $args{FRIENDLYNAME} and $args{FRIENDLYNAME} ne "") {
-        @name = ('-name', qq("$args{FRIENDLYNAME}"));
+        @name = ('-name', CertNanny::Util->osq("$args{FRIENDLYNAME}"));
       }
 
       my $cachainfile;
@@ -1106,7 +1106,7 @@ sub createPKCS12 {
 
         # add this temp file
         push(@cachain, '-certfile');
-        push(@cachain, qq("$cachainfile"));
+        push(@cachain, CertNanny::Util->osq("$cachainfile"));
 
         foreach my $entry (@{$args{CACHAIN}}) {
           #my $file = $entry->{CERTFILE};
@@ -1122,12 +1122,12 @@ sub createPKCS12 {
     	      CertNanny::Logging->error('MSG', "Could not append Root CA into chainfile");        
           } else {
       	    push(@cachain, '-caname');
-          	push(@cachain, qq("$CN"));
+          	push(@cachain, CertNanny::Util->osq("$CN"));
           }
         } ## end foreach my $entry (@{$args{...}})
       } ## end if (defined $args{CACHAIN...})
 
-      @cmd = (qq("$openssl"), 'pkcs12', '-export', '-out', qq("$args{FILENAME}"), @passout, '-in', qq("$certfile"), '-inkey', qq("$args{KEYFILE}"), @passin, @name, @cachain,);
+      @cmd = (CertNanny::Util->osq("$openssl"), 'pkcs12', '-export', '-out', CertNanny::Util->osq("$args{FILENAME}"), @passout, '-in', CertNanny::Util->osq("$certfile"), '-inkey', CertNanny::Util->osq("$args{KEYFILE}"), @passin, @name, @cachain,);
       if (CertNanny::Util->runCommand(\@cmd) != 0) {
         CertNanny::Logging->error('MSG', "PKCS#12 export failed");
       } else {
@@ -1578,7 +1578,7 @@ sub _createLocalCerts {
               if (File::Copy::copy($certFile, $target)) {
                 CertNanny::Logging->info('MSG', "Certificate $certFile copied to $target");
               } else {
-                CertNanny::Logging->fatal('MSG', "File creation error: $certFile link/copy to $target");
+                CertNanny::Logging->emergency('MSG', "File creation error: $certFile link/copy to $target");
                 $rc = 1;
               }
             }

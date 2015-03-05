@@ -144,6 +144,8 @@ sub AUTOLOAD {
   if ($attr =~ /^(?:check|renew|enroll|cleanup|updateRootCA|executeHook)$/) {
     return $self->_iterate_entries("do_$attr");
   }
+  
+  CertNanny::Logging->error('MSG', "Invalid action specified: <$attr>");
 } ## end sub AUTOLOAD
 
 
@@ -196,7 +198,7 @@ sub _dumpValue {
       my $name  = '  ' x ($#$aref + 1) . $key . ' = ';
       my $value = $name =~ /(pin|pw|target_pw|storepass|keypass|srcstorepass|deststorepass|srckeypass|destkeypass)/ ? "*HIDDEN*" : $cref->{$key};
       my $fillup = ' ' x (100 - length($name) - length($value));
-      CertNanny::Logging->printout('STR', $name . $fillup . $value . "\n");
+      CertNanny::Logging->Out('STR', $name . $fillup . $value . "\n");
     }
   }
   # Then handle all HASHs
@@ -208,9 +210,9 @@ sub _dumpValue {
       next if (defined($$aref[0]) && !defined($$aref[1]) && $target &&
               ($$aref[0] eq 'keystore') && ($key ne $target)); # $self->{keystore} = <keystore>: print all but the keystores plus <keystore>
       push(@$aref, $key);
-      CertNanny::Logging->printout('STR', '  ' x $#$aref . "$key Start\n");
+      CertNanny::Logging->Out('STR', '  ' x $#$aref . "$key Start\n");
       $self->_dumpValue(\%{$cref->{$key}}, $aref);
-      CertNanny::Logging->printout('STR', '  ' x $#$aref . "$key End\n");
+      CertNanny::Logging->Out('STR', '  ' x $#$aref . "$key End\n");
       pop(@$aref);
     }
   }
@@ -246,27 +248,27 @@ sub do_dump {
         $printthiskeystore = 1;
       }
       if ($printthiskeystore) {
-        CertNanny::Logging->printout('STR', "File: <$configFileName> SHA1: $config->{CONFIGFILES}->{$configFileName}->{SHA}\n");
+        CertNanny::Logging->Out('STR', "File: <$configFileName> SHA1: $config->{CONFIGFILES}->{$configFileName}->{SHA}\n");
         foreach my $lnr (sort {lc($a) <=> lc($b)} keys %{$config->{CONFIGFILES}->{$configFileName}->{CONTENT}}) {
           my $content = $config->{CONFIGFILES}->{$configFileName}->{CONTENT}->{$lnr};
           my $name = (split('=', $content))[0];
           if ($name =~ /(pin|pw|target_pw|storepass|keypass|srcstorepass|deststorepass|srckeypass|destkeypass)/) {
             $content = "${name}= *HIDDEN*";
           }
-          CertNanny::Logging->printout('STR', sprintf("Line: %3s Content: <%s>\n", $lnr, $content));
+          CertNanny::Logging->Out('STR', sprintf("Line: %3s Content: <%s>\n", $lnr, $content));
         }
-        CertNanny::Logging->printout('STR', "\n");
+        CertNanny::Logging->Out('STR', "\n");
       }
     }
   } elsif ($self->{OPTION}->{object} eq 'keystore') {
     my @keystores = (sort {lc($a) cmp lc($b)} keys(%{$config->{CONFIG}->{'keystore'}}));
     foreach my $keystore (@keystores) {
       next if (defined($target) && ($target ne $keystore));
-      CertNanny::Logging->printout('STR', "Keystore $keystore:\n");
+      CertNanny::Logging->Out('STR', "Keystore $keystore:\n");
       foreach my $configFileName (keys %{$config->{CONFIGFILES}}) {
         foreach my $cfgFileKeystore (@{$config->{CONFIGFILES}->{$configFileName}->{KEYSTORE}}) {
           if ($keystore eq $cfgFileKeystore) {
-            CertNanny::Logging->printout('STR', "  File: <$configFileName> SHA1: $config->{CONFIGFILES}->{$configFileName}->{SHA}\n");
+            CertNanny::Logging->Out('STR', "  File: <$configFileName> SHA1: $config->{CONFIGFILES}->{$configFileName}->{SHA}\n");
           }
         }
       }
@@ -275,11 +277,11 @@ sub do_dump {
     my @keystores = (sort {lc($a) cmp lc($b)} keys(%{$config->{CONFIG}->{'keystore'}}));
     foreach my $keystore (@keystores) {
       next if (defined($target) && ($target ne $keystore));
-      CertNanny::Logging->printout('STR', "Keystore $keystore:\n");
+      CertNanny::Logging->Out('STR', "Keystore $keystore:\n");
       foreach my $configFileName (keys %{$config->{CONFIGFILES}}) {
         foreach my $cfgFileKeystore (@{$config->{CONFIGFILES}->{$configFileName}->{KEYSTORE}}) {
           if ($keystore eq $cfgFileKeystore) {
-            CertNanny::Logging->printout('STR', "  File: <$configFileName> SHA1: $config->{CONFIGFILES}->{$configFileName}->{SHA}\n");
+            CertNanny::Logging->Out('STR', "  File: <$configFileName> SHA1: $config->{CONFIGFILES}->{$configFileName}->{SHA}\n");
           }
         }
       }
@@ -295,14 +297,14 @@ sub do_dump {
           $keystore->{CERT} = $instance->getCert();
           if (defined($keystore->{CERT})) {
             $keystore->{CERT}->{CERTINFO} = CertNanny::Util->getCertInfoHash(%{$keystore->{CERT}});
-            CertNanny::Logging->printout('STR', "  Subject:                  $keystore->{CERT}->{CERTINFO}->{'SubjectName'}\n");
-            CertNanny::Logging->printout('STR', "  Subject alternative name: $keystore->{CERT}->{CERTINFO}->{'SubjectAlternativeName'}\n");
-            CertNanny::Logging->printout('STR', "  Fingerprint:              $keystore->{CERT}->{CERTINFO}->{'CertificateFingerprint'}\n");
-            CertNanny::Logging->printout('STR', "  Validity from:            $keystore->{CERT}->{CERTINFO}->{'NotBefore'}\n");
-            CertNanny::Logging->printout('STR', "  Validity to:              $keystore->{CERT}->{CERTINFO}->{'NotAfter'}\n");
-            CertNanny::Logging->printout('STR', "  Serial:                   $keystore->{CERT}->{CERTINFO}->{'SerialNumber'}\n");
-            CertNanny::Logging->printout('STR', "  Location:                 $options->{ENTRY}->{'location'}\n");
-            CertNanny::Logging->printout('STR', "  Type:                     $options->{ENTRY}->{'type'}\n");
+            CertNanny::Logging->Out('STR', "  Subject:                  $keystore->{CERT}->{CERTINFO}->{'SubjectName'}\n");
+            CertNanny::Logging->Out('STR', "  Subject alternative name: $keystore->{CERT}->{CERTINFO}->{'SubjectAlternativeName'}\n");
+            CertNanny::Logging->Out('STR', "  Fingerprint:              $keystore->{CERT}->{CERTINFO}->{'CertificateFingerprint'}\n");
+            CertNanny::Logging->Out('STR', "  Validity from:            $keystore->{CERT}->{CERTINFO}->{'NotBefore'}\n");
+            CertNanny::Logging->Out('STR', "  Validity to:              $keystore->{CERT}->{CERTINFO}->{'NotAfter'}\n");
+            CertNanny::Logging->Out('STR', "  Serial:                   $keystore->{CERT}->{CERTINFO}->{'SerialNumber'}\n");
+            CertNanny::Logging->Out('STR', "  Location:                 $options->{ENTRY}->{'location'}\n");
+            CertNanny::Logging->Out('STR', "  Type:                     $options->{ENTRY}->{'type'}\n");
           }
         }
       }
@@ -311,7 +313,7 @@ sub do_dump {
     }
   } else {
     CertNanny::Logging->switchConsoleErr('STATUS', 1);
-    CertNanny::Logging->printerr('STR', "Missing Argument: --object cfg|data|keystore|certificate   specifies the object to be dumped\n");
+    CertNanny::Logging->Err('STR', "Missing Argument: --object cfg|data|keystore|certificate   specifies the object to be dumped\n");
   }
   
   CertNanny::Logging->debug('MSG', eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "Dump");
@@ -811,13 +813,13 @@ sub do_executeHook {
       my $hookdef = "keystore.$entryname.hook.$hook";
       my $hookcmd = $config->get($hookdef);
       if ($hookcmd) {
-        CertNanny::Logging->printout('STR', "Executing hook <$hookdef> with command <$hookcmd>\n");
+        CertNanny::Logging->Out('STR', "Executing hook <$hookdef> with command <$hookcmd>\n");
         $keystore->k_executeHook($hookcmd, %args);
       } else {
-        CertNanny::Logging->printout('STR', "No command defined for hook <$hookdef>\n");
+        CertNanny::Logging->Out('STR', "No command defined for hook <$hookdef>\n");
       }
     } else {
-      CertNanny::Logging->printout('STR', "No hook specified for execHook\n");
+      CertNanny::Logging->Out('STR', "No hook specified for execHook\n");
     }
   }
   
@@ -831,13 +833,36 @@ sub do_test {
   my $self = (shift)->getInstance();
   my %args = (@_);
 
-  shift(@ARGV);
-  my $cmd = shift(@ARGV);
-  # my $a1  = shift(@ARGV);
-  # my $a2  = shift(@ARGV);
+  my $config    = $self->{CONFIG};
+  my $target = $self->getOption('keystore');
 
-  CertNanny::Logging->switchConsoleLog('STATUS', 1); 
-  my $ret = $args{KEYSTORE}->{INSTANCE}->$cmd(@ARGV);
+  my @keystores = (sort {lc($a) cmp lc($b)} keys(%{$config->{CONFIG}->{'keystore'}}));
+  foreach my $keystore (@keystores) {
+    next if (defined($target) && ($target ne $keystore));
+    CertNanny::Logging->Out('STR', "Keystore $keystore:\n");
+    foreach my $configFileName (keys %{$config->{CONFIGFILES}}) {
+      foreach my $cfgFileKeystore (@{$config->{CONFIGFILES}->{$configFileName}->{KEYSTORE}}) {
+        if ($keystore eq $cfgFileKeystore) {
+          CertNanny::Util->setVariable('NAME',  'KEYSTORE', 
+                                       'VALUE', $keystore);
+          my $keystore = CertNanny::Keystore->new(CONFIG    => $self->{CONFIG},             # give it the whole configuration
+                                                  ENTRY     => $self->{ITEMS}->{$keystore}, # all keystore parameters from configfile
+                                                  ENTRYNAME => $keystore);                  # and the keystore name from configfile
+          if ($keystore) {
+            my $enroller = $keystore->k_getEnroller();
+            if (defined($enroller)) {
+              my %certs    = $enroller->getCA();
+              if (!defined %certs) {
+                
+              }
+            }
+          }
+          CertNanny::Util->setVariable('NAME',  'KEYSTORE', 
+                                       'VALUE', 'Common');
+        }
+      }
+    }
+  }
 
   CertNanny::Logging->debug('MSG', eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "Test");
   return 1;

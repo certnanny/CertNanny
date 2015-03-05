@@ -20,15 +20,12 @@ use Carp;
 use File::Copy;
 use File::Basename;
 use Data::Dumper;
+use English;
 
 use CertNanny::Util;
 
 # keyspecific needed modules
 use Cwd;
-use English;
-# use Smart::Comments;
-# use CertNanny::Keystore;
-# use CertNanny::Keystore::OpenSSL;
 
 
 ################################################################################
@@ -172,11 +169,7 @@ sub getCert {
   CertNanny::Logging->debug('MSG', "extract cert with label'$label'");
    
   my @cmd;
-   if ($OSNAME eq "MSWin32") {
-     @cmd = (qq("$gsk6cmd"), '-cert', '-extract', '-db', qq("$filename"), '-pw', qq("$self->{PIN}"), '-label', qq("$label"), '-target', qq("$certfile"), '-format', 'binary');   
-   }else{
-     @cmd = (qq("$gsk6cmd"), '-cert', '-extract', '-db', qq("$filename"), '-pw', "'".$self->{PIN}."'", '-label', qq("$label"), '-target', qq("$certfile"), '-format', 'binary');   
-   }
+  @cmd = (CertNanny::Util->osq("$gsk6cmd"), '-cert', '-extract', '-db', CertNanny::Util->osq("$filename"), '-pw', CertNanny::Util->osq("$self->{PIN}"), '-label', CertNanny::Util->osq("$label"), '-target', CertNanny::Util->osq("$certfile"), '-format', 'binary');   
  
   #if (system(join(' ', @cmd)) != 0) {
   if (CertNanny::Util->runCommand(\@cmd, HIDEPWD => 1) != 0) {  
@@ -275,11 +268,7 @@ sub installCert {
     CertNanny::Logging->info('MSG', "Created PKCS#12 file $pkcs12file");
 
     my @cmd;
-    if ($OSNAME eq "MSWin32") {
-      @cmd = (qq("$gsk6cmd"), '-keydb', '-create', '-type', 'cms', '-db', qq("$newkeystoredb"), '-pw', qq("$self->{PIN}"), '-stash',);
-    } else {
-      @cmd = (qq("$gsk6cmd"), '-keydb', '-create', '-type', 'cms', '-db', qq("$newkeystoredb"), '-pw', "'".$self->{PIN}."'", '-stash',);
-    }
+    @cmd = (CertNanny::Util->osq("$gsk6cmd"), '-keydb', '-create', '-type', 'cms', '-db', CertNanny::Util->osq("$newkeystoredb"), '-pw', CertNanny::Util->osq("$self->{PIN}"), '-stash',);
         
     if (CertNanny::Util->runCommand(\@cmd, HIDEPWD => 1)) {
       CertNanny::Logging->error('MSG', "Keystore creation failed");
@@ -289,11 +278,7 @@ sub installCert {
     CertNanny::Logging->info('MSG', "New MQ Keystore $newkeystoredb created.");
 
     # remove all certificates from this keystore
-    if ($OSNAME eq "MSWin32") {
-      @cmd = (qq("$gsk6cmd"), '-cert', '-list', '-db', qq("$newkeystoredb"), '-pw', qq("$self->{PIN}"),);
-    } else {
-      @cmd = (qq("$gsk6cmd"), '-cert', '-list', '-db', qq("$newkeystoredb"), '-pw', "'".$self->{PIN}."'",);
-    }
+    @cmd = (CertNanny::Util->osq("$gsk6cmd"), '-cert', '-list', '-db', CertNanny::Util->osq("$newkeystoredb"), '-pw', CertNanny::Util->osq("$self->{PIN}"),);
    
     my @calabels;
 
@@ -331,11 +316,7 @@ sub installCert {
     # now delete all preloaded CAs
     foreach my $label (@calabels) {
       CertNanny::Logging->debug('MSG', "deleting label '$label' from MQ keystore");
-      if ($OSNAME eq "MSWin32") {
-        @cmd = (qq("$gsk6cmd"), '-cert', '-delete', '-db', qq("$newkeystoredb"), '-pw', qq("$self->{PIN}"), '-label', qq("$label"),);
-      } else {
-        @cmd = (qq("$gsk6cmd"), '-cert', '-delete', '-db', qq("$newkeystoredb"), '-pw', "'".$self->{PIN}."'", '-label', qq("$label"),);
-      }
+      @cmd = (CertNanny::Util->osq("$gsk6cmd"), '-cert', '-delete', '-db', CertNanny::Util->osq("$newkeystoredb"), '-pw', CertNanny::Util->osq("$self->{PIN}"), '-label', CertNanny::Util->osq("$label"),);
     
       if (CertNanny::Util->runCommand(\@cmd, HIDEPWD => 1)) {
         CertNanny::Logging->debug('MSG', "Could not delete label $label certificate from keystore");
@@ -376,11 +357,7 @@ sub installCert {
         return undef;
       }
 
-      if ($OSNAME eq "MSWin32") {
-        @cmd = (qq("$gsk6cmd"), '-cert', '-add', '-db', qq("$newkeystoredb"), '-pw', qq("$self->{PIN}"), '-file', qq("$cacertfile"), '-format', 'ascii', '-label', qq("$CN"),);       
-      } else {
-        @cmd = (qq("$gsk6cmd"), '-cert', '-add', '-db', qq("$newkeystoredb"), '-pw', "'".$self->{PIN}."'", '-file', qq("$cacertfile"), '-format', 'ascii', '-label', qq("$CN"),);       
-      }
+      @cmd = (CertNanny::Util->osq("$gsk6cmd"), '-cert', '-add', '-db', CertNanny::Util->osq("$newkeystoredb"), '-pw', CertNanny::Util->osq("$self->{PIN}"), '-file', CertNanny::Util->osq("$cacertfile"), '-format', 'ascii', '-label', CertNanny::Util->osq("$CN"),);       
    
       if (CertNanny::Util->runCommand(\@cmd, HIDEPWD => 1)) {
         unlink $cacertfile;
@@ -408,18 +385,10 @@ sub installCert {
 
     if (!defined $options->{gsk6cmd}) {
       CertNanny::Logging->debug('MSG', "no gsk6cmd use gskcmd import command ");
-      if ($OSNAME eq "MSWin32") {
-        @importcmd = (qq("$gsk6cmd"), '-cert', '-import', '-db', qq("$pkcs12file"),'-type' ,'pkcs12' ,'-pw', qq("$self->{PIN}"), '-target', qq("$newkeystoredb"), '-target_pw', qq("$self->{PIN}"), '-target_type', 'cms');
-      } else {
-        @importcmd = (qq("$gsk6cmd"), '-cert', '-import', '-db', qq("$pkcs12file"),'-type' ,'pkcs12' ,'-pw', "'".$self->{PIN}."'", '-target', qq("$newkeystoredb"), '-target_pw', "'".$self->{PIN}."'", '-target_type', 'cms'); 
-      }
+      @importcmd = (CertNanny::Util->osq("$gsk6cmd"), '-cert', '-import', '-db', CertNanny::Util->osq("$pkcs12file"),'-type' ,'pkcs12' ,'-pw', CertNanny::Util->osq("$self->{PIN}"), '-target', CertNanny::Util->osq("$newkeystoredb"), '-target_pw', CertNanny::Util->osq("$self->{PIN}"), '-target_type', 'cms');
     } else {
       CertNanny::Logging->debug('MSG', "no gskcmd use gsk6cmd import command ");
-      if ($OSNAME eq "MSWin32") {
-        @importcmd = (qq("$gsk6cmd"), '-cert', '-import', '-target', qq("$basename"), '-target_pw', qq("$self->{PIN}"), '-file', qq("$pkcs12file"), '-pw', qq("$self->{PIN}"), '-type', 'pkcs12',);      
-      } else {
-        @importcmd = (qq("$gsk6cmd"), '-cert', '-import', '-target', qq("$basename"), '-target_pw', "'".$self->{PIN}."'", '-file', qq("$pkcs12file"), '-pw', "'".$self->{PIN}."'", '-type', 'pkcs12',);         
-      }
+      @importcmd = (CertNanny::Util->osq("$gsk6cmd"), '-cert', '-import', '-target', CertNanny::Util->osq("$basename"), '-target_pw', CertNanny::Util->osq("$self->{PIN}"), '-file', CertNanny::Util->osq("$pkcs12file"), '-pw', CertNanny::Util->osq("$self->{PIN}"), '-type', 'pkcs12',);      
     }
 
     if (CertNanny::Util->runCommand(\@importcmd, HIDEPWD => 1)) {
@@ -433,23 +402,6 @@ sub installCert {
   } else {
     if ($options->{keygenmode} eq "internal") {
       CertNanny::Logging->info('MSG', "Internal key generation not supported");
-
-      #   my @cmd = (qq("$gsk6cmd"),
-      #        '-certreq',
-      #        '-create',
-      #        '-file',
-      #        qq("$result->{REQUESTFILE}"),
-      #        '-db',
-      #        qq("$kdbfile"),
-      #        '-pw',
-      #        qq("$self->{PIN}"),
-      #        '-dn',
-      #        qq("$DN"),
-      #        '-label',
-      #        qq("$label"),
-      #        '-size',
-      #        '1024');
-
       return undef;
     } ## end if ($options->...)
   } ## end else
@@ -546,18 +498,18 @@ sub getKey {
 
     my @gsklibdir;
     if (defined $options->{gsklibdir}) {
-      @gsklibdir = ('-Djava.library.path=' . qq("$options->{gsklibdir}"));
+      @gsklibdir = ('-Djava.library.path=' . CertNanny::Util->osq("$options->{gsklibdir}"));
       $ENV{PATH} .= $separator . $self->{OPTIONS}->{gsklibdir};
     }
   
-    my @cmd = (qq("$options->{JAVA}"), 
-               '-classpath', qq("$classpath"), 
+    my @cmd = (CertNanny::Util->osq("$options->{JAVA}"), 
+               '-classpath', CertNanny::Util->osq("$classpath"), 
                'de.cynops.java.crypto.keystore.ExtractKey', @gsklibdir, 
-               '-keystore', qq("$keystore"), 
-               '-storepass', qq("$self->{PIN}"), 
-               '-keypass', qq("$self->{PIN}"), 
-               '-key', qq("$label"), 
-               '-keyfile', qq("$p8file"), 
+               '-keystore', CertNanny::Util->osq("$keystore"), 
+               '-storepass', CertNanny::Util->osq("$self->{PIN}"), 
+               '-keypass', CertNanny::Util->osq("$self->{PIN}"), 
+               '-key', CertNanny::Util->osq("$label"), 
+               '-keyfile', CertNanny::Util->osq("$p8file"), 
                '-provider', 'IBMJCE', 
                '-type', 'CMS');
 
@@ -590,11 +542,7 @@ sub getKey {
     chmod 0600, $exportp12;
   
     my @cmd;
-    if ($OSNAME eq "MSWin32") {
-      @cmd = (qq("$options->{gskcmd}"), '-cert', '-export', '-db', qq("$keystore"), '-pw', qq("$self->{PIN}"), '-label', qq("$label"), '-type cms', '-target', qq("$exportp12"), '-target_pw' , qq("$self->{PIN}"), '-target_type', 'pkcs12');   
-    } else {
-      @cmd = (qq("$options->{gskcmd}"), '-cert', '-export', '-db', qq("$keystore"), '-pw', "'".$self->{PIN}."'", '-label', qq("$label"), '-type cms', '-target', qq("$exportp12"), '-target_pw' , "'".$self->{PIN}."'", '-target_type', 'pkcs12');  
-    }
+    @cmd = (CertNanny::Util->osq("$options->{gskcmd}"), '-cert', '-export', '-db', CertNanny::Util->osq("$keystore"), '-pw', CertNanny::Util->osq("$self->{PIN}"), '-label', CertNanny::Util->osq("$label"), '-type cms', '-target', CertNanny::Util->osq("$exportp12"), '-target_pw' , CertNanny::Util->osq("$self->{PIN}"), '-target_type', 'pkcs12');   
 
     if (CertNanny::Util->runCommand(\@cmd, HIDEPWD => 1)) {
       CertNanny::Logging->error('MSG', "getKey(): could not extract private key");
@@ -613,7 +561,7 @@ sub getKey {
     my $exportkey = CertNanny::Util->getTmpFile();
     chmod 0600, $exportkey;
   
-    @opensslcmd = (qq("$openssl"), 'pkcs12', '-in', qq("$exportp12"), '-passin', qq("env:PASSIN"),  '-out', qq("$exportkey"), '-nodes' , '-nocerts' );
+    @opensslcmd = (CertNanny::Util->osq("$openssl"), 'pkcs12', '-in', CertNanny::Util->osq("$exportp12"), '-passin', CertNanny::Util->osq("env:PASSIN"),  '-out', CertNanny::Util->osq("$exportkey"), '-nodes' , '-nocerts' );
 
     if (CertNanny::Util->runCommand(\@opensslcmd, HIDEPWD => 1)) {
       CertNanny::Logging->error('MSG', "getKey(): could not extract private key");
@@ -909,11 +857,7 @@ sub getInstalledCAs {
       
       my @cmd ;
       # get label name for user certificate
-      if ($OSNAME eq "MSWin32") {
-        @cmd = (qq("$gsk6cmd"), '-cert', '-list', '-db', qq("$locName"), '-pw', qq("$self->{PIN}"));
-      } else {
-        @cmd = (qq("$gsk6cmd"), '-cert', '-list', '-db', qq("$locName"), '-pw', "'".$self->{PIN}."'");
-      }
+      @cmd = (CertNanny::Util->osq("$gsk6cmd"), '-cert', '-list', '-db', CertNanny::Util->osq("$locName"), '-pw', CertNanny::Util->osq("$self->{PIN}"));
       
       @certList = CertNanny::Util->runCommand(\@cmd, WANTOUT => 1, HIDEPWD => 1);
       foreach my $certlabel (@certList) {
@@ -929,11 +873,7 @@ sub getInstalledCAs {
           CertNanny::Logging->debug('MSG', "found certLabel <$certlabel>"); 
           my @certcmd;
           my $certexport= CertNanny::Util->getTmpFile();  
-          if ($OSNAME eq "MSWin32") {
-            @certcmd = (qq("$gsk6cmd"), '-cert', '-extract', '-db', qq("$locName"), '-pw', qq("$self->{PIN}") , '-label' ,qq("$certlabel") ,'-target' ,qq("$certexport"));     
-          } else {
-            @certcmd = (qq("$gsk6cmd"), '-cert', '-extract', '-db', qq("$locName"), '-pw', "'".$self->{PIN}."'" , '-label' ,qq("$certlabel") ,'-target' ,qq("$certexport"));      
-          }
+          @certcmd = (CertNanny::Util->osq("$gsk6cmd"), '-cert', '-extract', '-db', CertNanny::Util->osq("$locName"), '-pw', CertNanny::Util->osq("$self->{PIN}") , '-label' ,CertNanny::Util->osq("$certlabel") ,'-target' ,CertNanny::Util->osq("$certexport"));     
      
           $rc = CertNanny::Util->runCommand(\@certcmd, HIDEPWD => 1);
             
@@ -1113,11 +1053,7 @@ sub installRoots {
           if (!exists($availableRootCAs->{$certSHA1}) && ($self->k_getCertType($installedRootCAs->{$certSHA1}) eq 'installedRootCAs')) {
             CertNanny::Logging->debug('MSG', "Deleting root cert " . $installedRootCAs->{$certSHA1}->{CERTINFO}->{SubjectName});
             my @certcmd;
-            if ($OSNAME eq "MSWin32") {
-              @certcmd = (qq("$gsk6cmd"), '-cert', '-delete', '-db', qq("$dest"), '-pw', qq("$self->{PIN}") , '-label' ,qq("$installedRootCAs->{$certSHA1}->{'CERTALIAS'}") );           
-            } else {
-              @certcmd = (qq("$gsk6cmd"), '-cert', '-delete', '-db', qq("$dest"), '-pw', "'".$self->{PIN}."'" , '-label' ,qq("$installedRootCAs->{$certSHA1}->{'CERTALIAS'}") );
-            }  
+            @certcmd = (CertNanny::Util->osq("$gsk6cmd"), '-cert', '-delete', '-db', CertNanny::Util->osq("$dest"), '-pw', CertNanny::Util->osq("$self->{PIN}") , '-label' ,CertNanny::Util->osq("$installedRootCAs->{$certSHA1}->{'CERTALIAS'}") );           
    
             if (CertNanny::Util->runCommand(\@certcmd, HIDEPWD => 1)) {
               CertNanny::Logging->error('MSG', "Error deleting root cert " . $installedRootCAs->{$certSHA1}->{CERTINFO}->{SubjectName});
@@ -1139,11 +1075,7 @@ sub installRoots {
             }
             
             my @certcmd;
-            if ($OSNAME eq "MSWin32") {
-               @certcmd = (qq("$gsk6cmd"), '-cert', '-add', '-db', qq("$dest"), '-pw', qq("$self->{PIN}") , '-label' ,qq("$alias") , '-file', $tmpFile ,'-format', 'ascii'  );
-            } else {
-               @certcmd = (qq("$gsk6cmd"), '-cert', '-add', '-db', qq("$dest"), '-pw', "'".$self->{PIN}."'" , '-label' ,qq("$alias") , '-file', $tmpFile ,'-format', 'ascii'  );
-            }      
+            @certcmd = (CertNanny::Util->osq("$gsk6cmd"), '-cert', '-add', '-db', CertNanny::Util->osq("$dest"), '-pw', CertNanny::Util->osq("$self->{PIN}") , '-label' ,CertNanny::Util->osq("$alias") , '-file', $tmpFile ,'-format', 'ascii'  );
      
             if (CertNanny::Util->runCommand(\@certcmd, HIDEPWD => 1)) {
               CertNanny::Logging->error('MSG', "Error importing root cert " . $availableRootCAs->{$certSHA1}->{CERTINFO}->{SubjectName});
@@ -1189,24 +1121,15 @@ sub _buildGskCmd {
   }
   
 
-  my @cmd = (qq("$gsk6cmd"));
+  my @cmd = (CertNanny::Util->osq("$gsk6cmd"));
   # Commands-keydb - create | -cert -add |  -cert -import | -cert -list
-  push(@cmd, -db        => qq("$entry->{db}"))        if ($entry->{db});
-  if ($OSNAME eq "MSWin32") {      
-     push(@cmd, -pw        => qq("$entry->{pw}"))       if ($entry->{pw});
-  }else{
-     push(@cmd, -pw => ("'".$entry->{pw}."'")) if ($entry->{pw});
-  }
-  push(@cmd, -target    => qq("$entry->{target}"))    if ($entry->{target});
-    if ($OSNAME eq "MSWin32") {
-     push(@cmd, -target_pw =>qq("$entry->{target_pw}")) if ($entry->{target_pw});
-  }else{
-     push(@cmd, -target_pw => ("'".$entry->{target_pw}."'")) if ($entry->{target_pw});
-  }
-
-  push(@cmd, -label     => qq("$entry->{label}"))     if ($entry->{label});
-  push(@cmd, -file      => qq("$entry->{file}"))      if ($entry->{file});
-  push(@cmd, -format    => qq("$entry->{format}"))    if ($entry->{format});
+  push(@cmd, -db        => CertNanny::Util->osq("$entry->{db}"))        if ($entry->{db});
+  push(@cmd, -pw        => CertNanny::Util->osq("$entry->{pw}"))        if ($entry->{pw});
+  push(@cmd, -target    => CertNanny::Util->osq("$entry->{target}"))    if ($entry->{target});
+  push(@cmd, -target_pw => CertNanny::Util->osq("$entry->{target_pw}")) if ($entry->{target_pw});
+  push(@cmd, -label     => CertNanny::Util->osq("$entry->{label}"))     if ($entry->{label});
+  push(@cmd, -file      => CertNanny::Util->osq("$entry->{file}"))      if ($entry->{file});
+  push(@cmd, -format    => CertNanny::Util->osq("$entry->{format}"))    if ($entry->{format});
   push(@cmd, @_);
   @cmd;
 }
@@ -1238,7 +1161,7 @@ sub _getIBMJavaEnvironment {
       $gsk6cmd = $options->{gskcmd};   
     }
 
-    my $cmd = qq("$gsk6cmd") . " -version";
+    my $cmd = CertNanny::Util->osq("$gsk6cmd") . " -version";
 
     CertNanny::Logging->debug('MSG', "Execute: $cmd");
     open my $fh, $cmd . '|';
@@ -1340,24 +1263,9 @@ sub _getCertLabel {
      $gsk6cmd = $self->{OPTIONS}->{gskcmd};   
   }
 
-
   # get label name for user certificate
-   my @cmd;
-  if ($OSNAME eq "MSWin32") {  
-     @cmd = (qq("$gsk6cmd"), '-cert', '-list', 'personal', '-db', qq("$filename"), '-pw', qq("$self->{PIN}"));
-  }else{
-     @cmd = (qq("$gsk6cmd"), '-cert', '-list', 'personal', '-db', qq("$filename"), '-pw', "'".$self->{PIN}."'");
-  }
-
-
-  #my $fh;
-  #if (!open $fh, join(" ", @cmd) . "|") {
-
-# if (CertNanny::Util->runCommand(\@cmd,WANTOUT => 1, HIDEPWD => 1) != 0) { 
-#  CertNanny::Logging->error('MSG', "getCert(): could not run gsk6cmd");
-#    return undef;
-#  }
-  #binmode $fh;
+  my @cmd;
+  @cmd = (CertNanny::Util->osq("$gsk6cmd"), '-cert', '-list', 'personal', '-db', CertNanny::Util->osq("$filename"), '-pw', CertNanny::Util->osq("$self->{PIN}"));
 
   my  @certList = CertNanny::Util->runCommand(\@cmd, WANTOUT => 1, HIDEPWD => 1);
 
@@ -1373,21 +1281,6 @@ sub _getCertLabel {
     CertNanny::Logging->debug('MSG', "found label '$label'");
     }
   }
-  #my $label;
-  #my $match = $self->{OPTIONS}->{ENTRY}->{labelmatch} || "ibmwebspheremq.*";
-
-  #while (<$fh>) {
-  #  chomp;
-  #  next if /Certificates in database/;
-  #  s/^\s*//;
-  #  s/\s*$//;
-  #  if (!defined $match
-  #      or /$match/) {
-  #    $label = $_;
-  #    last;
-  #  }
- # } ## end while (<$fh>)
-  #close $fh;
   chomp($label);
 
   if (!defined $label) {

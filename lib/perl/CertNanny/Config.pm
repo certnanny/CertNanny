@@ -500,8 +500,9 @@ sub _sha1_hex {
   
   my $sha;
   my $openssl = $self->get('cmd.openssl', 'CMD');
+  $openssl = "/usr/bin/openssl";
   if (defined($openssl)) {
-    my @cmd = (qq("$openssl"), 'dgst', '-sha', qq("$file"));
+    my @cmd = (CertNanny::Util->osq($openssl), 'dgst', '-sha', CertNanny::Util->osq($file));
     chomp($sha = CertNanny::Util->runCommand(\@cmd, WANTOUT => 1));
     if ($sha =~ /^.*\)= (.*)$/) {
       $sha = $1;
@@ -517,7 +518,6 @@ sub _parseFile {
   my $configFile   = shift || $self->{CONFIGFILE};
   my $configPrefix = shift;
   
-  # CertNanny::Logging->printout('STR', sprintf("Parsing <%s> in dir <%s> with prefix <%s>\n", $configFile, $configPath, $configPrefix));
   # Parsing is done in the following steps
   #  - initialize datastructures (only done once)
   #  - read all lines
@@ -599,7 +599,7 @@ sub _parseFile {
         $var = $var->{$confPart};
       }
       if ($doDupCheck && defined($var->{$key})) {
-        CertNanny::Logging->printerr('STR', "Config file $configFile ERROR: duplicate value definition in line $lnr ($line)\n");
+        CertNanny::Logging->error('STR', "Config file $configFile ERROR: duplicate value definition in line $lnr ($line)\n");
       }
       
       while ($val =~ m{__ENV__(.*?)__}xms) {
@@ -614,7 +614,7 @@ sub _parseFile {
       $var->{$key} = $val;
     } else {
       if ($line !~ /^(include|keystores)\s+(.+)$/) {
-        CertNanny::Logging->printerr('STR', "Config file $configFile ERROR: parse error in line $lnr ($line)\n");
+        CertNanny::Logging->error('STR', "Config file $configFile ERROR: parse error in line $lnr ($line)\n");
       }
     }
   }
@@ -634,7 +634,6 @@ sub _parseFile {
 
   #  - recursive execute _parsefile for all includes
   while (($lnr, $line) = each(%lines)) {
-    # CertNanny::Logging->printerr('STR', "Line: $line\n");
     if ($line =~ /^\s*(include|keystores)[\s=]+(.+)\s*$/) {
       my $includeType = $1;
       my @includeList = split(' ', $2);

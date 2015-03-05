@@ -19,6 +19,14 @@ path.tmpdir                      = $(CNDATA)\tmp\
 
 # NOTE: Set the desired log level here. For common usage 2 or 3 should
 #       be OK.
+#          0       Emergency
+#          1       Alert
+#          2       Critical
+#          3       Error
+#          4       Warning
+#          5       Notice
+#          6       Informational
+#          7       Debug
 # 0: fatal, 1: error, 2: notice, 3: info, 4: debug, 5: scep verbose, 6: scep debug
 log.level = 3
 #Name and destination of the certnanny logfile

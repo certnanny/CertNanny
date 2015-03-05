@@ -41,7 +41,7 @@ sub new() {
   }
 
   unless (defined $hsm_options->{key}->{type} and (grep $_ eq $hsm_options->{key}->{type}, @avail_keytypes)) {
-    CertNanny::Logging->error('MSG', qq("$hsm_options->{key}->{type} is not an available keytype."));
+    CertNanny::Logging->error('MSG', CertNanny::Util->osq("$hsm_options->{key}->{type} is not an available keytype."));
     return undef;
   }
 
@@ -130,11 +130,11 @@ sub genkey() {
         $value =~ s/%i/$current_id/;
         $new_label = $value;
       } ## end if ($param eq "id")
-      push(@generateopts, qq($param=$value));
+      push(@generateopts, CertNanny::Util->osq($param=$value));
     } elsif ($param eq "genkey") {
-      $genkeyopt = qq($param=$value);
+      $genkeyopt = CertNanny::Util->osq($param=$value);
     } else {
-      CertNanny::Logging->error('MSG', qq("Could not handle parameter $param with value $value."));
+      CertNanny::Logging->error('MSG', CertNanny::Util->osq("Could not handle parameter $param with value $value."));
       return undef;
     }
   } ## end foreach my $param (keys %{$self...})
@@ -368,7 +368,7 @@ sub checkKeySanity() {
   foreach my $id (keys %{$self->{all_keys}}) {
     my $label       = $self->{all_keys}->{$id};
     my $requestfile = $self->createDummyCSR($id);
-    my @cmd         = (qq("$openssl"), 'req', '-in', qq("$requestfile"), '-modulus', '-noout');
+    my @cmd         = (CertNanny::Util->osq("$openssl"), 'req', '-in', CertNanny::Util->osq("$requestfile"), '-modulus', '-noout');
 
     my $cmd = join(" ", @cmd);
     CertNanny::Logging->debug('MSG', "Execute: $cmd");
@@ -449,7 +449,7 @@ sub createDummyCSR() {
   push(@engine_cmd, '-engine',  $self->engineid());
   push(@engine_cmd, '-keyform', $self->keyform());
 
-  my @cmd = (qq("$openssl"), 'req', '-config', qq("$tmpconfigfile"), '-new', '-sha1', '-out', qq("$requestfile"), '-key', qq("$keyid"),);
+  my @cmd = (CertNanny::Util->osq("$openssl"), 'req', '-config', CertNanny::Util->osq("$tmpconfigfile"), '-new', '-sha1', '-out', CertNanny::Util->osq("$requestfile"), '-key', CertNanny::Util->osq("$keyid"),);
   push(@cmd, @engine_cmd);
 
   if (CertNanny::Util->runCommand(\@cmd) != 0) {
@@ -474,7 +474,7 @@ sub deleteKey() {
   push(@deleteopts, 'Login=' . $hsm_options->{key}->{login});
   push(@deleteopts, 'Id=$' . $keyid);
 
-  my @cmd = (qq("$p11tool"), @deleteopts, 'DeleteObject');
+  my @cmd = (CertNanny::Util->osq("$p11tool"), @deleteopts, 'DeleteObject');
 
   # CertNanny::Logging->debug('MSG', "Execute: " . $self->hidepin(join(" ", @cmd)));
   # Todo pgk: Testen hidePin

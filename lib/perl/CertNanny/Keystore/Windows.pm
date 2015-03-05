@@ -202,7 +202,7 @@ sub getCert {
   } ## end unless (defined($derfile_tmp...))
  
   my $openssl = $config->get('cmd.openssl', 'CMD');
-  my @cmd = (qq("$openssl"), 'x509', '-in', qq("$derfile_tmp"), '-inform', 'DER');
+  my @cmd = (CertNanny::Util->osq("$openssl"), 'x509', '-in', CertNanny::Util->osq("$derfile_tmp"), '-inform', 'DER');
   $certdata = CertNanny::Util->runCommand(\@cmd, WANTOUT => 1);
   
   CertNanny::Logging->debug('MSG', eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "Get main certificate from keystore");
@@ -244,7 +244,7 @@ sub installCert {
   #my $keyfile = $self->{STATE}->{DATA}->{RENEWAL}->{REQUEST}->{KEYFILE};
   my $certfile = $args{CERTFILE};
 
-  my @cmd      = ('certreq', '-accept', qq("$certfile"));
+  my @cmd      = ('certreq', '-accept', CertNanny::Util->osq("$certfile"));
   if (CertNanny::Util->runCommand(\@cmd, HIDEPWD => 1)) {
     CertNanny::Logging->error('MSG', "installCert(): Certificate could not be imported.");
     return undef;
@@ -388,7 +388,7 @@ sub createRequest() {
   my $entryname = $options->{ENTRYNAME};
   my $config    = $options->{CONFIG};
   
-  $entry->{certreq}->{NewRequest}->{Subject} = qq("$self->{CERT}->{CERTINFO}->{SubjectName}");
+  $entry->{certreq}->{NewRequest}->{Subject} = CertNanny::Util->osq("$self->{CERT}->{CERTINFO}->{SubjectName}");
   my $inf_file_out = $self->_certReqWriteConfig();
   my $result;
 
@@ -402,7 +402,7 @@ sub createRequest() {
 
   # if the file exists, the sanity check has checked that everything is just fine...
   unless (-e $result->{REQUESTFILE}) {
-    my @cmd = ('certreq', '-new', qq("$inf_file_out"), qq("$result->{REQUESTFILE}"));
+    my @cmd = ('certreq', '-new', CertNanny::Util->osq("$inf_file_out"), CertNanny::Util->osq("$result->{REQUESTFILE}"));
     # my $cmd = join(' ', @cmd);
     # CertNanny::Logging->debug('MSG', "Execute: $cmd");
     # `$cmd`;
@@ -707,7 +707,7 @@ sub _certUtilWriteCerts() {
   push(@{$args{OPTIONS}}, '-user') if $self->{OPTIONS}->{ENTRY}->{storelocation} eq "user";
   $args{COMMAND} = '-store';
   my $tmpfile = CertNanny::Util->getTmpFile();
-  $args{OUTFILE} = qq($tmpfile) if defined $args{SERIAL};
+  $args{OUTFILE} = CertNanny::Util->osq($tmpfile) if defined $args{SERIAL};
   CertNanny::Logging->debug('MSG', "Calling certutil.exe to retrieve certificates.");
   my $outfile_tmp = $self->_certUtilWriteCertsCmd(%args);
   return $outfile_tmp;
@@ -748,9 +748,9 @@ sub _certUtilWriteCertsCmd() {
     push(@cmd, $option);
   }
   push(@cmd, $args{COMMAND});
-  push(@cmd, qq("$store"));                                 # NOTE: It is *mandatory* to have double quotes here!
+  push(@cmd, CertNanny::Util->osq("$store"));                                 # NOTE: It is *mandatory* to have double quotes here!
   push(@cmd, $serial) if defined $serial;
-  push(@cmd, qq("$outfile_tmp")) if defined $outfile_tmp;
+  push(@cmd, CertNanny::Util->osq("$outfile_tmp")) if defined $outfile_tmp;
   my $cmd = join(" ", @cmd);
   my $olddir = getcwd();
   chdir($args{TARGETDIR} || $self->{OPTIONS}->{ENTRY}->{statedir});
@@ -984,7 +984,7 @@ sub _installCertchain() {
         return undef;
       }
 
-      my @cmd = ('certutil', '-addstore', 'root', qq("$rootToInstall"));
+      my @cmd = ('certutil', '-addstore', 'root', CertNanny::Util->osq("$rootToInstall"));
       my $cmd = join(" ", @cmd);
 
       CertNanny::Logging->debug('MSG', "Execute: $cmd");
@@ -1011,7 +1011,7 @@ sub _installCertchain() {
         return undef;
       }
 
-      my @cmd = ('certutil', '-addstore', 'CA', qq("$CAToInstall"));
+      my @cmd = ('certutil', '-addstore', 'CA', CertNanny::Util->osq("$CAToInstall"));
       my $cmd = join(" ", @cmd);
 
       CertNanny::Logging->debug('MSG', "Execute: $cmd");

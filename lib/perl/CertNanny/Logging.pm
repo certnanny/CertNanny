@@ -15,6 +15,7 @@ use FindBin qw($Script);
 use Carp;
 
 use File::Basename;
+use Sys::Syslog qw(:standard :macros);
 
 use strict;
 use warnings;
@@ -25,12 +26,12 @@ use CertNanny::Util;
 
 use vars qw(@ISA @EXPORT @EXPORT_OK %EXPORT_TAGS $VERSION);
 
-@EXPORT = qw(printerr printout 
+@EXPORT = qw(Out Err
              logLevel
              switchLogging
              switchFileOut switchConsoleOut switchSysLogOut outOff
              switchFileErr switchConsoleErr switchSysLogErr errOff
-             log debug info notice error fatal);    # Symbols to autoexport (:DEFAULT tag)
+             log debug info notice error emergency);    # Symbols to autoexport (:DEFAULT tag)
 
 my $INSTANCE;
 
@@ -63,8 +64,8 @@ sub getInstance {
 
       # Determining Debug Level
       # Downward compatibility
-      if (!defined($args{CONFIG}->get('log.out.file')))      {$args{CONFIG}->set('log.out.file',      $args{CONFIG}->get('logfile'))}
-      if (!defined($args{CONFIG}->get('log.err.file')))      {$args{CONFIG}->set('log.err.file',      $args{CONFIG}->get('logfile'))}
+      if (!defined($args{CONFIG}->get('log.out.file'))) {$args{CONFIG}->set('log.out.file', $args{CONFIG}->get('logfile'))}
+      if (!defined($args{CONFIG}->get('log.err.file'))) {$args{CONFIG}->set('log.err.file', $args{CONFIG}->get('logfile'))}
       
       foreach my $target ('console', 'file', 'syslog') {
         # Downward compatibility
@@ -99,6 +100,18 @@ sub getInstance {
         # set Loglevel
         $INSTANCE->logLevel('TARGET', $target, 'LEVEL', $logLevel);
       }
+      
+      # Decide how to handle SysLog Messages
+      foreach my $target ('out', 'err') {
+        if (defined($args{CONFIG}->get("log.${target}.syslog")) && ($args{CONFIG}->get("log.${target}.syslog") ne '')) {
+          my @syslog = split(/ /, $args{CONFIG}->get("log.${target}.syslog"));
+          $INSTANCE->{OPTIONS}->{SYSLOG}->{$target}->{IDENTIFIER} = (defined($syslog[0])) ? $syslog[0] : '';
+          $INSTANCE->{OPTIONS}->{SYSLOG}->{$target}->{FACILITIES} = (defined($syslog[2])) ? $syslog[2] : 3;
+          $INSTANCE->{OPTIONS}->{SYSLOG}->{$target}->{OPTIONS}    = (defined($syslog[1])) ? $syslog[1] : '';
+        } else {
+          $INSTANCE->{OPTIONS}->{SYSLOG}->{$target}->{IDENTIFIER} = '';
+        }
+      }
 
       # Determine Logtargets
       $INSTANCE->switchFileOut   ('STATUS', defined($args{CONFIG}->get('log.out.file')) && ($args{CONFIG}->get('log.out.file') ne ''));
@@ -112,7 +125,7 @@ sub getInstance {
         $INSTANCE->switchConsoleOut('STATUS', 1);
         $INSTANCE->switchConsoleErr('STATUS', 1);
       }
-      # Now we now, what to do with Logs and it's no more buffering needed
+      # Now we know, what to do with Logs and it's no more buffering needed
       $bufferOut = 0;
 
       # Determining Debug Details
@@ -121,7 +134,7 @@ sub getInstance {
       # 2: full details w/o getInstance and Logging i.E.: 2013-09-13 15:58:26 : [info] [788] [CertNanny::Config::Config::new(83)->CertNanny::Config::_parse(343)->CertNanny::Config::_parseFile(428)->CertNanny::Config::_parseFile(406)] reading H:\data\Config\CertNanny\CfgFiles\Keystore\uat-certnanny-test Keystore openssl.cfg SHA1: BeCBVMvnNzl8HZU5tF4vzR4uIog
       # 3: full details                             i.E.: 2013-09-13 15:58:26 : [info] [788] [CertNanny::Config::getInstance(65)->CertNanny::Config::new(83)->CertNanny::Config::_parse(343)->CertNanny::Config::_parseFile(428)->CertNanny::Config::_parseFile(406)->CertNanny::Logging::info(224)->CertNanny::Logging::log(168)] reading H:\data\Config\CertNanny\CfgFiles\Keystore\uat-certnanny-test Keystore openssl.cfg SHA1: BeCBVMvnNzl8HZU5tF4vzR4uIog
       $dbgInfo = 1;
-      if (defined($args{CONFIG}->get('log.detail')))    {$dbgInfo = $args{CONFIG}->get('log.detail')}
+      if (defined($args{CONFIG}->get('log.detail'))) {$dbgInfo = $args{CONFIG}->get('log.detail')}
     }
   }
   return $INSTANCE;
@@ -147,8 +160,8 @@ sub new {
 sub DESTROY {
   my $self = shift;
 
-  $self->printerr();
-  $self->printout();
+  $self->Err();
+  $self->Out();
   return undef unless (exists $self->{TMPFILE});
   foreach my $file (@{$self->{TMPFILE}}) {
     unlink $file;
@@ -156,134 +169,6 @@ sub DESTROY {
   close STDOUT;
   close STDERR;
 }
-
-
-sub _print {
-  my $self = (shift)->getInstance();
-  my %args = (@_);
-
-  my $target    = $args{TARGET};
-  my $str       = $args{STR};
-  my $dbg       = 0;
-  my $buffer;
-  
-  my $myFile     = defined($self->{CONFIG}) ? CertNanny::Util->expandStr($self->{CONFIG}->get('log.'.lc($target).'.file', "FILE"), %args)     :  undef;
-  my $myLastFile = defined($self->{CONFIG}) ? CertNanny::Util->expandStr($self->{CONFIG}->get('log.'.lc($target).'.filelast', "FILE"), %args) :  undef;
-
-  my $fileTarget     = $logTarget{$target.'file'} && defined($myFile) && ($myFile ne '');
-  my $lastFileTarget = $logTarget{$target.'file'} && defined($myLastFile) && ($myLastFile ne '');
-  my $consoleTarget  = $logTarget{$target.'console'};
-  my $sysLogTarget   = $logTarget{$target.'syslog'};
-  
-  if ($target eq 'out') {
-    my $prio = lc($args{PRIO} || "info");
-    my %level = ('debug'  => 4,
-                 'info'   => 3,
-                 'notice' => 2,
-                 'error'  => 1,
-                 'fatal'  => 0);
-    $buffer     = \@outBuffer;
-
-    if (exists $level{$prio}) {
-      $dbg = $level{$prio};
-    } else {
-      push @$buffer, "${dbg}:WARNING: log called with undefined priority '$prio'" unless exists $level{$prio};
-    }
-  }
-
-  if ($target eq 'err') {
-    $buffer     = \@errBuffer;
-  }
-  
-  push(@$buffer, "${dbg}:${str}");
-  
-  if (!$bufferOut) {
-    while (@$buffer) {
-      $str = shift(@$buffer);
-      if ($str =~ /^([^:]):(.*)$/s) {
-        $dbg = $1;
-        $str = $2;
-      }
-      # Log to file
-      if ($fileTarget && ($target eq 'err') && ($dbg <= $self->logLevel('TARGET', 'file'))) {
-        $| = 1;
-        open STDERR, ">>", $myFile || die "Could not redirect STDERR to <$myFile>. Stopped";
-        print STDERR $str;
-        close STDERR;
-      }
-      if ($fileTarget && ($target eq 'out') && ($dbg <= $self->logLevel('TARGET', 'file'))) {
-        open STDOUT, ">>", $myFile || die "Could not redirect STDOUT to <$myFile>. Stopped";
-        print STDOUT $str;
-        close STDOUT;
-      }
-      
-      #Log to LastFile
-      if ($lastFileTarget && ($target eq 'err') && ($dbg <= $self->logLevel('TARGET', 'file'))) {
-        $| = 1;
-        if (!$logTargetOpen{$myLastFile}) {
-          open STDERR, ">", $myLastFile || die "Could not redirect STDERR to <$myLastFile>. Stopped";
-          $logTargetOpen{$myLastFile} = 1;
-        } else {
-          open STDERR, ">>", $myLastFile || die "Could not redirect STDERR to <$myLastFile>. Stopped";
-        }
-        print STDERR $str;
-        close STDERR;
-      }
-      if ($lastFileTarget && ($target eq 'out') && ($dbg <= $self->logLevel('TARGET', 'file'))) {
-        $| = 1;
-        if (!$logTargetOpen{$myLastFile}) {
-          open STDOUT, ">", $myLastFile || die "Could not redirect STDOUT. Stopped";
-          $logTargetOpen{$myLastFile} = 1;
-        } else {
-          open STDOUT, ">>", $myLastFile || die "Could not redirect STDOUT. Stopped";
-        }
-        print STDOUT $str;
-        close STDOUT;
-      }
-      
-      # Log to console
-      if ($consoleTarget && ($target eq 'err') && ($dbg <= $self->logLevel('TARGET', 'console'))) {
-        $| = 1;
-        open STDERR, ">&", $stdErrFake;
-        print STDERR $str;
-        close STDERR;
-      }
-      if ($consoleTarget && ($target eq 'out') && ($dbg <= $self->logLevel('TARGET', 'console'))) {
-        $| = 1;
-        open STDOUT, ">&", $stdOutFake;
-        print STDOUT $str;
-        close STDOUT;
-      }
-      
-      # Log to syslog
-      if ($sysLogTarget && ($target eq 'err') && ($dbg <= $self->logLevel('TARGET', 'syslog'))) {
-        $| = 1;
-      }
-      if ($sysLogTarget && ($target eq 'out') && ($dbg <= $self->logLevel('TARGET', 'syslog'))) {
-        $| = 1;
-      }
-    }
-  }
-  return 1;
-} ## end sub _print
-
-
-sub printerr {
-  my $self = (shift)->getInstance();
-  $self->_print('TARGET', 'err', 
-                'STR', '',
-                @_);
-  return 1;
-} ## end sub printerr
-
-
-sub printout {
-  my $self = (shift)->getInstance();
-  $self->_print('TARGET', 'out',
-                'STR', '',
-                @_);
-  return 1;
-} ## end sub printout
 
 
 sub logLevel {
@@ -441,88 +326,288 @@ sub switchSysLogOut {
 } ## end sub switchSysLogOut
 
 
-sub log {
+sub _print {
   my $self = (shift)->getInstance();
   my %args = (@_);
 
-  # confess "Not a hash ref" unless (ref($arg) eq "HASH");
-  return undef unless (defined $args{MSG});
+  my $target    = $args{TARGET};
+  my $str       = $args{STR};
+  my $dbg       = 0;
+  # SYSLOG:ERROR my $dbg       = 3;
+  my $buffer;
+  
+  my $myFile     = defined($self->{CONFIG}) ? CertNanny::Util->expandStr($self->{CONFIG}->get('log.'.lc($target).'.file', "FILE"), %args)     :  undef;
+  my $myLastFile = defined($self->{CONFIG}) ? CertNanny::Util->expandStr($self->{CONFIG}->get('log.'.lc($target).'.filelast', "FILE"), %args) :  undef;
 
-  my $logStr = '';
-  my ($subroutine, $i, $line) = ('', 0, 0);
-  while (defined(caller($i))) {
-    $logStr = (caller($i))[3];
-    $line = $line ? (caller($i-1))[2] : __LINE__;
-    $i++;
-    if ($dbgInfo > 0) {
-      if ((($dbgInfo <= 2) && ($logStr !~ /getInstance|Logging/)) || ($dbgInfo >= 3)) {
-        if ($dbgInfo == 1) {
-          $subroutine = "$logStr($line)" if (!$subroutine);  
+  my $fileTarget     = $logTarget{$target.'file'} && defined($args{PRIO}) && defined($myFile) && ($myFile ne '');
+  my $lastFileTarget = $logTarget{$target.'file'} && defined($args{PRIO}) && defined($myLastFile) && ($myLastFile ne '');
+  my $consoleTarget  = $logTarget{$target.'console'};
+  my $sysLogTarget   = $logTarget{$target.'syslog'} && defined($args{PRIO}) && ($self->{OPTIONS}->{SYSLOG}->{$target}->{IDENTIFIER} ne '');
+  
+  my %level = ('emergency' => 0,
+  #              'alert'     => 1,
+  #              'critical'  => 2,
+                'error'     => 1,
+  #              'warning'   => 4,
+                'notice'    => 2,
+                'info'      => 3,
+                'debug'     => 4);
+
+  # SYSLOG Levels
+  # my %level = ('emergency' => 0,
+  #              'alert'     => 1,
+  #              'critical'  => 2,
+  #              'error'     => 3,
+  #              'warning'   => 4,
+  #              'notice'    => 5,
+  #              'info'      => 6,
+  #              'debug'     => 7);
+
+  if ($target eq 'out') {
+    $buffer = \@outBuffer;
+    if (defined($args{PRIO})) {
+      my $prio = lc($args{PRIO} || "info");
+
+      if (exists $level{$prio}) {
+        $dbg = $level{$prio};
+      } else {
+        push @$buffer, "${dbg}:WARNING: log called with undefined priority '$prio'" unless exists $level{$prio};
+      }
+    }
+  }
+
+  if ($target eq 'err') {
+    $buffer     = \@errBuffer;
+  }
+  
+  push(@$buffer, "${dbg}:${str}");
+  
+  if (!$bufferOut) {
+    while (@$buffer) {
+      $str = shift(@$buffer);
+      if ($str =~ /^([^:]):(.*)$/s) {
+        $dbg = $1;
+        $str = $2;
+      }
+      # Log to file
+      if ($fileTarget && ($target eq 'err') && ($dbg <= $self->logLevel('TARGET', 'file'))) {
+        $| = 1;
+        open STDERR, ">>", $myFile || die "Could not redirect STDERR to <$myFile>. Stopped";
+        print STDERR $str;
+        close STDERR;
+      }
+      if ($fileTarget && ($target eq 'out') && ($dbg <= $self->logLevel('TARGET', 'file'))) {
+        open STDOUT, ">>", $myFile || die "Could not redirect STDOUT to <$myFile>. Stopped";
+        print STDOUT $str;
+        close STDOUT;
+      }
+      
+      #Log to LastFile
+      if ($lastFileTarget && ($target eq 'err') && ($dbg <= $self->logLevel('TARGET', 'file'))) {
+        $| = 1;
+        if (!$logTargetOpen{$myLastFile}) {
+          open STDERR, ">", $myLastFile || die "Could not redirect STDERR to <$myLastFile>. Stopped";
+          $logTargetOpen{$myLastFile} = 1;
         } else {
-          $subroutine = $subroutine ? "$logStr($line)->$subroutine" : "$logStr($line)";  
+          open STDERR, ">>", $myLastFile || die "Could not redirect STDERR to <$myLastFile>. Stopped";
+        }
+        print STDERR $str;
+        close STDERR;
+      }
+      if ($lastFileTarget && ($target eq 'out') && ($dbg <= $self->logLevel('TARGET', 'file'))) {
+        $| = 1;
+        if (!$logTargetOpen{$myLastFile}) {
+          open STDOUT, ">", $myLastFile || die "Could not redirect STDOUT. Stopped";
+          $logTargetOpen{$myLastFile} = 1;
+        } else {
+          open STDOUT, ">>", $myLastFile || die "Could not redirect STDOUT. Stopped";
+        }
+        print STDOUT $str;
+        close STDOUT;
+      }
+      
+      # Log to console
+      if ($consoleTarget && ($target eq 'err') && ($dbg <= $self->logLevel('TARGET', 'console'))) {
+        $| = 1;
+        open STDERR, ">&", $stdErrFake;
+        print STDERR $str;
+        close STDERR;
+      }
+      if ($consoleTarget && ($target eq 'out') && ($dbg <= $self->logLevel('TARGET', 'console'))) {
+        $| = 1;
+        open STDOUT, ">&", $stdOutFake;
+        print STDOUT $str;
+        close STDOUT;
+      }
+      
+      # Log to syslog
+      if ($sysLogTarget && ($dbg <= $self->logLevel('TARGET', 'syslog'))) {
+        my $syslogIdentifier = CertNanny::Util->expandStr($self->{OPTIONS}->{SYSLOG}->{$target}->{IDENTIFIER});
+        my $syslogOptions    = $self->{OPTIONS}->{SYSLOG}->{$target}->{OPTIONS};
+        my $syslogFacilities = $self->{OPTIONS}->{SYSLOG}->{$target}->{FACILITIES};
+        if ($syslogIdentifier ne '') {
+          Sys::Syslog::openlog($syslogIdentifier, $syslogOptions, $syslogFacilities);
+          Sys::Syslog::syslog($dbg, "%s", $str);
+          Sys::Syslog::closelog();
         }
       }
     }
   }
-  $subroutine = "[$subroutine] " if ($subroutine);
-  $logStr = CertNanny::Util->expandStr("__YEAR__-__MONTH__-__DAY__ __HOUR__:__MINUTE__:__SECOND__ : [__PRIO__] [__PID__] __SUB____MSG__\n", 
-                                       '__PRIO__', lc($args{PRIO} || "info"),
-                                       '__SUB__',  $subroutine,
-                                       '__MSG__',  $args{MSG});
-  $self->printout('STR', $logStr, %args);
+  return 1;
+} ## end sub _print
+
+
+sub _log {
+  my $self = (shift)->getInstance();
+  my %args = (@_);
+
+  my $logStr = '';
+  if (defined($args{PRIO})) {
+    # confess "Not a hash ref" unless (ref($arg) eq "HASH");
+    return undef unless (defined $args{MSG});
+    my ($subroutine, $i, $line) = ('', 0, 0);
+    # It's a debug, notice, etc. message, so we add a timestamp, etc.
+    while (defined(caller($i))) {
+      $logStr = (caller($i))[3];
+      $line = $line ? (caller($i-1))[2] : __LINE__;
+      $i++;
+      if ($dbgInfo > 0) {
+        if ((($dbgInfo <= 2) && ($logStr !~ /getInstance|Logging/)) || ($dbgInfo >= 3)) {
+          if ($dbgInfo == 1) {
+            $subroutine = "$logStr($line)" if (!$subroutine);  
+          } else {
+            $subroutine = $subroutine ? "$logStr($line)->$subroutine" : "$logStr($line)";  
+          }
+        }
+      }
+    }
+    $subroutine = "[$subroutine] " if ($subroutine);
+    $logStr = CertNanny::Util->expandStr("__YEAR__-__MONTH__-__DAY__ __HOUR__:__MINUTE__:__SECOND__ : [__PRIO__] [__PID__] __SUB____MSG__\n", 
+                                         '__PRIO__', lc($args{PRIO} || "info"),
+                                         '__SUB__',  $subroutine,
+                                         '__MSG__',  $args{MSG});
+  } else {
+    # It's a normal output message, so we just make an expandStr
+    $logStr = defined($args{MSG}) ? CertNanny::Util->expandStr($args{MSG}) : defined($args{STR}) ? $args{STR} : '';
+  }
+  
+  $self->_print('STR', $logStr,
+                %args);
+
+  return 1;
+} ## end sub _log
+
+
+sub Out {
+  my $self = (shift)->getInstance();
+  my %args = (@_);
+  
+  $self->_log('TARGET', 'out', 
+              %args);
 
   return 1;
 } ## end sub log
 
 
-sub debug {
+sub Err {
+  my $self = (shift)->getInstance();
+  my %args = (@_);
+  
+  $self->_log('TARGET', 'err', 
+              'PRIO',   0,
+              %args);
+
+  return 1;
+} ## end sub log
+
+
+# SYSLOG Levels 
+sub emergency {
   my $self = (shift)->getInstance();
   my %args = (@_);
 
-  $self->log(PRIO => 'debug', %args);
+  $self->Out('PRIO', 'emergency', 
+             %args);
   
   return 0
-} ## end sub debug
+} ## end sub emergancy
 
 
-sub info {
+#sub alert {
+#  my $self = (shift)->getInstance();
+#  my %args = (@_);
+#
+#  $self->Out('PRIO', 'alert', 
+#             %args);
+#  
+#  return 0
+#} ## end sub alert
+
+
+#sub critical {
+#  my $self = (shift)->getInstance();
+#  my %args = (@_);
+#
+#  $self->Out('PRIO', 'critical', 
+#             %args);
+#  
+#  return 0
+#} ## end sub critical
+
+
+sub error {
   my $self = (shift)->getInstance();
   my %args = (@_);
 
-  $self->log(PRIO => 'info', %args);
+  $self->Out('PRIO', 'error', 
+             %args);
   
   return 0
-} ## end sub info
+} ## end sub error
+
+
+#sub warning {
+#  my $self = (shift)->getInstance();
+#  my %args = (@_);
+#
+#  $self->Out('PRIO', 'warning', 
+#             %args);
+#  
+#  return 0
+#} ## end sub warning
 
 
 sub notice {
   my $self = (shift)->getInstance();
   my %args = (@_);
 
-  $self->log(PRIO => 'notice', %args);
+  $self->Out('PRIO', 'notice', 
+             %args);
   
   return 0
 } ## end sub notice
 
 
-sub error {
-  my $self = (shift)->getInstance();
-  my %args = (@_);
-  
-  $self->log(PRIO => 'error', %args);
-  
-  return 1
-} ## end sub error
-
-
-sub fatal {
+sub info {
   my $self = (shift)->getInstance();
   my %args = (@_);
 
-  $self->log(PRIO => 'fatal', %args);
+  $self->Out('PRIO', 'info', 
+             %args);
   
-  return 1
-} ## end sub fatal
+  return 0
+} ## end sub info
+
+
+sub debug {
+  my $self = (shift)->getInstance();
+  my %args = (@_);
+
+  $self->Out('PRIO', 'debug', 
+             %args);
+  
+  return 0
+} ## end sub debug
 
 
 1;

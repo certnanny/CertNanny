@@ -51,7 +51,7 @@ sub new {
   # keystore must be available
   my $type = $args{ENTRY}->{type};
   if (!defined $type || ($type eq "none")) {
-    CertNanny::Logging->printerr('STR', "Skipping keystore (no keystore type defined)\n");
+    CertNanny::Logging->Err('STR', "Skipping keystore (no keystore type defined)\n");
     return undef;
   }
   
@@ -88,8 +88,8 @@ sub new {
   # dynamically load keystore instance module
   eval "require CertNanny::Keystore::${type}";
   if ($@) {
-    CertNanny::Logging->printerr('STR', , join('', $@));
-    CertNanny::Logging->printerr('STR', "ERROR: Could not load keystore handler '$type'\n");
+    CertNanny::Logging->Err('STR', , join('', $@));
+    CertNanny::Logging->Err('STR', "ERROR: Could not load keystore handler '$type'\n");
     return undef;
   }
 
@@ -99,7 +99,7 @@ sub new {
   eval "\$self->{INSTANCE} = new CertNanny::Keystore::$type((\%args,                   # give it whole configuration plus all keystore parameters and keystore name from configfile
                                                              \%{\$self->{OPTIONS}}))"; # give it some common parameters from configfile
   if ($@) {
-    CertNanny::Logging->printerr('STR', join('', $@));
+    CertNanny::Logging->Err('STR', join('', $@));
     return undef;
   }
 
@@ -117,9 +117,9 @@ sub new {
   
       if (defined $self->{CERT}) {
         $self->{CERT}->{CERTINFO} = CertNanny::Util->getCertInfoHash(%{$self->{CERT}});
-        CertNanny::Logging->debug('MSG', "Certificate Information:\n\tSubjectName: " . $self->{CERT}->{CERTINFO}->{SubjectName}  . "\n\t" .
-                                                              "Serial: "      . $self->{CERT}->{CERTINFO}->{SerialNumber} . "\n\t" . 
-                                                              "Issuer: "      . $self->{CERT}->{CERTINFO}->{IssuerName});
+        CertNanny::Logging->debug('MSG', "Certificate Information: SubjectName: " . $self->{CERT}->{CERTINFO}->{SubjectName});
+        CertNanny::Logging->debug('MSG', "                         Serial:      " . $self->{CERT}->{CERTINFO}->{SerialNumber});
+        CertNanny::Logging->debug('MSG', "                         Issuer:      " . $self->{CERT}->{CERTINFO}->{IssuerName});
   
         my $output;
         my %convopts = %{$self->{CERT}};
@@ -686,7 +686,7 @@ sub k_convertKey {
   my $openssl = $config->get('cmd.openssl', 'CMD');
   
   return undef if (!defined($openssl));
-  my @cmd = (qq("$openssl"));
+  my @cmd = (CertNanny::Util->osq("$openssl"));
 
   # KEYTYPE OUTTYPE  CMD
   # OpenSSL OpenSSL  rsa
@@ -735,9 +735,9 @@ sub k_convertKey {
       CertNanny::Logging->error('MSG', "k_convertKey(): Could not write temporary file");
       return undef;
     }
-    push(@cmd, qq("$infile"));
+    push(@cmd, CertNanny::Util->osq("$infile"));
   } else {
-    push(@cmd, qq("$convertOptions{KEYFILE}"));
+    push(@cmd, CertNanny::Util->osq("$convertOptions{KEYFILE}"));
   }
 
   $ENV{PASSIN} = "";
@@ -757,9 +757,7 @@ sub k_convertKey {
 
   ### PASSIN: $ENV{PASSOUT}
   ### PASSOUT: $ENV{PASSOUT}
-  #$output->{KEYDATA} = `$cmd`;
   $output->{KEYDATA} = `$cmd`;
-  ### keydata: $output->{KEYDATA}
 
   delete $ENV{PASSIN};
   delete $ENV{PASSOUT};
@@ -1089,7 +1087,7 @@ sub k_getNextTrustAnchor {
                                                                                      FORCE      => 0)) {
     CertNanny::Logging->error('MSG', "Could not build certificatechain file");
   } else {
-    my $enroller = $self->_getEnroller();
+    my $enroller = $self->k_getEnroller();
     my %certs    = $enroller->getNextCA($certchainfile);
 
     if (exists $certs{SIGNERCERT} and exists $certs{NEXTCACERTS}  ) {
@@ -1504,12 +1502,12 @@ sub k_buildCertificateChain {
     my $child  = shift;
    
     if (!defined $parent || !defined $child) {
-      CertNanny::Logging->printerr('STR', "ERROR: is_issuer: missing parameters\n");
+      CertNanny::Logging->Err('STR', "ERROR: is_issuer: missing parameters\n");
       return undef;
     }
 
     if (ref $parent ne 'HASH' || ref $child ne 'HASH') {
-      CertNanny::Logging->printerr('STR', "ERROR: is_issuer: illegal parameters\n");
+      CertNanny::Logging->Err('STR', "ERROR: is_issuer: illegal parameters\n");
       return undef;
     }
 
@@ -1817,9 +1815,9 @@ sub k_executeHook {
     # assume it's an executable
     if (!exists($args{__LOCATION__})) {
       if (exists $self->{INSTANCE}->{OPTIONS}->{ENTRY}->{location} and $self->{INSTANCE}->{OPTIONS}->{ENTRY}->{location} ne '') {
-        $args{__LOCATION__} = qq("$self->{INSTANCE}->{OPTIONS}->{ENTRY}->{location}");
+        $args{__LOCATION__} = CertNanny::Util->osq("$self->{INSTANCE}->{OPTIONS}->{ENTRY}->{location}");
       } else {
-        $args{__LOCATION__} = qq("$self->{OPTIONS}->{ENTRY}->{location}");
+        $args{__LOCATION__} = CertNanny::Util->osq("$self->{OPTIONS}->{ENTRY}->{location}");
       }
       $args{__LOCATION__} = File::Spec->canonpath($args{__LOCATION__});
     }
@@ -1854,7 +1852,7 @@ sub k_getAvailableCaCerts {
 
   my $scepracert = $self->{STATE}->{DATA}->{SCEP}->{RACERT};
 
-  my $enroller = $self->_getEnroller();
+  my $enroller = $self->k_getEnroller();
   my %certs    = $enroller->getCA();
 
   $self->{STATE}->{DATA}->{SCEP}->{CACERTS} = $certs{CACERTS};
@@ -2048,7 +2046,7 @@ sub _sendRequest {
                                   LocalCertFile  => $newcertfile},
                  sscep        => {CACertFile => $scepracert,});
 
-  my $enroller = $self->_getEnroller();
+  my $enroller = $self->k_getEnroller();
   $enroller->enroll(%options);
 
   unless ($self->_hasEngine()) {
@@ -2200,7 +2198,7 @@ sub _sendRequest {
 } ## end sub _sendRequest
 
 
-sub _getEnroller {
+sub k_getEnroller {
   ###########################################################################
   #
   # get enroller
@@ -2222,7 +2220,7 @@ sub _getEnroller {
     my $enrollertype     = ucfirst($enrollertype_cfg);
     eval "use CertNanny::Enroll::$enrollertype";
     if ($@) {
-      CertNanny::Logging->printerr('STR', join('', $@));
+      CertNanny::Logging->Err('STR', join('', $@));
       CertNanny::Logging->debug('MSG', eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "get enroller");
       return undef;
     }
@@ -2231,7 +2229,7 @@ sub _getEnroller {
     
     eval "\$entry->{ENROLLER} = CertNanny::Enroll::$enrollertype->new(\$entry, \$config, \$entryname)";
     if ($@) {
-      CertNanny::Logging->printerr('STR', join('', $@));
+      CertNanny::Logging->Err('STR', join('', $@));
       CertNanny::Logging->debug('MSG', eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "get enroller");
       return undef;
     }
@@ -2239,7 +2237,7 @@ sub _getEnroller {
 
   CertNanny::Logging->debug('MSG', eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "get enroller");
   return $entry->{ENROLLER};
-} ## end sub _getEnroller
+} ## end sub k_getEnroller
 
 
 sub _renewalState {

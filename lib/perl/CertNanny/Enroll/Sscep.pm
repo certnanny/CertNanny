@@ -38,7 +38,6 @@ sub new {
     $config->{CONFIG}->{keystore}->{$entryname}->{enroll}->{sscep}->{monitorSysInfo} = 'yes';
   }
 
-  #CertNanny::Logging->printout('STR', ' $entryname sscep self is:' .Dumper($config) . $config->{CONFIG}->{keystore}->{$entryname}->{enroll}->{sscep}->{monitorsysinfo});
   $self->{OPTIONS} = $self->defaultOptions($config->{CONFIG}->{keystore}->{$entryname}->{enroll}->{sscep}->{monitorSysInfo}, $config, $entryname);
   $self->readConfig($entry_options->{enroll});
   #CertNanny::Logging->debug('MSG', "enroll sscep self" .Dumper($self));
@@ -107,14 +106,14 @@ sub execute {
   my $self      = shift;
   my $operation = shift;
 
-  my @cmd = (qq("$self->{cmd}"), $operation, '-f', qq("$self->{config_filename}"));
+  my @cmd = (CertNanny::Util->osq("$self->{cmd}"), $operation, '-f', CertNanny::Util->osq("$self->{config_filename}"));
 
   my $cmd = join(' ', @cmd);
   CertNanny::Logging->debug('MSG', "Exec: $cmd in " . getcwd());
   open FH, "$cmd |" or die "Couldn't execute $cmd: $!\n";
   while (defined(my $line = <FH>)) {
     chomp($line);
-    CertNanny::Logging->printout('STR', "$line\n");
+    CertNanny::Logging->info('STR', "$line\n");
   }
   close FH;
   my $exitval = $? >> 8;
@@ -144,8 +143,6 @@ sub enroll {
 
   CertNanny::Logging->info('MSG', "Sending request");
 
-  #CertNanny::Logging->printout('STR', Dumper $self->{STATE}->{DATA});
-
   my %certs = $self->getCA();
   if (!%certs) {
     CertNanny::Logging->error('MSG', "Could not get CA certs");
@@ -155,7 +152,6 @@ sub enroll {
   eval {
     local $SIG{ALRM} = sub {die "alarm\n"};    # NB: \n required
     eval {alarm 120};                          # eval not supported in perl 5.7.1 on win32
-#     CertNanny::Logging->debug('MSG', "scep options". Dumper(%options));
     $self->readConfig(\%options);
     $self->writeConfigFile();
     $rc = $self->execute("enroll");
@@ -166,7 +162,6 @@ sub enroll {
   chdir $olddir;
 
   if ($@) {
-
     # timed out
     die unless $@ eq "alarm\n";                # propagate unexpected errors
     CertNanny::Logging->info('MSG', "Timed out.");
@@ -174,7 +169,6 @@ sub enroll {
   }
 
   if ($rc == 3) {
-
     # request is pending
     CertNanny::Logging->info('MSG', "Request is still pending");
     return 1;
@@ -211,7 +205,6 @@ sub writeConfigFile {
 
 
 sub getCA {
-
   my $self   = shift;
   my $config = shift;
   unless (defined $self->{certs}->{RACERT} and defined $self->{certs}->{CACERTS}) {

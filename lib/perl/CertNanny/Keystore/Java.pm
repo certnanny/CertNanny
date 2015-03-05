@@ -56,7 +56,7 @@ sub new {
   $options->{keytool} = $config->get('cmd.keytool', 'CMD');
   croak "cmd.keytool not found" unless (defined $options->{keytool});
   
-  @cmd = (qq("$options->{keytool}"), "2>&1");
+  @cmd = (CertNanny::Util->osq("$options->{keytool}"), "2>&1");
   @keys = CertNanny::Util->runCommand(\@cmd, WANTOUT => 1);
   my $rightKeytoolVersion = 0;
   foreach (@keys) {
@@ -190,32 +190,35 @@ sub getCert {
   my $entryname = $options->{ENTRYNAME};
   my $config    = $options->{CONFIG};
   
-  my $rc = undef;
+  my $rc = 1;
   my $certData;
 
   if (defined $args{CERTDATA}) {
     if (defined $args{CERTFILE}) {
-      $rc = CertNanny::Logging->error('MSG', "getCert(): Either CERTFILE or CERTDATA may be defined.");
+      CertNanny::Logging->error('MSG', "getCert(): Either CERTFILE or CERTDATA may be defined.");
+      $rc = undef;
     }
     $certData = $args{CERTDATA};
   } else {
     if (!defined $args{CERTFILE}) {
       if (!($args{CERTFILE} = $self->_generateKeystore())) {
-        $rc = CertNanny::Logging->error('MSG', 'getCert(): Could not generate a new tem. keystore');
+        CertNanny::Logging->error('MSG', 'getCert(): Could not generate a new tem. keystore');
+        $rc = undef;
       }
     }
-    if (!$rc) {
+    if ($rc) {
       my @cmd = $self->_buildKeytoolCmd($args{CERTFILE}, '-export', '-rfc', -alias => qq{"$entry->{alias}"});
       $certData = CertNanny::Util->runCommand(\@cmd, WANTOUT => 1, HIDEPWD => 1);
       if ($? || !defined $certData) {
         chomp($certData);
         CertNanny::Logging->error('MSG', "getCert(): keytool -export failed ($certData)");
-        $rc = CertNanny::Logging->error('MSG', "getCert(): Could not read instance certificate file $args{CERTFILE}");
+        CertNanny::Logging->error('MSG', "getCert(): Could not read instance certificate file $args{CERTFILE}");
+        $rc = undef;
       }
     }
   }
 
-  if (!$rc) {
+  if ($rc) {
     local $/ = undef;
     if ($certData =~ m/(-----BEGIN CERTIFICATE-----.*?-----END CERTIFICATE-----)(.*?)[\n\r]*$/s) {
       $rc = {CERTDATA   => $1,
@@ -374,13 +377,13 @@ sub getKey {
   my @cmd;
   if (my $tmpKeystore = $self->_generateKeystore($keystore, 'unique')) {
     if (!defined($entry->{key}->{pin}) || ("$entry->{store}->{pin}" ne "$entry->{key}->{pin}")) {
-      @cmd = (qq("$options->{keytool}"), -keypasswd);
+      @cmd = (CertNanny::Util->osq("$options->{keytool}"), -keypasswd);
       push(@cmd, -noprompt);
-      push(@cmd, -keystore   => qq("$tmpKeystore"));
-      push(@cmd, -storepass  => qq("$entry->{store}->{pin}")) if ($entry->{store}->{pin});
-      push(@cmd, -alias      => qq("$alias"));
-      push(@cmd, -keypass    => qq("$entry->{key}->{pin}")) if ($entry->{key}->{pin});
-      push(@cmd, -new        => qq("$entry->{store}->{pin}")) if ($entry->{store}->{pin});
+      push(@cmd, -keystore   => CertNanny::Util->osq("$tmpKeystore"));
+      push(@cmd, -storepass  => CertNanny::Util->osq("$entry->{store}->{pin}")) if ($entry->{store}->{pin});
+      push(@cmd, -alias      => CertNanny::Util->osq("$alias"));
+      push(@cmd, -keypass    => CertNanny::Util->osq("$entry->{key}->{pin}")) if ($entry->{key}->{pin});
+      push(@cmd, -new        => CertNanny::Util->osq("$entry->{store}->{pin}")) if ($entry->{store}->{pin});
   
       $rc = CertNanny::Util->runCommand(\@cmd, WANTOUT => 1, HIDEPWD => 1);
       if ($rc) {
@@ -391,14 +394,14 @@ sub getKey {
 
     my $tmpFile = CertNanny::Util->getTmpFile();
     CertNanny::Logging->info('MSG', "Extracting key <$alias> from <$tmpKeystore/$keystore> to tmp. file <$tmpFile> in format <PKCS12>.");
-    @cmd = (qq("$options->{keytool}"), -importkeystore);
+    @cmd = (CertNanny::Util->osq("$options->{keytool}"), -importkeystore);
     push(@cmd, -noprompt);
-    push(@cmd, -srckeystore   => qq("$tmpKeystore"));
-    push(@cmd, -srcstorepass  => qq("$entry->{store}->{pin}")) if ($entry->{store}->{pin});
-    push(@cmd, -srcalias      => qq("$alias"));
-    push(@cmd, -srckeypass    => qq("$entry->{store}->{pin}")) if ($entry->{store}->{pin});
-    push(@cmd, -destkeystore  => qq("$tmpFile"));
-    push(@cmd, -deststorepass => qq("$entry->{store}->{pin}")) if ($entry->{store}->{pin});
+    push(@cmd, -srckeystore   => CertNanny::Util->osq("$tmpKeystore"));
+    push(@cmd, -srcstorepass  => CertNanny::Util->osq("$entry->{store}->{pin}")) if ($entry->{store}->{pin});
+    push(@cmd, -srcalias      => CertNanny::Util->osq("$alias"));
+    push(@cmd, -srckeypass    => CertNanny::Util->osq("$entry->{store}->{pin}")) if ($entry->{store}->{pin});
+    push(@cmd, -destkeystore  => CertNanny::Util->osq("$tmpFile"));
+    push(@cmd, -deststorepass => CertNanny::Util->osq("$entry->{store}->{pin}")) if ($entry->{store}->{pin});
     push(@cmd, -deststoretype => 'PKCS12');
   
     $rc = CertNanny::Util->runCommand(\@cmd, WANTOUT => 1, HIDEPWD => 1);
@@ -415,8 +418,8 @@ sub getKey {
   
     if (!$rc) {
       # extract private key unencrypted
-      @cmd = (qq("$openssl"), 'pkcs12');
-      push(@cmd, -in => qq("$tmpFile"));
+      @cmd = (CertNanny::Util->osq("$openssl"), 'pkcs12');
+      push(@cmd, -in => CertNanny::Util->osq("$tmpFile"));
       push(@cmd, -passin => 'env:PIN');
       push(@cmd, -nocerts);
       push(@cmd, -nodes);
@@ -904,7 +907,7 @@ sub installRoots {
         foreach my $certSHA1 (keys %{$installedRootCAs}) {
           if (!exists($availableRootCAs->{$certSHA1}) && ($self->k_getCertType($installedRootCAs->{$certSHA1}) eq 'installedRootCAs')) {
             CertNanny::Logging->debug('MSG', "Deleting root cert " . $installedRootCAs->{$certSHA1}->{CERTINFO}->{SubjectName});
-            @cmd =  (qq("$options->{keytool}"), -noprompt, -storepass => qq("$entry->{store}->{pin}"), '-keystore' ,qq("$locName"), '-delete', '-alias', '"'.$installedRootCAs->{$certSHA1}->{CERTALIAS}.'"' );
+            @cmd =  (CertNanny::Util->osq("$options->{keytool}"), -noprompt, -storepass => CertNanny::Util->osq("$entry->{store}->{pin}"), '-keystore' ,CertNanny::Util->osq("$locName"), '-delete', '-alias', '"'.$installedRootCAs->{$certSHA1}->{CERTALIAS}.'"' );
  
             #@cmd = $self->_buildKeytoolCmd($locName, '-delete', '-alias', $installedRootCAs->{$certSHA1}->{CERTALIAS});
             if (CertNanny::Util->runCommand(\@cmd, HIDEPWD => 1)) {
@@ -924,7 +927,7 @@ sub installRoots {
             if ($availableRootCAs->{$certSHA1}->{CERTINFO}->{SubjectName} =~ /CN=([^,]+).*/) {
               ($alias = $1) =~ s/\s/_/g;
             }
-            @cmd =  (qq("$options->{keytool}"), -noprompt, -storepass => qq("$entry->{store}->{pin}"),'-keystore' ,'"'.$locName.'"', '-importcert', '-file', '"'.$tmpFile.'"', '-trustcacerts', '-alias' , $alias);
+            @cmd =  (CertNanny::Util->osq("$options->{keytool}"), -noprompt, -storepass => CertNanny::Util->osq("$entry->{store}->{pin}"),'-keystore' ,'"'.$locName.'"', '-importcert', '-file', '"'.$tmpFile.'"', '-trustcacerts', '-alias' , $alias);
             #@cmd = $self->_buildKeytoolCmd($locName, '-importcert', '-file', $tmpFile, '-trustcacerts', '-alias' , $alias );
             if (CertNanny::Util->runCommand(\@cmd, HIDEPWD => 1)) {
               CertNanny::Logging->error('MSG', "Error importing root cert " . $availableRootCAs->{$certSHA1}->{CERTINFO}->{SubjectName});
@@ -961,11 +964,11 @@ sub _buildKeytoolCmd {
   my $options = $self->{OPTIONS};
   my $entry   = $options->{ENTRY};
 
-  my @cmd = (qq("$options->{keytool}"), -noprompt, -storepass => qq("$entry->{store}->{pin}"));
-  push(@cmd, -provider  => qq("$entry->{provider}"))      if ($entry->{provider});
-  push(@cmd, -storetype => qq("$entry->{key}->{format}")) if ($entry->{key}->{format});
-  push(@cmd, -keystore  => qq("$location"))               if ($location);
-  push(@cmd, -keypass   => qq("$entry->{key}->{pin}"))    if ($entry->{key}->{pin});
+  my @cmd = (CertNanny::Util->osq("$options->{keytool}"), -noprompt, -storepass => CertNanny::Util->osq("$entry->{store}->{pin}"));
+  push(@cmd, -provider  => CertNanny::Util->osq("$entry->{provider}"))      if ($entry->{provider});
+  push(@cmd, -storetype => CertNanny::Util->osq("$entry->{key}->{format}")) if ($entry->{key}->{format});
+  push(@cmd, -keystore  => CertNanny::Util->osq("$location"))               if ($location);
+  push(@cmd, -keypass   => CertNanny::Util->osq("$entry->{key}->{pin}"))    if ($entry->{key}->{pin});
   push(@cmd, @_);
   @cmd;
 } ## end sub _buildKeytoolCmd

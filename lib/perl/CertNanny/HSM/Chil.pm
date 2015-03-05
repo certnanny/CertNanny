@@ -44,7 +44,7 @@ sub new() {
   }
 
   unless (defined $hsm_options->{key}->{type} and (grep $_ eq $hsm_options->{key}->{type}, @avail_keytypes)) {
-    CertNanny::Logging->error('MSG', qq("$hsm_options->{key}->{type} is not an available keytype."));
+    CertNanny::Logging->error('MSG', CertNanny::Util->osq("$hsm_options->{key}->{type} is not an available keytype."));
     return undef;
   }
 
@@ -62,7 +62,7 @@ sub genkey() {
   my $key;
   my @generateopts = ();
   foreach my $param (keys %{$self->{hsm_options}->{key}}) {
-    push(@generateopts, qq("$param=$self->{hsm_options}->{key}->{$param}"));
+    push(@generateopts, CertNanny::Util->osq("$param=$self->{hsm_options}->{key}->{$param}"));
   }
 
   my @cmd;

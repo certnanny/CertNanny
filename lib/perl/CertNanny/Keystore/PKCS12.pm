@@ -602,7 +602,7 @@ sub installRoots {
     
           # First argument ist the CAListfile Name
           my @CAList     = ();
-          push(@CAList, '-certfile', qq("$CAListFile"));
+          push(@CAList, '-certfile', CertNanny::Util->osq("$CAListFile"));
           
           # then collect the certs
           foreach my $item (keys (%certHash)) {
@@ -618,7 +618,7 @@ sub installRoots {
               $rc = CertNanny::Logging->error('MSG', "Could not append Root CA into chainfile");        
             } else {
               # and collect the certName in the Argumentlist
-              push(@CAList, '-caname', qq("$CN"));
+              push(@CAList, '-caname', CertNanny::Util->osq("$CN"));
             }
           } ## end foreach my $entry (@{$args{...}})
 
@@ -787,7 +787,7 @@ sub _buildOpenSSLPKCS12Cmd {
   $args{-passout}  = "env:PASSOUT";
   $args{-passin}   = "env:PASSIN";
   
-  my @cmd = (qq("$openssl"), 'pkcs12') if ($openssl);
+  my @cmd = (CertNanny::Util->osq("$openssl"), 'pkcs12') if ($openssl);
   foreach (keys (%args)) {
     if (defined($args{$_})) {
       if ($_ eq 'ARGS') {

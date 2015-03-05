@@ -26,6 +26,7 @@ use Time::Local;
 use Time::HiRes qw(gettimeofday);
 
 use MIME::Base64;
+use English;
 
 use Data::Dumper;
 
@@ -38,7 +39,7 @@ use Exporter;
              getTmpFile staticEngine encodeBMPString writeOpenSSLConfig 
              getDefaultOpenSSLConfig backoffTime getMacAddresses 
              fetchFileList callOpenSSL os_type is_os_type setVariable
-             unsetVariable);    # Symbols to autoexport (:DEFAULT tag)
+             unsetVariable osq);    # Symbols to autoexport (:DEFAULT tag)
 
 # This variable stores arbitrary data like created temporary files
 my $INSTANCE;
@@ -83,7 +84,7 @@ sub DESTROY {
 } ## end sub DESTROY
 
 
-sub setVariable() {
+sub setVariable {
   my $self    = (shift)->getInstance();
   my %args   = (NAME  => '',
                 VALUE => '',
@@ -92,7 +93,7 @@ sub setVariable() {
 }
 
 
-sub unsetVariable() {
+sub unsetVariable {
   my $self    = (shift)->getInstance();
   my %args   = (NAME  => '',
                 @_);
@@ -100,7 +101,7 @@ sub unsetVariable() {
 }
 
 
-sub hidePin() {
+sub hidePin {
   my $self    = (shift)->getInstance();
   my @cmd = @_;
   
@@ -111,6 +112,22 @@ sub hidePin() {
   my $commando = join(' ', @cmd);
   
   return $commando;
+}
+
+
+sub osq {
+  my $self = (shift)->getInstance();
+  my $str  = shift;
+  
+  my $command;
+  if ($OSNAME eq "MSWin32") {
+     $str =~ s/^"||"$//g;
+     $command = qq("$str");
+   } else {
+     $str =~ s/^'||'$//g;
+     $command = "'$str'";
+   }
+  return $command;
 }
 
 
@@ -585,14 +602,14 @@ sub callOpenSSL {
   my $openssl = $self->{CONFIG}->get('cmd.openssl', 'CMD');
   
   if (defined($openssl)){
-    my @cmd = (qq("$openssl"), $command);
-    push(@cmd, ('-in', qq("$args{CERTFILE}")))       if (defined $args{CERTFILE});
-    push(@cmd, ('-inform', qq("$args{CERTFORMAT}"))) if (defined $args{CERTFORMAT});
+    my @cmd = (CertNanny::Util->osq("$openssl"), $command);
+    push(@cmd, ('-in', CertNanny::Util->osq("$args{CERTFILE}")))       if (defined $args{CERTFILE});
+    push(@cmd, ('-inform', CertNanny::Util->osq("$args{CERTFORMAT}"))) if (defined $args{CERTFORMAT});
     foreach (@$params) {
       push(@cmd, -$_);
     }
     my $outfile = CertNanny::Util->getTmpFile();
-    push(@cmd, ('>', qq("$outfile")));
+    push(@cmd, ('>', CertNanny::Util->osq("$outfile")));
 
     # export certificate to tempfile
     CertNanny::Logging->debug('MSG', "Execute: " . join(" ", @cmd));
@@ -670,7 +687,7 @@ sub _sha1_base64 {
                                  SRCCONTENT => $data)) {
     my $openssl =$self->{CONFIG}->get('cmd.openssl', 'CMD');
     if (defined($openssl)) {
-      my @cmd = (qq("$openssl"), 'dgst', '-sha', qq("$tmpfile"));
+      my @cmd = (CertNanny::Util->osq("$openssl"), 'dgst', '-sha', CertNanny::Util->osq("$tmpfile"));
       chomp($sha = CertNanny::Util->runCommand(\@cmd, WANTOUT => 1));
       if ($sha =~ /^.*\)= (.*)$/) {
         $sha = $1;
@@ -1023,7 +1040,7 @@ sub convertCert {
   my $openssl = $self->{CONFIG}->get('cmd.openssl', 'CMD');
   
   if (defined($openssl)) {
-    my @cmd     = (qq("$openssl"), 'x509', '-in',);
+    my @cmd     = (CertNanny::Util->osq("$openssl"), 'x509', '-in',);
 
     if (exists $args{CERTDATA}) {
       $infile = CertNanny::Util->getTmpFile();
@@ -1032,9 +1049,9 @@ sub convertCert {
         CertNanny::Logging->error('MSG', "convertCert(): Could not write temporary file: $infile");
         return undef;
       }
-      push(@cmd, qq("$infile"));
+      push(@cmd, CertNanny::Util->osq("$infile"));
     } else {
-      push(@cmd, qq("$args{CERTFILE}"));
+      push(@cmd, CertNanny::Util->osq("$args{CERTFILE}"));
     }
 
     push(@cmd, ('-inform',  $args{CERTFORMAT}));
@@ -1086,7 +1103,7 @@ sub staticEngine {
   my $openssl = $self->{CONFIG}->get('cmd.openssl', 'CMD');
   
   if (defined($openssl)) {
-    my @cmd = (qq("$openssl"));
+    my @cmd = (CertNanny::Util->osq("$openssl"));
     push(@cmd, 'engine');
     $engine_id =~ s/[^A-Za-z0-9]*//g;
     push(@cmd, $engine_id);
