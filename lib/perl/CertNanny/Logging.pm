@@ -167,8 +167,8 @@ sub _print {
   my $dbg       = 0;
   my $buffer;
   
-  my $myFile     = defined($self->{CONFIG}) ? CertNanny::Util->expandstring($self->{CONFIG}->get('log.'.lc($target).'.file', "FILE"), %args)     :  undef;
-  my $myLastFile = defined($self->{CONFIG}) ? CertNanny::Util->expandstring($self->{CONFIG}->get('log.'.lc($target).'.filelast', "FILE"), %args) :  undef;
+  my $myFile     = defined($self->{CONFIG}) ? CertNanny::Util->expandStr($self->{CONFIG}->get('log.'.lc($target).'.file', "FILE"), %args)     :  undef;
+  my $myLastFile = defined($self->{CONFIG}) ? CertNanny::Util->expandStr($self->{CONFIG}->get('log.'.lc($target).'.filelast', "FILE"), %args) :  undef;
 
   my $fileTarget     = $logTarget{$target.'file'} && defined($myFile) && ($myFile ne '');
   my $lastFileTarget = $logTarget{$target.'file'} && defined($myLastFile) && ($myLastFile ne '');
@@ -385,7 +385,6 @@ sub switchConsoleErr {
   my $self  = (shift)->getInstance();
   $self->switchLogging('TARGET', 'errconsole',
                        'STATUS', !$logTarget{'errconsole'},
-#                       'MESSAGE', 'Console Error Logging',
                        @_);
   return 1;
 } ## end sub switchConsoleErr
@@ -395,7 +394,6 @@ sub switchFileErr {
   my $self = (shift)->getInstance();
   $self->switchLogging('TARGET',   'errfile',
                        'STATUS',   !$logTarget{'errfile'},
-#                       'MESSAGE',  "File Error Logging to " . $self->{CONFIG}->get('log.err.file') || '',
                        'FILE',     $self->{CONFIG}->get('log.err.file', "FILE"),
                        'FILELAST', $self->{CONFIG}->get('log.err.filelast', "FILE"),
                        'CLEAR',    undef,
@@ -408,7 +406,6 @@ sub switchSysLogErr {
   my $self  = (shift)->getInstance();
   $self->switchLogging('TARGET', 'errsyslog',
                        'STATUS', !$logTarget{'errsyslog'},
-#                       'MESSAGE', 'SysLog Error Logging',
                        @_);
   return 1;
 } ## end sub switchSysLogErr
@@ -418,7 +415,6 @@ sub switchConsoleOut {
   my $self  = (shift)->getInstance();
   $self->switchLogging('TARGET', 'outconsole',
                        'STATUS', !$logTarget{'outconsole'},
-#                       'MESSAGE', 'Console Logging',
                        @_);
   return 1;
 } ## end sub switchConsoleOut
@@ -428,7 +424,6 @@ sub switchFileOut {
   my $self = (shift)->getInstance();
   $self->switchLogging('TARGET',   'outfile',
                        'STATUS',   !$logTarget{'outfile'},
-#                       'MESSAGE',  "File Logging to " . $self->{CONFIG}->get('log.out.file') || '',
                        'FILE',     $self->{CONFIG}->get('log.out.file', "FILE"),
                        'FILELAST', $self->{CONFIG}->get('log.out.filelast', "FILE"),
                        'CLEAR',    undef,
@@ -441,7 +436,6 @@ sub switchSysLogOut {
   my $self  = (shift)->getInstance();
   $self->switchLogging('TARGET', 'outsyslog',
                        'STATUS', !$logTarget{'outsyslog'},
-#                       'MESSAGE', 'SysLog Logging',
                        @_);
   return 1;
 } ## end sub switchSysLogOut
@@ -471,16 +465,11 @@ sub log {
     }
   }
   $subroutine = "[$subroutine] " if ($subroutine);
-  $logStr = CertNanny::Util->expandstring("__YEAR__-__MONTH__-__DAY__ __HOUR__:__MINUTE__:__SECOND__ : [__PRIO__] [__PID__] __SUB____MSG__\n", 
-                                          '__PRIO__', lc($args{PRIO} || "info"),
-                                          '__SUB__',  $subroutine,
-                                          '__MSG__',  $args{MSG});
+  $logStr = CertNanny::Util->expandStr("__YEAR__-__MONTH__-__DAY__ __HOUR__:__MINUTE__:__SECOND__ : [__PRIO__] [__PID__] __SUB____MSG__\n", 
+                                       '__PRIO__', lc($args{PRIO} || "info"),
+                                       '__SUB__',  $subroutine,
+                                       '__MSG__',  $args{MSG});
   $self->printout('STR', $logStr, %args);
-
-  # call hook
-  #$self->executehook($self->{INSTANCE}->{OPTIONS}->{ENTRY}->{hook}->{log},
-  #			   '__PRIORITY__' => $prio,
-  #			   '__MESSAGE__' => $args{MSG});
 
   return 1;
 } ## end sub log

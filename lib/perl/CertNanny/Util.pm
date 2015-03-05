@@ -255,7 +255,7 @@ sub expandDate {
 } ## end sub expandDate
 
 
-sub expandstring {
+sub expandStr {
   #################################################################
   # Expands a string by replacing placeholders with values
   #
@@ -305,9 +305,9 @@ sub expandstring {
   $input =~ s:__EXEC\(([^\)]*?)\)__:`$1`:ge;
 
   # Replace date, time, etc.
-  my ($n, $s, $m, $S, $D, $M, $Y, $WD, $YD, $isdst);
+  my ($n, $s, $m, $h, $D, $M, $Y, $WD, $YD, $isdst);
   $n = substr( (gettimeofday)[1], 0, 4 );
-  ($s, $m, $S, $D, $M, $Y, $WD, $YD, $isdst) = localtime(time);
+  ($s, $m, $h, $D, $M, $Y, $WD, $YD, $isdst) = localtime(time);
   $M++;
   my $YY = $Y - 100;
   $Y += 1900;
@@ -316,7 +316,7 @@ sub expandstring {
   $D  = sprintf('%02d', $D);
   $WD = sprintf('%01d', $WD);
   $YD = sprintf('%03d', $YD);
-  $S  = sprintf('%02d', $S);
+  $h  = sprintf('%02d', $h);
   $m  = sprintf('%02d', $m);
   $s  = sprintf('%02d', $s);
   $n  = sprintf('%04d', $n);
@@ -326,13 +326,13 @@ sub expandstring {
   $args{'__MONTH__'}  = $M                           if (!exists($args{'__MONTH__'}));
   $args{'__DAY__'}    = $D                           if (!exists($args{'__DAY__'}));
   $args{'__WDAY__'}   = $WD                          if (!exists($args{'__WDAY__'}));
-  $args{'__JDAY__'}   = $YD                          if (!exists($args{'__JDAY__'}));
-  $args{'__HOUR__'}   = $S                           if (!exists($args{'__HOUR__'}));
+  $args{'__YDAY__'}   = $YD                          if (!exists($args{'__YDAY__'}));
+  $args{'__HOUR__'}   = $h                           if (!exists($args{'__HOUR__'}));
   $args{'__MINUTE__'} = $m                           if (!exists($args{'__MINUTE__'}));
   $args{'__SECOND__'} = $s                           if (!exists($args{'__SECOND__'}));
   $args{'__NANO__'}   = $n                           if (!exists($args{'__NANO__'}));
-  $args{'__TS4__'}    = "${Y}${M}${D}_${S}${m}${s}"  if (!exists($args{'__TS4__'}));
-  $args{'__TS2__'}    = "${YY}${M}${D}_${S}${m}${s}" if (!exists($args{'__TS2__'}));
+  $args{'__TS4__'}    = "${Y}${M}${D}_${h}${m}${s}"  if (!exists($args{'__TS4__'}));
+  $args{'__TS2__'}    = "${YY}${M}${D}_${h}${m}${s}" if (!exists($args{'__TS2__'}));
 
   # Replace Process ID
   $args{'__PID__'} = $$ if (!exists($args{'__PID__'}));
@@ -372,6 +372,15 @@ sub expandstring {
   # delete unresolved placeholders
   $input =~ s/__(?:(?!__).)*__//g;
   
+  # alternativ date compatible time/date placeholders
+  $input =~ s:%y:$YY:g;
+  $input =~ s:%Y:$Y:g;
+  $input =~ s:%m:$M:g;
+  $input =~ s:%d:$D:g;
+  $input =~ s:%H:$h:g;
+  $input =~ s:%M:$m:g;
+  $input =~ s:%S:$s:g;
+
   return $input;
 } ## end sub expandDate
 

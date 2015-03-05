@@ -1825,7 +1825,7 @@ sub k_executeHook {
     }
 
     # replace val
-    $hook = CertNanny::Util->expandstring($hook, %args);
+    $hook = CertNanny::Util->expandStr($hook, %args);
     # foreach my $key (keys %args) {
     #   my $value = $args{$key} || "";
     #   $hook =~ s/$key/$value/g;
