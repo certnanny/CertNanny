@@ -121,14 +121,14 @@ sub execute {
   return $exitval;
 } ## end sub execute
 
-# Enroll needs
-# PrivateKeyFile
-# CertReqFile
-# SignKeyFile
-# SignCertFile
-# LocalCertFile
-# EncCertFile
 sub enroll {
+  # Enroll needs
+  # PrivateKeyFile
+  # CertReqFile
+  # SignKeyFile
+  # SignCertFile
+  # LocalCertFile
+  # EncCertFile
   my $self    = shift;
   my %options = (@_,);
 

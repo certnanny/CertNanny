@@ -2225,7 +2225,7 @@ sub k_getEnroller {
       return undef;
     }
 
-    CertNanny::Logging->debug('MSG', "getEnroller" . ref($self->{INSTANCE}));
+    CertNanny::Logging->debug('MSG', "k_getEnroller " . ref($self->{INSTANCE}));
     
     eval "\$entry->{ENROLLER} = CertNanny::Enroll::$enrollertype->new(\$entry, \$config, \$entryname)";
     if ($@) {
