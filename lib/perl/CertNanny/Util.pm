@@ -39,7 +39,7 @@ use Exporter;
              getTmpFile staticEngine encodeBMPString writeOpenSSLConfig 
              getDefaultOpenSSLConfig backoffTime getMacAddresses 
              fetchFileList callOpenSSL os_type is_os_type setVariable
-             unsetVariable osq);    # Symbols to autoexport (:DEFAULT tag)
+             unsetVariable osq dumpCertInfoHash);    # Symbols to autoexport (:DEFAULT tag)
 
 # This variable stores arbitrary data like created temporary files
 my $INSTANCE;
@@ -762,7 +762,7 @@ sub getCertInfoHash {
   #   or       CERTFILE   => cert file to parse
   #   optional CERTFORMAT => PEM|DER (default: DER)
   #
-  # exacly one of CERTDATA or CERFILE mut be provided
+  # exacly one of CERTDATA or CERFILE must be provided
   #
   # Output: Hash with certificate information
   # always:
@@ -787,7 +787,6 @@ sub getCertInfoHash {
   #   CRLDistributionPoints  => <X509v3 CRL Distribution Points>
   #
   my $self = (shift)->getInstance();
-  
   my %args = (CERTFORMAT => 'DER',
               @_);    # argument pair list
 
@@ -829,6 +828,43 @@ sub getCertInfoHash {
 
   return $info;
 } ## end sub getCertInfoHash
+
+
+sub dumpCertInfoHash {
+  # parse DER encoded X.509v3 certificate and dump certificate information
+  # in a hash ref
+  # Prerequisites: requires external openssl executable
+  #
+  # Input: Hash with
+  #   either   CERTDATA   => directly contains certificate data
+  #   or       CERTFILE   => cert file to parse
+  #   optional CERTFORMAT => PEM|DER (default: DER)
+  #   optional PADDING    => Indent output by PADDING blanks
+  #   optional LOCATION   => output the location
+  #   optional TYPE       => output the type
+  #
+  # exactly one of CERTDATA or CERFILE must be provided
+  #
+  # Output: Hashdump to OUT with certificate information
+  #
+  my $self = (shift)->getInstance();
+  my %args = (CERTFORMAT => 'DER',
+              @_);    # argument pair list
+
+  if (defined($args{CERTDATA}) || defined($args{CERTFILE})) {
+    my %certinfo = CertNanny::Util->getCertInfoHash(%args);
+    my $fillup = defined($args{PADDING}) ? ' ' x $args{PADDING} : '';
+    
+    CertNanny::Logging->Out('STR', $fillup . "Subject:                  $certinfo{'SubjectName'}\n");
+    CertNanny::Logging->Out('STR', $fillup . "Subject alternative name: $certinfo{'SubjectAlternativeName'}\n");
+    CertNanny::Logging->Out('STR', $fillup . "Fingerprint:              $certinfo{'CertificateFingerprint'}\n");
+    CertNanny::Logging->Out('STR', $fillup . "Validity from:            $certinfo{'NotBefore'}\n");
+    CertNanny::Logging->Out('STR', $fillup . "Validity to:              $certinfo{'NotAfter'}\n");
+    CertNanny::Logging->Out('STR', $fillup . "Serial:                   $certinfo{'SerialNumber'}\n");
+    CertNanny::Logging->Out('STR', $fillup . "Location:                 $args{LOCATION}\n") if defined($args{LOCATION});
+    CertNanny::Logging->Out('STR', $fillup . "Type:                     $args{TYPE}\n")     if defined($args{TYPE});
+  }
+} ## end sub dumpCertInfoHash
 
 
 sub getCSRInfoHash {

@@ -42,6 +42,10 @@ sub new {
   my $self = {};
   bless $self, $class;
   
+  my $entry     = $args{ENTRY};
+  my $entryname = $args{ENTRYNAME};
+  my $config    = $args{CONFIG};
+  
   #  # Store singleton objects in CertNanny
   #  $self->{CONFIG}  = CertNanny::Config->getInstance(%args); return undef unless defined $self->{CONFIG};
   #  $self->{UTIL}    = CertNanny::Util->getInstance(CONFIG => $self->{CONFIG});
@@ -49,37 +53,37 @@ sub new {
   #
   # sanity check keystore config parameters
   # keystore must be available
-  my $type = $args{ENTRY}->{type};
+  my $type = $entry->{type};
   if (!defined $type || ($type eq "none")) {
     CertNanny::Logging->Err('STR', "Skipping keystore (no keystore type defined)\n");
     return undef;
   }
   
-  # CertNanny::Logging->debug('MSG', "Keystore args dump:". Dumper( $args{ENTRY} ));
+  # CertNanny::Logging->debug('MSG', "Keystore args dump:". Dumper( $entry ));
  
   # statedir and scepcertdir must exist and be writeable
   foreach my $item (qw(statedir scepcertdir)) {
-    if (!exists $args{ENTRY}->{$item}) {croak "No $item specified for keystore " . $args{ENTRY}->{location};}
-    if (!-d $args{ENTRY}->{$item})     {croak "$item directory $args{ENTRY}->{$item} does not exist";}
-    if (!-x $args{ENTRY}->{$item} or
-        !-r $args{ENTRY}->{$item} or
-        !-w $args{ENTRY}->{$item})  {croak "Insufficient permissions for $item $args{ENTRY}->{$item}";}
+    if (!exists $entry->{$item}) {croak "No $item specified for keystore " . $entry->{location};}
+    if (!-d $entry->{$item})     {croak "$item directory $entry->{$item} does not exist";}
+    if (!-x $entry->{$item} or
+        !-r $entry->{$item} or
+        !-w $entry->{$item})  {croak "Insufficient permissions for $item $entry->{$item}";}
   } ## end foreach my $item (qw(statedir scepcertdir))
 
   # if there is no statefile defined, create one
-  if (!exists $args{ENTRY}->{statefile}) {
-    my $entry = $args{ENTRYNAME} || "entry";
-    my $statefile = File::Spec->catfile($args{ENTRY}->{statedir}, "$entry.state");
-    $args{ENTRY}->{statefile} = $statefile;
+  if (!exists $entry->{statefile}) {
+    my $entry = $entryname || "entry";
+    my $statefile = File::Spec->catfile($entry->{statedir}, "$entry.state");
+    $entry->{statefile} = $statefile;
   }
 
   # set defaults
-  # $self->{CONFIG} = $args{CONFIG};
+  # $self->{CONFIG} = $config;
   
-  $self->{OPTIONS}->{'path.tmpdir'}  = $args{CONFIG}->get('path.tmpdir', 'FILE');
-  $self->{OPTIONS}->{'cmd.openssl'}  = $args{CONFIG}->get('cmd.openssl', 'CMD');
-  $self->{OPTIONS}->{'cmd.sscep'}    = $args{CONFIG}->get('cmd.sscep',   'CMD');
-  $self->{OPTIONS}->{ENTRYNAME}      = $args{ENTRYNAME};
+  $self->{OPTIONS}->{'path.tmpdir'}  = $config->get('path.tmpdir', 'FILE');
+  $self->{OPTIONS}->{'cmd.openssl'}  = $config->get('cmd.openssl', 'CMD');
+  $self->{OPTIONS}->{'cmd.sscep'}    = $config->get('cmd.sscep',   'CMD');
+  $self->{OPTIONS}->{ENTRYNAME}      = $entryname;
 
   croak "No tmp directory specified"            unless defined $self->{OPTIONS}->{'path.tmpdir'};
   croak "No openssl binary configured or found" unless (defined $self->{OPTIONS}->{'cmd.openssl'});
@@ -120,6 +124,8 @@ sub new {
         CertNanny::Logging->debug('MSG', "Certificate Information: SubjectName: " . $self->{CERT}->{CERTINFO}->{SubjectName});
         CertNanny::Logging->debug('MSG', "                         Serial:      " . $self->{CERT}->{CERTINFO}->{SerialNumber});
         CertNanny::Logging->debug('MSG', "                         Issuer:      " . $self->{CERT}->{CERTINFO}->{IssuerName});
+        CertNanny::Logging->debug('MSG', "                         valid from:  " . $self->{CERT}->{CERTINFO}->{NotBefore});
+        CertNanny::Logging->debug('MSG', "                         valid until: " . $self->{CERT}->{CERTINFO}->{NotAfter});
   
         my $output;
         my %convopts = %{$self->{CERT}};

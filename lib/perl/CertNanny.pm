@@ -296,15 +296,9 @@ sub do_dump {
         if ($options->{ENTRY}->{'location'} ne 'rootonly') {
           $keystore->{CERT} = $instance->getCert();
           if (defined($keystore->{CERT})) {
-            $keystore->{CERT}->{CERTINFO} = CertNanny::Util->getCertInfoHash(%{$keystore->{CERT}});
-            CertNanny::Logging->Out('STR', "  Subject:                  $keystore->{CERT}->{CERTINFO}->{'SubjectName'}\n");
-            CertNanny::Logging->Out('STR', "  Subject alternative name: $keystore->{CERT}->{CERTINFO}->{'SubjectAlternativeName'}\n");
-            CertNanny::Logging->Out('STR', "  Fingerprint:              $keystore->{CERT}->{CERTINFO}->{'CertificateFingerprint'}\n");
-            CertNanny::Logging->Out('STR', "  Validity from:            $keystore->{CERT}->{CERTINFO}->{'NotBefore'}\n");
-            CertNanny::Logging->Out('STR', "  Validity to:              $keystore->{CERT}->{CERTINFO}->{'NotAfter'}\n");
-            CertNanny::Logging->Out('STR', "  Serial:                   $keystore->{CERT}->{CERTINFO}->{'SerialNumber'}\n");
-            CertNanny::Logging->Out('STR', "  Location:                 $options->{ENTRY}->{'location'}\n");
-            CertNanny::Logging->Out('STR', "  Type:                     $options->{ENTRY}->{'type'}\n");
+            CertNanny::Util->dumpCertInfoHash(%{$keystore->{CERT}},
+                                              'LOCATION', $options->{ENTRY}->{'location'},
+                                              'TYPE',     $options->{ENTRY}->{'type'});
           }
         }
       }
@@ -774,7 +768,6 @@ sub do_updateRootCA {
   my $entryname = $options->{ENTRYNAME};
   my $config    = $options->{CONFIG};
 
-
   if (defined $self->{ITEMS}->{$entryname}->{rootcaupdate}->{enable} &&
       $self->{ITEMS}->{$entryname}->{rootcaupdate}->{enable} eq "true") {
     CertNanny::Logging->debug('MSG', "RootCA update activated running k_getNextTrustAnchor");
@@ -833,7 +826,7 @@ sub do_test {
   my $self = (shift)->getInstance();
   my %args = (@_);
 
-  my $config    = $self->{CONFIG};
+  my $config = $self->{CONFIG};
   my $target = $self->getOption('keystore');
 
   my @keystores = (sort {lc($a) cmp lc($b)} keys(%{$config->{CONFIG}->{'keystore'}}));
@@ -849,11 +842,27 @@ sub do_test {
                                                   ENTRY     => $self->{ITEMS}->{$keystore}, # all keystore parameters from configfile
                                                   ENTRYNAME => $keystore);                  # and the keystore name from configfile
           if ($keystore) {
-            my $enroller = $keystore->k_getEnroller();
+            $keystore     = $keystore->{INSTANCE};
+            my $options   = $keystore->{OPTIONS};
+            my $entry     = $options->{ENTRY};
+            my $enroller  = $keystore->k_getEnroller();
             if (defined($enroller)) {
-              my %certs    = $enroller->getCA();
-              if (!defined %certs) {
-                
+              my %certs = $enroller->getCA();
+              if (%certs) {
+                CertNanny::Logging->Out('STR', "  Certificate $certs{RACERT}:\n");
+                dumpCertInfoHash($keystore->{CERT},
+                                 'PADDING',  4,
+                                 'LOCATION', $entry->{'location'}, 
+                                 'TYPE',     $entry->{'type'});
+                foreach ($certs{CACERTS}) {
+                  CertNanny::Logging->Out('STR', "  Certificate $_->{CERTFILE}:\n");
+                  dumpCertInfoHash($_,
+                                   'PADDING',  4,
+                                   'LOCATION', $entry->{'location'}, 
+                                   'TYPE',     $entry->{'type'});
+                }
+              } else {
+                CertNanny::Logging->Out('STR', "  Could not instantiate Keystore: $keystore\n");
               }
             }
           }
