@@ -7,49 +7,58 @@
 #############################################
 
 
-#Name of the CertNanny service 
+#Name of the CertNanny service
 # Windows Service Name
 platform.windows.servicename     = CertNanny
-                               
+
 #time frame for starting the renewal process (in seconds)
 #once a day  86400
 platform.windows.serviceinterval = 86400
 
-#helper variable to ease configuration 
+#helper variable to ease configuration
 #can be accesed via $(prefix)
 prefix                           = /var/CertNanny/
 #tmp directory for certnanny
 path.tmpdir                      = $(prefix)tmp/
 
+# Log settings (Level, Console, File, Syslog)
 # NOTE: Set the desired log level here. For common usage 2 or 3 should
 #       be OK.
 # 0: fatal, 1: error, 2: notice, 3: info, 4: debug, 5: scep verbose, 6: scep debug
-log.level                        = 3
-
+# ToDo: Change Loglevels to: emergency, 1: alert, 2: critical, 3: error, 4: warning, i5: notice, 6: info, 7: debug
+log.level.console                = 6
+log.level.file                   = 0
+log.level.syslog                 = 3
 # depricated
-#loglevel                        = 3
-
+# loglevel                         = 1
 # Log Detail settings
 # 0: Timestamp, Level, PID, text       i.E.: 2015-01-29 21:47:15 : [debug] [64726] Start CertNanny::do_dump Dump
 # 1: 0 + direct calling proc           i.E.: 2015-01-29 21:47:48 : [debug] [64747] [CertNanny::do_dump(601)] Start CertNanny::do_dump Dump
 # 2: 1 + chain of all calling procs    i.E.: 2015-01-29 21:48:40 : [debug] [64781] [CertNanny::AUTOLOAD(187)->CertNanny::do_dump(601)] Start CertNanny::do_dump Dump
 # 3: 2 + getInstance and Logging procs i.E.: 2015-01-29 21:49:47 : [debug] [64820] [CertNanny::AUTOLOAD(187)->CertNanny::do_dump(601)->CertNanny::Logging::debug(451)->CertNanny::Logging::log(415)] Start CertNanny::do_dump Dump
-log.detail                       = 3
+log.detail                       = 1
 
-#Name and destination of the certnanny logfile
 log.out.console                  = 1
-log.out.file                     = $(prefix)logs/certnanny.log
-log.out.filelast                 = $(prefix)logs/certnanny.last.log
-#log.out.syslog                   = tcp://localhost:2486
+log.out.file                     = $(prefix)logs/certnanny___YEAR__.__MONTH__.__KEYSTORE__.log
+log.out.filelast                 = $(prefix)logs/certnanny___YEAR__.__MONTH__.__KEYSTORE__.last.log
+# Format for syslog parameter: <SysLogIdentifier> <Facility> <Syslog Options separated by , (NO BLANKS ALLOWED)>
+# If you want to user SysLog you should consider configuring you syslogd Daemon
+# For Example the following configures the syslogd to write all Messages from Senders with an SysLogIdentifier
+# beginning with "certnanny" (not case sensitiv) and with an Level equal or less notice to the file
+# /var/log/certnanny.log. The Logfile is rotated every 5M
+#  > certnanny.log mode=0640 format=bsd rotate=seq compress file_max=5M all_max=50M
+#  ? [CA= Sender certnanny] [<= Level debug] file certnanny.log
+log.out.syslog                   = CertNanny.__KEYSTORE__.log LOG_DAEMON ndelay
+
+# Err output settings (Console, File, Syslog)
 log.err.console                  = 1
-log.err.file                     = $(prefix)logs/certnanny.err
-log.err.filelast                 = $(prefix)logs/certnanny.last.err
-#log.err.syslog                   = tcp://localhost:2486
+log.err.file                     = $(prefix)logs/certnanny___YEAR__.__MONTH__.__KEYSTORE__.err
+log.err.filelast                 = $(prefix)logs/certnanny___YEAR__.__MONTH__.__KEYSTORE__.last.err
+log.err.syslog                   = CertNanny.__KEYSTORE__.err LOG_DAEMON ndelay
+# depricated
+# logfile                     = $(prefix)logs/certnanny.log
 
-#depricated
-#logfile                          = $(prefix)logs/certnanny.log
-
-#randomWait if this is set there will be a random backoff time while renewing a certificate to ease the stress 
+#randomWait if this is set there will be a random backoff time while renewing a certificate to ease the stress
 #on the PKI (e.g. 1000 servers run certanny with the same config for a cron job)
 randomWait                       = 300
 
@@ -65,11 +74,11 @@ randomWait                       = 300
 #
 # OpenSSL location (required)
 cmd.openssl                      = /usr/bin/openssl
-#Optional openssl conf path , to avoid warnings from openSSL CertNanny will set the OPENSSL_CONF enviroment var 
+#Optional openssl conf path , to avoid warnings from openSSL CertNanny will set the OPENSSL_CONF enviroment var
 #cmd.opensslconf                 = /path/to/openssl.conf
 
 # sscep binary location (required)
-cmd.sscep                        = /opt/CertNanny/bin/sscep_static
+cmd.sscep                        = /opt/CertNanny/bin/sscep
 # java an keytool location (optional)
 cmd.java                         = /usr/bin/java
 cmd.keytool                      = /usr/bin/keytool
@@ -79,21 +88,6 @@ cmd.ifconfig                     = /sbin/ifconfig
 
 
 ####Include keystore configuration files####
-# If you specify keystores, CertNanny searches for configuration
-# files named Keystore-<keystorename>.cfg and includes them.
-# Within these files you don't need the prefix keystore.<keystorename>
-# but it is not an error when you use it. If you use it the keystorename
-# must be identical to the one specified here.
-# <keystorename> is case sensitive!
-# Example:
-# keystores = openssl java
-# includes the two cfg file Keystore-openssl.cfg and Keystore-java.cfg
-# In these cfg files you may specify values as
-# store.pin    =   123456 
-# or as (depricated)
-# keystore.java.store.pin    =   123456 
-keystores                        = openssl java
-
 # if you specify a directory all files in the directory will be included
 # include KeystoreConfigDirectory/
 # or specify several files by globbing to be included
@@ -102,30 +96,20 @@ keystores                        = openssl java
 # or specify the config file to include one by one by absolute or relative path starting from this config files directory
 # include certnanny-local.cfg
 
-include Keystore-DEFAULT.cfg
-
-# single Keystore include is depricated
-#include Keystore-Java.cfg
-#include Keystore-OpenSSL.cfg
+keystores                        = openssl java
+# depricated
+#include Keystore-DEFAULT.cfg
+#include Keystore-myJava.cfg
+#include Keystore-myOpenSSL.cfg
 #include Keystore-Windows.cfg
 #include Keystore-MQ.cfg
 #include Keystore-OpenSSL-PKCS8.cfg
 #include Keystore-PKCS12.cfg
-#
-# Alternative syntax to include keystores
-# keystores                   = <keystorename> <keystorename> ...
-# i.E.: keystores                     = java openssl
-# A file named Keystore-<keystorename>.cfg is expected
-# In the file  Keystore-<keystorename>.cfg the keystore must be named <keystorename>
-# <keystorename> is case sensitiv
-# In the file Keystore-<keystorename>.cfg keys can be specified without the prefix keystore.<keystorename>
-# i.E.:       type                = Java
-# instead of: keystore.java.type  = Java
-# if <keystorename> is java 
+
 
 ####Include system specific configuration files####
 # Do not edit or delete
 # Do not remove folder /var/Certnanny/etc/system ot change files in this folder
 # This directory is used for system default configurations provided by an additional, optional configuration package
 # Any Files in this directory can be changed, deleted or added by subsequent updates without further notice
-include /var/CertNanny/etc/system
+include $(prefix)etc/system
