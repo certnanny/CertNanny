@@ -850,17 +850,20 @@ sub dumpCertInfoHash {
   my $self = (shift)->getInstance();
   my %args = (CERTFORMAT => 'DER',
               @_);    # argument pair list
+              
+  my $certinfo = $args{CERTINFO};
 
-  if (defined($args{CERTDATA}) || defined($args{CERTFILE})) {
-    my %certinfo = CertNanny::Util->getCertInfoHash(%args);
+  if (!defined($certinfo) && (defined($args{CERTDATA}) || defined($args{CERTFILE}))) {$certinfo = CertNanny::Util->getCertInfoHash(%args)}
+  
+  if (defined($certinfo)) {
     my $fillup = defined($args{PADDING}) ? ' ' x $args{PADDING} : '';
     
-    CertNanny::Logging->Out('STR', $fillup . "Subject:                  $certinfo{'SubjectName'}\n");
-    CertNanny::Logging->Out('STR', $fillup . "Subject alternative name: $certinfo{'SubjectAlternativeName'}\n");
-    CertNanny::Logging->Out('STR', $fillup . "Fingerprint:              $certinfo{'CertificateFingerprint'}\n");
-    CertNanny::Logging->Out('STR', $fillup . "Validity from:            $certinfo{'NotBefore'}\n");
-    CertNanny::Logging->Out('STR', $fillup . "Validity to:              $certinfo{'NotAfter'}\n");
-    CertNanny::Logging->Out('STR', $fillup . "Serial:                   $certinfo{'SerialNumber'}\n");
+    CertNanny::Logging->Out('STR', $fillup . "Subject:                  $certinfo->{'SubjectName'}\n");
+    CertNanny::Logging->Out('STR', $fillup . "Subject alternative name: $certinfo->{'SubjectAlternativeName'}\n");
+    CertNanny::Logging->Out('STR', $fillup . "Fingerprint:              $certinfo->{'CertificateFingerprint'}\n");
+    CertNanny::Logging->Out('STR', $fillup . "Validity from:            $certinfo->{'NotBefore'}\n");
+    CertNanny::Logging->Out('STR', $fillup . "Validity to:              $certinfo->{'NotAfter'}\n");
+    CertNanny::Logging->Out('STR', $fillup . "Serial:                   $certinfo->{'SerialNumber'}\n");
     CertNanny::Logging->Out('STR', $fillup . "Location:                 $args{LOCATION}\n") if defined($args{LOCATION});
     CertNanny::Logging->Out('STR', $fillup . "Type:                     $args{TYPE}\n")     if defined($args{TYPE});
   }

@@ -72,8 +72,8 @@ sub new {
 
   # if there is no statefile defined, create one
   if (!exists $entry->{statefile}) {
-    my $entry = $entryname || "entry";
-    my $statefile = File::Spec->catfile($entry->{statedir}, "$entry.state");
+    my $myEntryname = $entryname || "entry";
+    my $statefile = File::Spec->catfile($entry->{statedir}, "$myEntryname.state");
     $entry->{statefile} = $statefile;
   }
 

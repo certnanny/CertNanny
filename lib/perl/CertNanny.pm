@@ -850,16 +850,20 @@ sub do_test {
               my %certs = $enroller->getCA();
               if (%certs) {
                 CertNanny::Logging->Out('STR', "  Certificate $certs{RACERT}:\n");
-                dumpCertInfoHash($keystore->{CERT},
-                                 'PADDING',  4,
-                                 'LOCATION', $entry->{'location'}, 
-                                 'TYPE',     $entry->{'type'});
-                foreach ($certs{CACERTS}) {
-                  CertNanny::Logging->Out('STR', "  Certificate $_->{CERTFILE}:\n");
-                  dumpCertInfoHash($_,
-                                   'PADDING',  4,
-                                   'LOCATION', $entry->{'location'}, 
-                                   'TYPE',     $entry->{'type'});
+                CertNanny::Util->dumpCertInfoHash('CERTINFO', $keystore->{CERT}->{CERTINFO},
+                                                  'CERTDATA', $keystore->{CERT}->{CERTDATA},
+                                                  'CERTFILE', $keystore->{CERT}->{CERTFILE},
+                                                  'PADDING',  4,
+                                                  'LOCATION', $entry->{'location'}, 
+                                                  'TYPE',     $entry->{'type'});
+                foreach my $cert (@{$certs{CACERTS}}) {
+                  CertNanny::Logging->Out('STR', "  Certificate $cert->{CERTFILE}:\n");
+                  CertNanny::Util->dumpCertInfoHash('CERTINFO', $cert->{CERTINFO},
+                                                    'CERTDATA', $cert->{CERTDATA},
+                                                    'CERTFILE', $cert->{CERTFILE},
+                                                    'PADDING',  4,
+                                                    'LOCATION', $entry->{'location'}, 
+                                                    'TYPE',     $entry->{'type'});
                 }
               } else {
                 CertNanny::Logging->Out('STR', "  Could not instantiate Keystore: $keystore\n");
