@@ -423,7 +423,7 @@ sub printableIsoDate {
 sub readFile {
   # read (slurp) file from disk
   # Example: $self->readFile($filename);
-  CertNanny::Logging->debug('MSG', eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "write file/content to disk");
+  CertNanny::Logging->debug('MSG', (eval 'ref(\$self)' ? "End " : "Start ") . (caller(0))[3] . " write file/content to disk");
   my $self = (shift)->getInstance();
   my $filename = shift;
 
@@ -450,7 +450,7 @@ sub readFile {
     }
   }
 
-  CertNanny::Logging->debug('MSG', eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "write file/content to disk");
+  CertNanny::Logging->debug('MSG', (eval 'ref(\$self)' ? "End " : "Start ") . (caller(0))[3] . " write file/content to disk");
   return $result;
 } ## end sub readFile
 
@@ -480,7 +480,7 @@ sub writeFile {
   #
   # Example: $self->writeFile(DSTFILE => $filename, SRCCONTENT => $data, FORCE => 1);
   #
-  #CertNanny::Logging->debug('MSG', eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "write file/content to disk");
+  #CertNanny::Logging->debug('MSG', (eval 'ref(\$self)' ? "End " : "Start ") . (caller(0))[3] . " write file/content to disk");
   my $self = (shift)->getInstance();
   my %args = (@_);
 
@@ -546,7 +546,7 @@ sub writeFile {
       }
     }
   }
-  #CertNanny::Logging->debug('MSG', eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "write file/content to disk");
+  #CertNanny::Logging->debug('MSG', (eval 'ref(\$self)' ? "End " : "Start ") . (caller(0))[3] . " write file/content to disk");
   return !$rc;
 } ## end sub writeFile
 
@@ -1121,7 +1121,7 @@ sub getTmpFile {
   # NOTE: this is UNSAFE (beware of race conditions). We cannot use a file
   # handle here because we are calling external programs to use these
   # temporary files.
-  #CertNanny::Logging->debug('MSG', eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "get a tmp file");
+  #CertNanny::Logging->debug('MSG', (eval 'ref(\$self)' ? "End " : "Start ") . (caller(0))[3] . " get a tmp file");
   my $self = (shift)->getInstance();
   
   my $tmpdir = $self->{CONFIG}->get('path.tmpdir', 'FILE');
@@ -1132,7 +1132,7 @@ sub getTmpFile {
   my $tmpfile = mktemp($template);
 
   push(@{$self->{TMPFILE}}, $tmpfile);
-  # CertNanny::Logging->debug('MSG', eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "get a tmp file");
+  # CertNanny::Logging->debug('MSG', (eval 'ref(\$self)' ? "End " : "Start ") . (caller(0))[3] . " get a tmp file");
   return $tmpfile;
 } ## end sub getTmpFile
 
@@ -1346,7 +1346,7 @@ sub getMacAddresses {
 
 
 sub fetchFileList {
-  CertNanny::Logging->debug('MSG', eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "fetch a file list");
+  CertNanny::Logging->debug('MSG', (eval 'ref(\$self)' ? "End " : "Start ") . (caller(0))[3] . " fetch a file list");
   my $self   = (shift)->getInstance();
   my $myGlob = shift;
   
@@ -1380,7 +1380,7 @@ sub fetchFileList {
       }
     }
   } ## end foreach my $item (@myList)
-  CertNanny::Logging->debug('MSG', eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "fetch a file list");
+  CertNanny::Logging->debug('MSG', (eval 'ref(\$self)' ? "End " : "Start ") . (caller(0))[3] . " fetch a file list");
   return \@tmpList;
 } ## end sub fetchFileList
 

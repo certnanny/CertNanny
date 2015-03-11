@@ -181,7 +181,7 @@ sub getCert {
   # Gets the first certificate found either in CERTDATA or in CERTFILE and 
   # returns it in CERTDATA. 
   # If there is a rest in the input, it is returned in CERTREST
-  CertNanny::Logging->debug('MSG', eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "Get main certificate from keystore");
+  CertNanny::Logging->debug('MSG', (eval 'ref(\$self)' ? "End " : "Start ") . (caller(0))[3] . " Get main certificate from keystore");
   my $self = shift;
   my %args = (@_);    # argument pair list
  
@@ -228,7 +228,7 @@ sub getCert {
   } else {
     $rc = undef;
   }
-  CertNanny::Logging->debug('MSG', eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "Get main certificate from keystore");
+  CertNanny::Logging->debug('MSG', (eval 'ref(\$self)' ? "End " : "Start ") . (caller(0))[3] . " Get main certificate from keystore");
   return $rc
 } ## end sub getCert
 
@@ -360,7 +360,7 @@ sub getKey {
   #           KEYTYPE   => format (e. g. 'PKCS8' or 'OpenSSL'
   #           KEYPASS   => key pass phrase (only if protected by pass phrase)
   #         or undef on error
-  CertNanny::Logging->debug('MSG', eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "get private key for main certificate from keystore");
+  CertNanny::Logging->debug('MSG', (eval 'ref(\$self)' ? "End " : "Start ") . (caller(0))[3] . " get private key for main certificate from keystore");
   my $self     = shift;
   my $keystore = shift;
   my $alias    = shift;                                               # defaults to $entry->{alias}, see below
@@ -437,7 +437,7 @@ sub getKey {
     }
   }
   
-  CertNanny::Logging->debug('MSG', eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "get private key for main certificate from keystore");
+  CertNanny::Logging->debug('MSG', (eval 'ref(\$self)' ? "End " : "Start ") . (caller(0))[3] . " get private key for main certificate from keystore");
   return $rc;
 } ## end sub getKey
 
@@ -454,7 +454,7 @@ sub getCertLocation {
   # Output: caller gets a hash ref:
   #           <locationname in lowercase> => <Location>
   #         or undef on error
-  CertNanny::Logging->debug('MSG', eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "get the key specific locations for certificates");
+  CertNanny::Logging->debug('MSG', (eval 'ref(\$self)' ? "End " : "Start ") . (caller(0))[3] . " get the key specific locations for certificates");
   my $self = shift;
   my %args = (TYPE => 'TrustedRootCA',
               @_);
@@ -484,7 +484,7 @@ sub getCertLocation {
     }
   }
 
-  CertNanny::Logging->debug('MSG', eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "get the key specific locations for certificates");
+  CertNanny::Logging->debug('MSG', (eval 'ref(\$self)' ? "End " : "Start ") . (caller(0))[3] . " get the key specific locations for certificates");
   return $rc
 } ## end sub getKey
 
@@ -791,7 +791,7 @@ sub getInstalledCAs {
   #   my $self = shift;
   #   return $self->SUPER::getInstalledCAs(@_) if $self->can("SUPER::getInstalledCAs");
   # }
-  CertNanny::Logging->debug('MSG', eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "get all installed root certificates");
+  CertNanny::Logging->debug('MSG', (eval 'ref(\$self)' ? "End " : "Start ") . (caller(0))[3] . " get all installed root certificates");
   my $self = shift;
   my %args = (@_);
 
@@ -844,7 +844,7 @@ sub getInstalledCAs {
     }
   }
 
-  CertNanny::Logging->debug('MSG', eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "get all installed root certificates");
+  CertNanny::Logging->debug('MSG', (eval 'ref(\$self)' ? "End " : "Start ") . (caller(0))[3] . " get all installed root certificates");
   return $rc;
 } ## end sub getInstalledCAs
 
@@ -877,7 +877,7 @@ sub installRoots {
   #   my $self = shift;
   #   return $self->SUPER::installRoots(@_) if $self->can("SUPER::installRoots");
   # }
-  CertNanny::Logging->debug('MSG', eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "Install all available root certificates");
+  CertNanny::Logging->debug('MSG', (eval 'ref(\$self)' ? "End " : "Start ") . (caller(0))[3] . " Install all available root certificates");
   my $self = shift;
   my %args = (@_);
 
@@ -949,7 +949,7 @@ sub installRoots {
       }
     }
   }
-  CertNanny::Logging->debug('MSG', eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "Install all available root certificates");
+  CertNanny::Logging->debug('MSG', (eval 'ref(\$self)' ? "End " : "Start ") . (caller(0))[3] . " Install all available root certificates");
   return $rc;
 } ## end sub installRoots
 

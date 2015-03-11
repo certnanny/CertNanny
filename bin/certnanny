@@ -296,6 +296,7 @@ certnanny [OPTIONS...] COMMAND [ARGUMENTS...]
   uninstall             Uninstall CertNanny service (applicable only on 
                         Windows platforms)
   updateRootCA          Run trusted root CA certificate update via SCEP 
+  test                  Test the keystore integrity
   dump                  Dump the content of CertNanny Objects to STDOUT. The
                         Object to be dumped is given as an argument. Valid 
                         arguments are

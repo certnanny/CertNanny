@@ -104,20 +104,20 @@ sub getConfigValue {
 
 
 sub setOption {
-  CertNanny::Logging->debug('MSG', eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3]);
+  CertNanny::Logging->debug('MSG', (eval 'ref(\$self)' ? "End " : "Start ") . (caller(0))[3]);
   my $self  = (shift)->getInstance();
   my $key   = shift;
   my $value = shift;
 
   $self->{OPTION}->{$key} = $value;
 
-  CertNanny::Logging->debug('MSG', eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "Key: <$key>  Value: <$value>");
+  CertNanny::Logging->debug('MSG', (eval 'ref(\$self)' ? "End " : "Start ") . (caller(0))[3] . " Key: <$key>  Value: <$value>");
   return 1;
 } ## end sub setOption
 
 
 sub getOption {
-  # CertNanny::Logging->debug('MSG', eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3]);
+  # CertNanny::Logging->debug('MSG', (eval 'ref(\$self)' ? "End " : "Start ") . (caller(0))[3]);
   my $self  = (shift)->getInstance();
   my $key   = shift;
 
@@ -126,7 +126,7 @@ sub getOption {
     $value = $self->{OPTION}->{$key};
   }
   
-  # CertNanny::Logging->debug('MSG', eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "Key: <$key>  Value: <", defined($value) ? $value.">" : "undefined>");
+  # CertNanny::Logging->debug('MSG', (eval 'ref(\$self)' ? "End " : "Start ") . (caller(0))[3] . " Key: <$key>  Value: <", defined($value) ? $value.">" : "undefined>");
   return $value;
 } ## end sub setOption
 
@@ -220,7 +220,7 @@ sub _dumpValue {
 
 
 sub do_dump {
-  CertNanny::Logging->debug('MSG', eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "Dump");
+  CertNanny::Logging->debug('MSG', (eval 'ref(\$self)' ? "End " : "Start ") . (caller(0))[3] . " Dump");
   my $self = (shift)->getInstance();
   my %args = (@_);
 
@@ -310,13 +310,13 @@ sub do_dump {
     CertNanny::Logging->Err('STR', "Missing Argument: --object cfg|data|keystore|certificate   specifies the object to be dumped\n");
   }
   
-  CertNanny::Logging->debug('MSG', eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "Dump");
+  CertNanny::Logging->debug('MSG', (eval 'ref(\$self)' ? "End " : "Start ") . (caller(0))[3] . " Dump");
   return 1;
 } ## end sub do_cfgdump
 
 
 sub do_check {
-  CertNanny::Logging->debug('MSG', eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "Check");
+  CertNanny::Logging->debug('MSG', (eval 'ref(\$self)' ? "End " : "Start ") . (caller(0))[3] . " Check");
   my $self = (shift)->getInstance();
   my %args = (@_);
 
@@ -339,7 +339,7 @@ sub do_check {
 
     if (!$instance->k_checkValidity(0)) {
       CertNanny::Logging->error('MSG', "Certificate has expired. No automatic renewal can be performed.");
-      CertNanny::Logging->debug('MSG', eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "Check");
+      CertNanny::Logging->debug('MSG', (eval 'ref(\$self)' ? "End " : "Start ") . (caller(0))[3] . " Check");
       return $instance->k_executeHook($config->get("keystore.$entryname.hook.warnexpired"));
       #return 1;
     }
@@ -352,22 +352,22 @@ sub do_check {
 
     if (!$instance->k_checkValidity($self->{ITEMS}->{$args{ENTRYNAME}}->{warnexpiry_days})) {
       CertNanny::Logging->notice('MSG', "WARNEXPIRY Certificate is valid for less than $self->{ITEMS}->{$args{ENTRYNAME}}->{warnexpiry_days} days");
-      CertNanny::Logging->debug('MSG', eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "Check");
+      CertNanny::Logging->debug('MSG', (eval 'ref(\$self)' ? "End " : "Start ") . (caller(0))[3] . " Check");
       return $instance->k_executeHook($config->get("keystore.$entryname.hook.warnexpiry"));
 #      $keystore->{INSTANCE}->k_warnExpiryHook();
     }
   } else {
     CertNanny::Logging->error('MSG', "Could not parse instance certificate");
-    CertNanny::Logging->debug('MSG', eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "Check");
+    CertNanny::Logging->debug('MSG', (eval 'ref(\$self)' ? "End " : "Start ") . (caller(0))[3] . " Check");
     return undef;
   }
-  CertNanny::Logging->debug('MSG', eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "Check");
+  CertNanny::Logging->debug('MSG', (eval 'ref(\$self)' ? "End " : "Start ") . (caller(0))[3] . " Check");
   return 1;
 } ## end sub do_check
 
 
 sub do_renew {
-  CertNanny::Logging->debug('MSG', eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "Renew");
+  CertNanny::Logging->debug('MSG', (eval 'ref(\$self)' ? "End " : "Start ") . (caller(0))[3] . " Renew");
   my $self   = (shift)->getInstance();
   my %args = (@_);
 
@@ -398,7 +398,7 @@ sub do_renew {
   } else {
     if (!$instance->k_checkValidity(0)) {
       CertNanny::Logging->error('MSG', "Certificate has expired. No automatic renewal can be performed.");
-      CertNanny::Logging->debug('MSG', eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "Renew");
+      CertNanny::Logging->debug('MSG', (eval 'ref(\$self)' ? "End " : "Start ") . (caller(0))[3] . " Renew");
       return $instance->k_executeHook($config->get("keystore.$entryname.hook.warnexpired"));
     }
 
@@ -428,13 +428,13 @@ sub do_renew {
     }
   }
 
-  CertNanny::Logging->debug('MSG', eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "Renew");
+  CertNanny::Logging->debug('MSG', (eval 'ref(\$self)' ? "End " : "Start ") . (caller(0))[3] . " Renew");
   return 1;
 } ## end sub do_renew
 
 
 sub do_enroll {
-  CertNanny::Logging->debug('MSG', eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "Enrollment");
+  CertNanny::Logging->debug('MSG', (eval 'ref(\$self)' ? "End " : "Start ") . (caller(0))[3] . " Enrollment");
   my $self      = (shift)->getInstance();
   my %args      = (@_);
 
@@ -526,7 +526,7 @@ sub do_enroll {
 
       if ($newkeystore) {
         if (!$newkeystore->{INSTANCE}->k_retrieveState()) {
-          CertNanny::Logging->debug('MSG', eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "Enrollment");
+          CertNanny::Logging->debug('MSG', (eval 'ref(\$self)' ? "End " : "Start ") . (caller(0))[3] . " Enrollment");
           return undef;
         }
         my $renewalstate = $newkeystore->{INSTANCE}->{STATE}->{DATA}->{RENEWAL}->{STATUS};
@@ -552,7 +552,7 @@ sub do_enroll {
     } else {
       CertNanny::Logging->info('MSG', "Can't run initial enrollment on behalf, check enrollment on behalf certificate configuration.");
     }
-    CertNanny::Logging->debug('MSG', eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "Enrollment");
+    CertNanny::Logging->debug('MSG', (eval 'ref(\$self)' ? "End " : "Start ") . (caller(0))[3] . " Enrollment");
     CertNanny::Util->setVariable('NAME',  'KEYSTORE', 
                                  'VALUE', 'Common');
     return 1;
@@ -667,7 +667,7 @@ sub do_enroll {
 #        $newkeystore->{INSTANCE}->k_convertCert(%convopts)->{CERTDATA};
       } else {
         CertNanny::Logging->error('MSG', "Could not parse instance certificate");
-        CertNanny::Logging->debug('MSG', eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "Enrollment");
+        CertNanny::Logging->debug('MSG', (eval 'ref(\$self)' ? "End " : "Start ") . (caller(0))[3] . " Enrollment");
         return undef;
       }
 
@@ -725,7 +725,7 @@ sub do_enroll {
           CertNanny::Logging->info('MSG', "Initial enrollment still ongoing. Mode:" . $self->{ITEMS}->{$entryname}->{initialenroll}->{auth}->{mode});
         }
       }
-      CertNanny::Logging->debug('MSG', eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "Enrollment");
+      CertNanny::Logging->debug('MSG', (eval 'ref(\$self)' ? "End " : "Start ") . (caller(0))[3] . " Enrollment");
       CertNanny::Util->setVariable('NAME',  'KEYSTORE', 
                                    'VALUE', 'Common');
       return 1;
@@ -733,13 +733,13 @@ sub do_enroll {
       CertNanny::Logging->error('MSG', "Initial enrollment authentication method " . $self->{ITEMS}->{$entryname}->{initialenroll}->{auth}->{mode} . " not supported");
     }
   } ## end else [ if ($self->{ITEMS}->{$entryname...})]
-  CertNanny::Logging->debug('MSG', eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "Enrollment");
+  CertNanny::Logging->debug('MSG', (eval 'ref(\$self)' ? "End " : "Start ") . (caller(0))[3] . " Enrollment");
   return 1;
 } ## end sub do_enroll
 
 
 sub do_cleanup {
-  CertNanny::Logging->debug('MSG', eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "CleanUp");
+  CertNanny::Logging->debug('MSG', (eval 'ref(\$self)' ? "End " : "Start ") . (caller(0))[3] . " CleanUp");
   my $self = (shift)->getInstance();
   my %args = (@_);
 
@@ -754,13 +754,13 @@ sub do_cleanup {
     $instance->k_checkclearState(1);
   }
 
-  CertNanny::Logging->debug('MSG', eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "CleanUp");
+  CertNanny::Logging->debug('MSG', (eval 'ref(\$self)' ? "End " : "Start ") . (caller(0))[3] . " CleanUp");
   return 1;
 } ## end sub do_info
 
 
 sub do_updateRootCA {
-  CertNanny::Logging->debug('MSG', eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "Update Root CA");
+  CertNanny::Logging->debug('MSG', (eval 'ref(\$self)' ? "End " : "Start ") . (caller(0))[3] . " Update Root CA");
   my $self = (shift)->getInstance();
   my %args = (@_);
 
@@ -778,13 +778,13 @@ sub do_updateRootCA {
     CertNanny::Logging->debug('MSG', "RootCA update deactivated");
   }
 
-  CertNanny::Logging->debug('MSG', eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "Update Root CA");
+  CertNanny::Logging->debug('MSG', (eval 'ref(\$self)' ? "End " : "Start ") . (caller(0))[3] . " Update Root CA");
   return 1;
 } ## end sub do_updateRootCA
 
 
 sub do_executeHook {
-  CertNanny::Logging->debug('MSG', eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "Info");
+  CertNanny::Logging->debug('MSG', (eval 'ref(\$self)' ? "End " : "Start ") . (caller(0))[3] . " Info");
   my $self = (shift)->getInstance();
   my %args = (@_);
 
@@ -818,13 +818,13 @@ sub do_executeHook {
     }
   }
   
-  CertNanny::Logging->debug('MSG', eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "Info");
+  CertNanny::Logging->debug('MSG', (eval 'ref(\$self)' ? "End " : "Start ") . (caller(0))[3] . " Info");
   return 1;
 } ## end sub do_info
 
 
 sub do_test {
-  CertNanny::Logging->debug('MSG', eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "Test");
+  CertNanny::Logging->debug('MSG', (eval 'ref(\$self)' ? "End " : "Start ") . (caller(0))[3] . " Test");
   my $self = (shift)->getInstance();
   my %args = (@_);
 
@@ -867,6 +867,7 @@ sub do_test {
                                                     'LOCATION', $entry->{'location'}, 
                                                     'TYPE',     $entry->{'type'});
                 }
+                CertNanny::Logging->Out('STR', "\n");
               } else {
                 CertNanny::Logging->Out('STR', "  Could not instantiate Keystore: <$keystore>\n");
               }
@@ -879,7 +880,7 @@ sub do_test {
     }
   }
 
-  CertNanny::Logging->debug('MSG', eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "Test");
+  CertNanny::Logging->debug('MSG', (eval 'ref(\$self)' ? "End " : "Start ") . (caller(0))[3] . " Test");
   return 1;
 } ## end sub do_test
 

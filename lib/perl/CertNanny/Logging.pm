@@ -195,9 +195,11 @@ sub Off {
     $| = 1;
     if ($target eq 'err') {
       $self->debug('MSG', 'Error Logging is disabled');
+      close STDERR;
       open STDERR, ">", "/dev/null";
     } else {
       $self->debug('MSG', 'Logging is disabled');
+      close STDOUT;
       open STDOUT, ">", "/dev/null";
     }  
     $logTarget{$target.'console'} = 0;
