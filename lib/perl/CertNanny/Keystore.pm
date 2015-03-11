@@ -93,7 +93,7 @@ sub new {
   eval "require CertNanny::Keystore::${type}";
   if ($@) {
     CertNanny::Logging->Err('STR', , join('', $@));
-    CertNanny::Logging->Err('STR', "ERROR: Could not load keystore handler '$type'\n");
+    CertNanny::Logging->Err('STR', "ERROR: Could not load keystore handler <$type>\n");
     return undef;
   }
 
@@ -121,11 +121,11 @@ sub new {
   
       if (defined $self->{CERT}) {
         $self->{CERT}->{CERTINFO} = CertNanny::Util->getCertInfoHash(%{$self->{CERT}});
-        CertNanny::Logging->debug('MSG', "Certificate Information: SubjectName: " . $self->{CERT}->{CERTINFO}->{SubjectName});
-        CertNanny::Logging->debug('MSG', "                         Serial:      " . $self->{CERT}->{CERTINFO}->{SerialNumber});
-        CertNanny::Logging->debug('MSG', "                         Issuer:      " . $self->{CERT}->{CERTINFO}->{IssuerName});
-        CertNanny::Logging->debug('MSG', "                         valid from:  " . $self->{CERT}->{CERTINFO}->{NotBefore});
-        CertNanny::Logging->debug('MSG', "                         valid until: " . $self->{CERT}->{CERTINFO}->{NotAfter});
+        CertNanny::Logging->debug('MSG', "Certificate Information: SubjectName: <" . $self->{CERT}->{CERTINFO}->{SubjectName} . ">");
+        CertNanny::Logging->debug('MSG', "                         Serial:      <" . $self->{CERT}->{CERTINFO}->{SerialNumber} . ">");
+        CertNanny::Logging->debug('MSG', "                         Issuer:      <" . $self->{CERT}->{CERTINFO}->{IssuerName} . ">");
+        CertNanny::Logging->debug('MSG', "                         valid from:  <" . $self->{CERT}->{CERTINFO}->{NotBefore} . ">");
+        CertNanny::Logging->debug('MSG', "                         valid until: <" . $self->{CERT}->{CERTINFO}->{NotAfter} . ">");
   
         my $output;
         my %convopts = %{$self->{CERT}};
@@ -538,29 +538,29 @@ sub k_storeState {
       close $fh;
     
       if (-e $file) {
-        CertNanny::Logging->debug('MSG', "Statefile $file exists. Creating backup $bakFile.");
+        CertNanny::Logging->debug('MSG', "Statefile <$file> exists. Creating backup <$bakFile>.");
         if (File::Copy::move($file, $bakFile)) {
-          CertNanny::Logging->debug('MSG', "Moving tmp. statefile $tmpFile to $file.");
+          CertNanny::Logging->debug('MSG', "Moving tmp. statefile <$tmpFile> to <$file>.");
           if (File::Copy::move($tmpFile, $file)) {
-            CertNanny::Logging->debug('MSG', "Unlinking backupfile $bakFile.");
+            CertNanny::Logging->debug('MSG', "Unlinking backupfile <$bakFile>.");
             eval {unlink($bakFile);};
           } else {
-            CertNanny::Logging->debug('MSG', "Error moving $tmpFile to $file. Rollback.");
+            CertNanny::Logging->debug('MSG', "Error moving <$tmpFile> to <$file>. Rollback.");
             File::Copy::move($bakFile, $file);
             eval {unlink($tmpFile);};
-            croak "Error moving keystore tmp. state file $tmpFile to $file";
+            croak "Error moving keystore tmp. state file <$tmpFile> to <$file>";
           }
         } else {
-          CertNanny::Logging->debug('MSG', "Error creating backup $bakFile of state file $file");
+          CertNanny::Logging->debug('MSG', "Error creating backup <$bakFile> of state file <$file>");
           eval {unlink($bakFile);};
-          croak "Error creating backup $bakFile of state file $file";
+          croak "Error creating backup <$bakFile> of state file <$file>";
         }
       } else {
-        CertNanny::Logging->debug('MSG', "Statefile $file does not exists. No backup needed.");
+        CertNanny::Logging->debug('MSG', "Statefile <$file> does not exists. No backup needed.");
         if (!File::Copy::move($tmpFile, $file)) {
-          CertNanny::Logging->debug('MSG', "Error moving keystore tmp. state file $tmpFile to $file");
+          CertNanny::Logging->debug('MSG', "Error moving keystore tmp. state file <$tmpFile> to <$file>");
           eval {unlink($tmpFile);};
-          croak "Error moving keystore tmp. state file $tmpFile to $file";
+          croak "Error moving keystore tmp. state file <$tmpFile> to <$file>";
         }
       }
     } ## end if (ref $self->{STATE}...)
@@ -675,14 +675,14 @@ sub k_convertKey {
   # sanity checks
   foreach my $key (qw( KEYFORMAT OUTFORMAT )) {
     if ($convertOptions{$key} !~ m{ \A (?: DER | PEM ) \z }xms) {
-      CertNanny::Logging->error('MSG', "k_convertKey(): Incorrect $key: $convertOptions{$key}");
+      CertNanny::Logging->error('MSG', "k_convertKey(): Incorrect <$key>: <$convertOptions{$key}>");
       return undef;
     }
   }
 
   foreach my $key (qw( KEYTYPE OUTTYPE )) {
     if ($convertOptions{$key} !~ m{ \A (?: OpenSSL | PKCS8 ) \z }xms) {
-      CertNanny::Logging->error('MSG', "k_convertKey(): Incorrect $key: $convertOptions{$key}");
+      CertNanny::Logging->error('MSG', "k_convertKey(): Incorrect <$key>: <$convertOptions{$key}>");
       return undef;
     }
   }
@@ -735,7 +735,7 @@ sub k_convertKey {
   push(@cmd, '-in');
   if (defined $convertOptions{KEYDATA}) {
     $infile = CertNanny::Util->getTmpFile();
-    CertNanny::Logging->debug('MSG', "k_convertKey(): temporary  in file $infile");
+    CertNanny::Logging->debug('MSG', "k_convertKey(): temporary  in file <$infile>");
     if (!CertNanny::Util->writeFile(DSTFILE    => $infile,
                                     SRCCONTENT => $convertOptions{KEYDATA},)) {
       CertNanny::Logging->error('MSG', "k_convertKey(): Could not write temporary file");
@@ -759,7 +759,7 @@ sub k_convertKey {
 
   my $cmd = join(' ', @cmd);
 
-  CertNanny::Logging->debug('MSG', "Execute: " . $cmd);
+  CertNanny::Logging->debug('MSG', "Execute: <" . $cmd . ">");
 
   ### PASSIN: $ENV{PASSOUT}
   ### PASSOUT: $ENV{PASSOUT}
@@ -937,7 +937,7 @@ WRITEFILES:
     if (!rename $tmpfile, $file) {
       # should not happen!
       # ... but we have to handle this nevertheless
-      CertNanny::Logging->error('MSG', "k_saveInstallFile(): could not rename $tmpfile to target file $file");
+      CertNanny::Logging->error('MSG', "k_saveInstallFile(): could not rename <$tmpfile> to target file <$file>");
       # undo rename operations
       foreach my $undo (@original_files) {
         unlink $undo->{SRC};
@@ -1952,15 +1952,15 @@ sub _sendRequest {
   my $newcertfile = $self->{STATE}->{DATA}->{RENEWAL}->{REQUEST}->{CERTFILE};
   my $rc          = 0;
 
-  CertNanny::Logging->debug('MSG', "request:              $requestfile");
-  CertNanny::Logging->debug('MSG', "keyfile:              $requestkeyfile");
-  CertNanny::Logging->debug('MSG', "sscep:                " . $config->get('cmd.sscep'));
-  CertNanny::Logging->debug('MSG', "scepurl:              " . $entry->{enroll}->{sscep}->{URL});
-  CertNanny::Logging->debug('MSG', "scepsignaturekey:     $scepsignaturekey");
-  CertNanny::Logging->debug('MSG', "scepchecksubjectname: " . $scepchecksubjectname);
-  CertNanny::Logging->debug('MSG', "scepracert:           $scepracert");
-  CertNanny::Logging->debug('MSG', "newcertfile:          $newcertfile");
-  CertNanny::Logging->debug('MSG', "openssl:              " . $options->{'cmd.openssl'});
+  CertNanny::Logging->debug('MSG', "request:              <$requestfile>");
+  CertNanny::Logging->debug('MSG', "keyfile:              <$requestkeyfile>");
+  CertNanny::Logging->debug('MSG', "sscep:                <" . $config->get('cmd.sscep')) . ">";
+  CertNanny::Logging->debug('MSG', "scepurl:              <" . $entry->{enroll}->{sscep}->{URL}) . ">";
+  CertNanny::Logging->debug('MSG', "scepsignaturekey:     <$scepsignaturekey") . ">";
+  CertNanny::Logging->debug('MSG', "scepchecksubjectname: <" . $scepchecksubjectname) . ">";
+  CertNanny::Logging->debug('MSG', "scepracert:           <$scepracert>");
+  CertNanny::Logging->debug('MSG', "newcertfile:          <$newcertfile>");
+  CertNanny::Logging->debug('MSG', "openssl:              <" . $options->{'cmd.openssl'}) . ">";
   my $newkey;
 
   unless ($self->_hasEngine()) {

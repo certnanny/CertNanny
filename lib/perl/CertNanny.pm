@@ -71,17 +71,17 @@ sub new {
     pop @dirs;
     if (!$self->{CONFIG}->get("path.lib", "FILE")) {
       $self->{CONFIG}->set("path.lib", File::Spec->catdir(@dirs, 'lib'));
-      CertNanny::Logging->debug('MSG', "set perl path lib to:" . $self->{CONFIG}->get("path.lib", "FILE"));
+      CertNanny::Logging->debug('MSG', "set perl path lib to: <" . $self->{CONFIG}->get("path.lib", "FILE") . ">");
     }
     if (!$self->{CONFIG}->get("path.libjava", "FILE")) {
       $self->{CONFIG}->set("path.libjava", File::Spec->catdir($self->{CONFIG}->get("path.lib", "FILE"), 'java'));
-      CertNanny::Logging->debug('MSG', "set java path lib to:" . $self->{CONFIG}->get("path.libjava", "FILE"));
+      CertNanny::Logging->debug('MSG', "set java path lib to: <" . $self->{CONFIG}->get("path.libjava", "FILE") . ">");
     }
 
 
     if($self->{CONFIG}->get("cmd.opensslconf", "FILE")){
       $ENV{OPENSSL_CONF} = $self->{CONFIG}->get("cmd.opensslconf", "FILE");
-      CertNanny::Logging->debug('MSG', "set OPENSSL_CONF enviroment var to  to:" . $self->{CONFIG}->get("cmd.opensslconf", "FILE"));
+      CertNanny::Logging->debug('MSG', "set OPENSSL_CONF enviroment var to  to: <" . $self->{CONFIG}->get("cmd.opensslconf", "FILE") . ">");
     }
 
     $self->{ITEMS} = ${$self->{CONFIG}->getRef("keystore", 'ref')};
@@ -111,7 +111,7 @@ sub setOption {
 
   $self->{OPTION}->{$key} = $value;
 
-  CertNanny::Logging->debug('MSG', eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "Key: $key  Value: $value");
+  CertNanny::Logging->debug('MSG', eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "Key: <$key>  Value: <$value>");
   return 1;
 } ## end sub setOption
 
@@ -126,7 +126,7 @@ sub getOption {
     $value = $self->{OPTION}->{$key};
   }
   
-  # CertNanny::Logging->debug('MSG', eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "Key: $key  Value:", defined($value) ? $value : "undefined");
+  # CertNanny::Logging->debug('MSG', eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "Key: <$key>  Value: <", defined($value) ? $value.">" : "undefined>");
   return $value;
 } ## end sub setOption
 
@@ -158,7 +158,7 @@ sub _iterate_entries {
   foreach my $entryname (keys %{$self->{ITEMS}}) {    # Instantiate every keystore, that is configured
     CertNanny::Util->setVariable('NAME',  'KEYSTORE', 
                                  'VALUE', $entryname);
-    CertNanny::Logging->debug('MSG', "Checking keystore $entryname");
+    CertNanny::Logging->debug('MSG', "Checking keystore <$entryname>");
     my $keystore = CertNanny::Keystore->new(CONFIG    => $self->{CONFIG},              # give it the whole configuration
                                             ENTRY     => $self->{ITEMS}->{$entryname}, # all keystore parameters from configfile
                                             ENTRYNAME => $entryname);                  # and the keystore name from configfile
@@ -168,7 +168,7 @@ sub _iterate_entries {
                      KEYSTORE  => $keystore);
     } else {
       # Keystore does not exists -> create new Keystore (enroll) no matter wether we did a renew or an enroll
-      CertNanny::Logging->error('MSG', "Could not instantiate keystore $entryname");
+      CertNanny::Logging->error('MSG', "Could not instantiate keystore <$entryname>");
       if ($action eq 'do_renew' or $action eq 'do_enroll') {
         CertNanny::Logging->info('MSG', "Check for initial enrollment configuration.");
         if ($self->{ITEMS}->{$entryname}->{initialenroll}->{auth}) {
@@ -264,7 +264,7 @@ sub do_dump {
     my @keystores = (sort {lc($a) cmp lc($b)} keys(%{$config->{CONFIG}->{'keystore'}}));
     foreach my $keystore (@keystores) {
       next if (defined($target) && ($target ne $keystore));
-      CertNanny::Logging->Out('STR', "Keystore $keystore:\n");
+      CertNanny::Logging->Out('STR', "Keystore <$keystore>:\n");
       foreach my $configFileName (keys %{$config->{CONFIGFILES}}) {
         foreach my $cfgFileKeystore (@{$config->{CONFIGFILES}->{$configFileName}->{KEYSTORE}}) {
           if ($keystore eq $cfgFileKeystore) {
@@ -277,7 +277,7 @@ sub do_dump {
     my @keystores = (sort {lc($a) cmp lc($b)} keys(%{$config->{CONFIG}->{'keystore'}}));
     foreach my $keystore (@keystores) {
       next if (defined($target) && ($target ne $keystore));
-      CertNanny::Logging->Out('STR', "Keystore $keystore:\n");
+      CertNanny::Logging->Out('STR', "Keystore <$keystore>:\n");
       foreach my $configFileName (keys %{$config->{CONFIGFILES}}) {
         foreach my $cfgFileKeystore (@{$config->{CONFIGFILES}->{$configFileName}->{KEYSTORE}}) {
           if ($keystore eq $cfgFileKeystore) {
@@ -621,9 +621,9 @@ sub do_enroll {
       unless (-e $keyfile) {
         my $newkey = $keystore->{INSTANCE}->generateKey();
 
-        CertNanny::Logging->debug('MSG', "keyfile $newkey->{KEYFILE} ,  ");
+        CertNanny::Logging->debug('MSG', "keyfile <$newkey->{KEYFILE}> ,  ");
         $keystore->{INSTANCE}->{OPTIONS}->{ENTRY}->{key}->{file} = $newkey->{KEYFILE};
-        CertNanny::Logging->debug('MSG', "keyfile $keystore->{INSTANCE}->{OPTIONS}->{ENTRY}->{key}->{file} ,  ");
+        CertNanny::Logging->debug('MSG', "keyfile <$keystore->{INSTANCE}->{OPTIONS}->{ENTRY}->{key}->{file}> ,  ");
         $keystore->{INSTANCE}->{ENTRY}->{key}->{format} = 'PEM';
       } else {
         CertNanny::Logging->debug('MSG', "Key already generated");
@@ -653,7 +653,9 @@ sub do_enroll {
         my $subjectname = $keystore->{CERT}->{CERTINFO}->{SubjectName};
         my $serial      = $keystore->{CERT}->{CERTINFO}->{SerialNumber};
         my $issuer      = $keystore->{CERT}->{CERTINFO}->{IssuerName};
-        CertNanny::Logging->debug('MSG', "Certificate Information:\n\tSubjectName: $subjectname\n\tSerial: $serial\n\tIssuer: $issuer");
+        CertNanny::Logging->debug('MSG', "Certificate Information: SubjectName: <$subjectname>");
+        CertNanny::Logging->debug('MSG', "                         Serial:      <$serial>");
+        CertNanny::Logging->debug('MSG', "                         Issuer:      <$issuer>");
 
         my %convopts = %{$keystore->{CERT}};
 
@@ -683,7 +685,7 @@ sub do_enroll {
       my $renewalstate = $keystore->{INSTANCE}->{STATE}->{DATA}->{RENEWAL}->{STATUS};
 
       if (defined $renewalstate) {
-        CertNanny::Logging->debug('MSG', "renewalstate is " . $renewalstate);
+        CertNanny::Logging->debug('MSG', "renewalstate is <" . $renewalstate . ">");
       }
 
       if (defined $renewalstate and $renewalstate eq 'sendrequest') {
@@ -832,7 +834,7 @@ sub do_test {
   my @keystores = (sort {lc($a) cmp lc($b)} keys(%{$config->{CONFIG}->{'keystore'}}));
   foreach my $keystore (@keystores) {
     next if (defined($target) && ($target ne $keystore));
-    CertNanny::Logging->Out('STR', "Keystore $keystore:\n");
+    CertNanny::Logging->Out('STR', "Keystore <$keystore:>\n");
     foreach my $configFileName (keys %{$config->{CONFIGFILES}}) {
       foreach my $cfgFileKeystore (@{$config->{CONFIGFILES}->{$configFileName}->{KEYSTORE}}) {
         if ($keystore eq $cfgFileKeystore) {
@@ -849,7 +851,7 @@ sub do_test {
             if (defined($enroller)) {
               my %certs = $enroller->getCA();
               if (%certs) {
-                CertNanny::Logging->Out('STR', "  Certificate $certs{RACERT}:\n");
+                CertNanny::Logging->Out('STR', "  Certificate <$certs{RACERT}>:\n");
                 CertNanny::Util->dumpCertInfoHash('CERTINFO', $keystore->{CERT}->{CERTINFO},
                                                   'CERTDATA', $keystore->{CERT}->{CERTDATA},
                                                   'CERTFILE', $keystore->{CERT}->{CERTFILE},
@@ -857,7 +859,7 @@ sub do_test {
                                                   'LOCATION', $entry->{'location'}, 
                                                   'TYPE',     $entry->{'type'});
                 foreach my $cert (@{$certs{CACERTS}}) {
-                  CertNanny::Logging->Out('STR', "  Certificate $cert->{CERTFILE}:\n");
+                  CertNanny::Logging->Out('STR', "  Certificate <$cert->{CERTFILE}>:\n");
                   CertNanny::Util->dumpCertInfoHash('CERTINFO', $cert->{CERTINFO},
                                                     'CERTDATA', $cert->{CERTDATA},
                                                     'CERTFILE', $cert->{CERTFILE},
@@ -866,7 +868,7 @@ sub do_test {
                                                     'TYPE',     $entry->{'type'});
                 }
               } else {
-                CertNanny::Logging->Out('STR', "  Could not instantiate Keystore: $keystore\n");
+                CertNanny::Logging->Out('STR', "  Could not instantiate Keystore: <$keystore>\n");
               }
             }
           }

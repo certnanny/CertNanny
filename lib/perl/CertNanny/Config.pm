@@ -473,10 +473,10 @@ sub _parse {
       foreach my $filename1 (keys %{$self->{CONFIGFILES}}) {
         foreach my $filename2 (keys %{$self->{CONFIGFILES}}) {
           if (($filename1 ne $filename2) && ($self->{CONFIGFILES}{$filename1}{SHA} eq $self->{CONFIGFILES}{$filename2}{SHA})) {
-            CertNanny::Logging->error('MSG', "double configfile: $filename1 SHA1: $self->{CONFIGFILES}{$filename1}{SHA} <> $filename2 SHA1: $self->{CONFIGFILES}{$filename2}{SHA}");
+            CertNanny::Logging->error('MSG', "double configfile: <$filename1> SHA1: $self->{CONFIGFILES}{$filename1}{SHA} <> $filename2 SHA1: $self->{CONFIGFILES}{$filename2}{SHA}");
           }
         }
-        CertNanny::Logging->info('MSG', "$filename1 SHA1: $self->{CONFIGFILES}{$filename1}{SHA}");
+        CertNanny::Logging->info('MSG', "<$filename1> SHA1: $self->{CONFIGFILES}{$filename1}{SHA}");
       }
     } ## end else [ if (exists($self->{CONFIGFILES...}))]
 
@@ -503,7 +503,6 @@ sub _sha1_hex {
   
   my $sha;
   my $openssl = $self->get('cmd.openssl', 'CMD');
-  $openssl = "/usr/bin/openssl";
   if (defined($openssl)) {
     my @cmd = (CertNanny::Util->osq($openssl), 'dgst', '-sha', CertNanny::Util->osq($file));
     chomp($sha = CertNanny::Util->runCommand(\@cmd, WANTOUT => 1));
@@ -549,7 +548,7 @@ sub _parseFile {
     $self->{CFGFLAG} = {};
   } ## end if (!exists($self->{CONFIGFILES...}))
 
-  CertNanny::Logging->debug('MSG', "reading $configFile");
+  CertNanny::Logging->debug('MSG', "reading <$configFile>");
 
   #  - read all lines
   seek $handle,0,0;
@@ -602,13 +601,13 @@ sub _parseFile {
         $var = $var->{$confPart};
       }
       if ($doDupCheck && defined($var->{$key})) {
-        CertNanny::Logging->error('STR', "Config file $configFile ERROR: duplicate value definition in line $lnr ($line)\n");
+        CertNanny::Logging->error('STR', "Config file <$configFile> ERROR: duplicate value definition in line $lnr ($line)\n");
       }
       
       while ($val =~ m{__ENV__(.*?)__}xms) {
         my $envvar = $1;
         if (! exists $ENV{$envvar}) {
-          CertNanny::Logging->info('MSG', "Config file $configFile WARNING: Environment variable $envvar referenced in line $lnr does not exist");
+          CertNanny::Logging->info('MSG', "Config file <$configFile> WARNING: Environment variable $envvar referenced in line $lnr does not exist");
         }
         my $myENVvar = $ENV{$envvar} || '';
         $val =~ s{__ENV_(.*?)__}{$myENVvar}xms;
@@ -617,7 +616,7 @@ sub _parseFile {
       $var->{$key} = $val;
     } else {
       if ($line !~ /^(include|keystores)\s+(.+)$/) {
-        CertNanny::Logging->error('STR', "Config file $configFile ERROR: parse error in line $lnr ($line)\n");
+        CertNanny::Logging->error('STR', "Config file <$configFile> ERROR: parse error in line $lnr ($line)\n");
       }
     }
   }

@@ -147,9 +147,9 @@ sub runCommand {
   }
   my $logCmd = $args{HIDEPWD} ? $self->hidePin(@cmdarr) : join(' ' , @cmdarr);
 
-  CertNanny::Logging->debug('MSG', "Execute: $logCmd");
+  CertNanny::Logging->debug('MSG', "Execute: <$logCmd>");
 
-  open my $PROGRAM, join(' ' , @cmdarr) . "|" or die "could not execute $logCmd";
+  open my $PROGRAM, join(' ' , @cmdarr) . "|" or die "could not execute <$logCmd>";
   my ($output, @outputArr);
   
   if (wantarray()) {
@@ -811,7 +811,7 @@ sub getCertInfoHash {
     my ($mon, $day, $hh, $mm, $ss, $year, $tz) = $info->{$var} =~ /(\S+)\s+(\d+)\s+(\d+):(\d+):(\d+)\s+(\d+)\s*(\S*)/;
     my $dmon = $month{$mon};
     if (!defined $dmon) {
-      CertNanny::Logging->error('MSG', "getCertInfoHash(): could not parse month '$mon' in date '$info->{$var}' returned by OpenSSL");
+      CertNanny::Logging->error('MSG', "getCertInfoHash(): could not parse month <$mon> in date <$info->{$var}> returned by OpenSSL");
       return undef;
     }
 
@@ -821,7 +821,7 @@ sub getCertInfoHash {
   # sanity checks
   foreach my $var (qw(Version SerialNumber SubjectName IssuerName NotBefore NotAfter CertificateFingerprint Modulus)) {
     if (!exists $info->{$var}) {
-      CertNanny::Logging->error('MSG', "getCertInfoHash(): Could not determine field '$var' from X.509 certificate");
+      CertNanny::Logging->error('MSG', "getCertInfoHash(): Could not determine field <$var> from X.509 certificate");
       return undef;
     }
   }
@@ -858,14 +858,14 @@ sub dumpCertInfoHash {
   if (defined($certinfo)) {
     my $fillup = defined($args{PADDING}) ? ' ' x $args{PADDING} : '';
     
-    CertNanny::Logging->Out('STR', $fillup . "Subject:                  $certinfo->{'SubjectName'}\n");
-    CertNanny::Logging->Out('STR', $fillup . "Subject alternative name: $certinfo->{'SubjectAlternativeName'}\n");
-    CertNanny::Logging->Out('STR', $fillup . "Fingerprint:              $certinfo->{'CertificateFingerprint'}\n");
-    CertNanny::Logging->Out('STR', $fillup . "Validity from:            $certinfo->{'NotBefore'}\n");
-    CertNanny::Logging->Out('STR', $fillup . "Validity to:              $certinfo->{'NotAfter'}\n");
-    CertNanny::Logging->Out('STR', $fillup . "Serial:                   $certinfo->{'SerialNumber'}\n");
-    CertNanny::Logging->Out('STR', $fillup . "Location:                 $args{LOCATION}\n") if defined($args{LOCATION});
-    CertNanny::Logging->Out('STR', $fillup . "Type:                     $args{TYPE}\n")     if defined($args{TYPE});
+    CertNanny::Logging->Out('STR', $fillup . "Subject:                  <$certinfo->{'SubjectName'}>\n");
+    CertNanny::Logging->Out('STR', $fillup . "Subject alternative name: <$certinfo->{'SubjectAlternativeName'}>\n");
+    CertNanny::Logging->Out('STR', $fillup . "Fingerprint:              <$certinfo->{'CertificateFingerprint'}>\n");
+    CertNanny::Logging->Out('STR', $fillup . "Validity from:            <$certinfo->{'NotBefore'}>\n");
+    CertNanny::Logging->Out('STR', $fillup . "Validity to:              <$certinfo->{'NotAfter'}>\n");
+    CertNanny::Logging->Out('STR', $fillup . "Serial:                   <$certinfo->{'SerialNumber'}>\n");
+    CertNanny::Logging->Out('STR', $fillup . "Location:                 <$args{LOCATION}>\n") if defined($args{LOCATION});
+    CertNanny::Logging->Out('STR', $fillup . "Type:                     <$args{TYPE}>\n")     if defined($args{TYPE});
   }
 } ## end sub dumpCertInfoHash
 
@@ -904,7 +904,7 @@ sub getCSRInfoHash {
   # sanity checks
   foreach my $var (qw(Version SubjectName Modulus)) {
     if (!exists $info->{$var}) {
-      CertNanny::Logging->error('MSG', "getCSRInfoHash(): Could not determine field '$var' from certificate signing request.");
+      CertNanny::Logging->error('MSG', "getCSRInfoHash(): Could not determine field <$var> from certificate signing request.");
       return undef;
     }
   }
@@ -1069,7 +1069,7 @@ sub convertCert {
   # sanity checks
   foreach my $key (qw( CERTFORMAT OUTFORMAT )) {
     if ($args{$key} !~ m{ \A (?: DER | PEM ) \z }xms) {
-      CertNanny::Logging->error('MSG', "convertCert(): Incorrect $key: $args{$key}");
+      CertNanny::Logging->error('MSG', "convertCert(): Incorrect <$key>: <$args{$key}>");
       return undef;
     }
   }
@@ -1085,7 +1085,7 @@ sub convertCert {
       $infile = CertNanny::Util->getTmpFile();
       if (!CertNanny::Util->writeFile(DSTFILE    => $infile,
                                       SRCCONTENT => $args{CERTDATA})) {
-        CertNanny::Logging->error('MSG', "convertCert(): Could not write temporary file: $infile");
+        CertNanny::Logging->error('MSG', "convertCert(): Could not write temporary file: <$infile>");
         return undef;
       }
       push(@cmd, CertNanny::Util->osq("$infile"));
@@ -1156,7 +1156,7 @@ sub staticEngine {
       $output .= $line;
     }
     close FH;
-    CertNanny::Logging->debug('MSG', "Output is $output\n");
+    CertNanny::Logging->debug('MSG', "Output is <$output>\n");
     return $output =~ m/\(cs\).*\[ available \]/s;
   }
   return undef;
@@ -1349,27 +1349,27 @@ sub fetchFileList {
   foreach my $item (@myList) {
     $item =~ s/^["']*|["']*$//g;
     $item = File::Spec->canonpath($item);
-    CertNanny::Logging->debug('MSG', "cannonpath file: $item");
+    CertNanny::Logging->debug('MSG', "cannonpath file: <$item>");
     if (-f $item) {
-      CertNanny::Logging->debug('MSG', "Found file: $item");
+      CertNanny::Logging->debug('MSG', "Found file: <$item>");
       push(@tmpList, $item);
     } else {
       if (-d $item) {
-       CertNanny::Logging->debug('MSG', "Found directory: $item");
+       CertNanny::Logging->debug('MSG', "Found directory: <$item>");
         if (opendir(DIR, $item)) {
           while (defined(my $file = readdir(DIR))) {
             my $osFileName = File::Spec->catfile($item, $file);
             if (-f $osFileName) {
-              CertNanny::Logging->debug('MSG', "Found file: $osFileName");
+              CertNanny::Logging->debug('MSG', "Found file: <$osFileName>");
               push(@tmpList, $osFileName);
             } else {
-              CertNanny::Logging->debug('MSG', "Found non-file: $osFileName");
+              CertNanny::Logging->debug('MSG', "Found non-file: <$osFileName>");
             }
           }
           closedir(DIR);
         }
       } else {
-        CertNanny::Logging->debug('MSG', "Item is empty, does not exist or is binary (possible misconfiguration): $item");
+        CertNanny::Logging->debug('MSG', "Item is empty, does not exist or is binary (possible misconfiguration): <$item>");
       }
     }
   } ## end foreach my $item (@myList)

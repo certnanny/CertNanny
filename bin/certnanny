@@ -120,8 +120,8 @@ foreach my $cmd (@ARGV) {   # command line parameters are already stripped off. 
       CertNanny::Logging->Out('STR', "Installing CertNanny Service.\n");
       my $servicepath     = File::Spec->catfile($FindBin::Bin, $FindBin::Script);
       my $executable_name = $EXECUTABLE_NAME;
-      CertNanny::Logging->Out('STR', "Executable name:" .  $EXECUTABLE_NAME . "\n");
-      CertNanny::Logging->Out('STR', "Service path:" . $servicepath . "\n");
+      CertNanny::Logging->Out('STR', "Executable name: <" .  $EXECUTABLE_NAME . ">\n");
+      CertNanny::Logging->Out('STR', "Service path: <" . $servicepath . ">\n");
       if ($servicepath =~ /\w+\.exe/) {
         $executable_name = $servicepath;
       }
@@ -131,7 +131,7 @@ foreach my $cmd (@ARGV) {   # command line parameters are already stripped off. 
       }
     
       $params_str = qq{$params_str --config "$monitor->getOption(config)" --sleep $monitor->getOption(sleep)};
-      CertNanny::Logging->Out('STR', "Param str: " . $params_str . "\n");
+      CertNanny::Logging->Out('STR', "Param str: <" . $params_str . ">\n");
       my $ret = Win32::Daemon::CreateService({machine     => '',
                                               name        => $servicename,
                                               display     => $servicename,
@@ -228,7 +228,7 @@ if ($OSNAME eq 'MSWin32') {
         eval {$rc = $monitor->$servicecmd($servicecmd);};
         if ($rc != 1) {
           CertNanny::Logging->Out('STR', "There was an error executing CertNanny monitor object\n");
-          CertNanny::Logging->Out('STR', join('', $@));
+          CertNanny::Logging->Out('STR', "<" . join('', $@) . ">");
         }
  
         #if the renewal was successful the starttime will be increased by one day (86400 seconds -> 24hours -> 3600 seconds per hour)
@@ -300,7 +300,7 @@ certnanny [OPTIONS...] COMMAND [ARGUMENTS...]
                         Object to be dumped is given as an argument. Valid 
                         arguments are
                           cfg        : Dump content of the configuration file.
-                          data       : Dump internal data strukture
+                          data       : Dump internal data structure
                           keystore   : Dump defined keystores and related
                                        configuration files
                           certificate: Dump certificate information
