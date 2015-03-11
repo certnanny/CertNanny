@@ -764,7 +764,7 @@ sub createRequest {
     push(@cmd, ('-passin', 'env:PIN')) unless $pin eq "";
     push(@cmd, @engine_cmd);
     $ENV{PIN} = $pin;
-    if (CertNanny::Util->runCommand(\@cmd) != 0) {
+    if (CertNanny::Util->runCommand(\@cmd)->{RC} != 0) {
       CertNanny::Logging->error('MSG', "Request creation failed");
       delete $ENV{PIN};
       unlink $tmpconfigfile;
@@ -865,7 +865,7 @@ sub selfSign {
 
   push(@cmd, ('-passin', 'env:PIN')) unless $pin eq "";
   $ENV{PIN} = $pin;
-  if (CertNanny::Util->runCommand(\@cmd) != 0) {
+  if (CertNanny::Util->runCommand(\@cmd)->{RC} != 0) {
     CertNanny::Logging->error('MSG', "Selfsign certifcate creation failed!");
     delete $ENV{PIN};
   }
@@ -928,7 +928,7 @@ sub generateKey {
     my $keyfile = $entryname . "-key.pem";
     $outfile = File::Spec->catfile($entry->{statedir}, $keyfile);
 
-    # Todo Arkadius: Ist $self und $entry hier nicht dasselbe -> Gro�-/Kleinschreibung der elemente ?!?
+    # Todo Arkadius: Ist $self und $entry hier nicht dasselbe -> Gross-/Kleinschreibung der elemente ?!?
     my $pin        = $self->{PIN}        || $entry->{key}->{pin} || "";
     my $bits       = $self->{SIZE}       || $entry->{size}       || '2048';
     my $engine     = $self->{ENGINE}     || $entry->{engine}     || 'no';
@@ -968,7 +968,7 @@ sub generateKey {
         # generate key
         my @cmd = (CertNanny::Util->osq("$openssl"), 'genrsa', '-out', CertNanny::Util->osq("$outfile"), @passout, @engine_cmd, $bits);
         $ENV{PIN} = $pin;
-        if (CertNanny::Util->runCommand(\@cmd) != 0) {
+        if (CertNanny::Util->runCommand(\@cmd)->{RC} != 0) {
           delete $ENV{PIN};
           $rc = CertNanny::Logging->error('MSG', "RSA key generation failed");
         }
@@ -1073,7 +1073,7 @@ sub createPKCS12 {
 
       # Todo pgk: Testen runCommand
       @cmd = (CertNanny::Util->osq("$openssl"), 'x509', '-in', CertNanny::Util->osq("$args{CERTFILE}"), '-inform', CertNanny::Util->osq("$args{CERTFORMAT}"), '-out', CertNanny::Util->osq("$certfile"), '-outform', 'PEM',);
-      if (CertNanny::Util->runCommand(\@cmd) != 0) {
+      if (CertNanny::Util->runCommand(\@cmd)->{RC} != 0) {
         $rc = CertNanny::Logging->error('MSG', "Certificate format conversion failed")
       }
     } ## end if ($args{CERTFORMAT} ...)
@@ -1128,7 +1128,7 @@ sub createPKCS12 {
       } ## end if (defined $args{CACHAIN...})
 
       @cmd = (CertNanny::Util->osq("$openssl"), 'pkcs12', '-export', '-out', CertNanny::Util->osq("$args{FILENAME}"), @passout, '-in', CertNanny::Util->osq("$certfile"), '-inkey', CertNanny::Util->osq("$args{KEYFILE}"), @passin, @name, @cachain,);
-      if (CertNanny::Util->runCommand(\@cmd) != 0) {
+      if (CertNanny::Util->runCommand(\@cmd)->{RC} != 0) {
         CertNanny::Logging->error('MSG', "PKCS#12 export failed");
       } else {
         $rc = {FILENAME => $args{FILENAME}};
@@ -1527,7 +1527,7 @@ sub _createLocalCerts {
     $cmdTemplate = '"' . $self->{OPTIONS}->{CONFIG}->get('cmd.openssl', 'CMD') . '" x509 -subject_hash -subject_hash_old -noout -in "%s"';
 
     foreach $certFile (@certFileList) {
-      chomp(@subject_hashs = CertNanny::Util->runCommand(sprintf($cmdTemplate, $certFile), WANTOUT => 1));
+      chomp(@subject_hashs = @{CertNanny::Util->runCommand(sprintf($cmdTemplate, $certFile))->{OUTPUT}});
       if (@subject_hashs) {
         CertNanny::Logging->info('MSG', "Valid certificate found: $certFile");
 

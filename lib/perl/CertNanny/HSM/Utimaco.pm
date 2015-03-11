@@ -143,7 +143,7 @@ sub genkey() {
 
   # CertNanny::Logging->debug('MSG', "Execute: " . $self->hidepin(join(" ", @cmd)));
   # Todo pgk: Testen hidePin
-  my $rc = CertNanny::Util->runCommand(\@cmd, HIDEPWD => 1);
+  my $rc = CertNanny::Util->runCommand(\@cmd, HIDEPWD => 1)->{RC};
   if ($rc != 0) {
     CertNanny::Logging->error('MSG', "genkey(): Could not generate new key in HSM, see logging output.");
     return undef;
@@ -165,20 +165,27 @@ sub loadKeyInfo() {
   my $cmd     = join(" ", @cmd);
   # CertNanny::Logging->debug('MSG', "Exec: " . $self->hidepin($cmd));
   # Todo pgk: Testen hidePin
-  CertNanny::Logging->debug('MSG', "Exec: " . CertNanny::Util->hidePin($cmd));
-  my $output;
 
-  open FH, "$cmd |" or die "Couldn't execute $cmd: $!\n";
-  while (defined(my $line = <FH>)) {
-    $output .= $line;
-  }
-  close FH;
-  my $exitval = $? >> 8;
-  if ($exitval != 0) {
-    CertNanny::Logging->error('MSG', "Could not execute command successfully.");
-    return undef;
-  }
-
+  #CertNanny::Logging->debug('MSG', "Exec: " . CertNanny::Util->hidePin($cmd));
+  #my $output;
+  #
+  #open FH, "$cmd |" or die "Couldn't execute $cmd: $!\n";
+  #while (defined(my $line = <FH>)) {
+  #  $output .= $line;
+  #}
+  #close FH;
+  #
+  #    if ($rc) {
+  #      chomp($rc);
+  #      $rc = CertNanny::Logging->error('MSG', "getKey(): keytool -importkeystore failed ($rc)");
+  #    }
+  #  }
+  #my $exitval = $? >> 8;
+  #if ($exitval != 0) {
+  #  CertNanny::Logging->error('MSG', "Could not execute command successfully.");
+  #  return undef;
+  #}
+  my $output = shift(@{CertNanny::Util->runCommand($cmd, HIDEPWD => 1)->{OUTPUT}});
   my $keys = {};
   my @groups = split(/\+ \d+\.\d+/, $output);
   foreach my $group (@groups) {
@@ -370,14 +377,16 @@ sub checkKeySanity() {
     my $requestfile = $self->createDummyCSR($id);
     my @cmd         = (CertNanny::Util->osq("$openssl"), 'req', '-in', CertNanny::Util->osq("$requestfile"), '-modulus', '-noout');
 
-    my $cmd = join(" ", @cmd);
-    CertNanny::Logging->debug('MSG', "Execute: $cmd");
-    my $output;
-    open FH, "$cmd |" or die "checkKeySanity(): Couldn't execute $cmd: $!\n";
-    while (defined(my $line = <FH>)) {
-      $output .= $line;
-    }
-    close FH;
+    #my $cmd = join(" ", @cmd);
+    #CertNanny::Logging->debug('MSG', "Execute: $cmd");
+    #my $output;
+    #open FH, "$cmd |" or die "checkKeySanity(): Couldn't execute $cmd: $!\n";
+    #while (defined(my $line = <FH>)) {
+    #  $output .= $line;
+    #}
+    #close FH;
+
+    my $output = shift(@{CertNanny::Util->runCommand(\@cmd)->{OUTPUT}});
     $output =~ m/Modulus=([A-F0-9]+)$/;
     my $modulus = $1;
     unless ($modulus) {
@@ -452,7 +461,7 @@ sub createDummyCSR() {
   my @cmd = (CertNanny::Util->osq("$openssl"), 'req', '-config', CertNanny::Util->osq("$tmpconfigfile"), '-new', '-sha1', '-out', CertNanny::Util->osq("$requestfile"), '-key', CertNanny::Util->osq("$keyid"),);
   push(@cmd, @engine_cmd);
 
-  if (CertNanny::Util->runCommand(\@cmd) != 0) {
+  if (CertNanny::Util->runCommand(\@cmd)->{RC} != 0) {
     CertNanny::Logging->error('MSG', "Could not create dummy CSR for key ID $keyid");
     return undef;
   }
@@ -478,7 +487,7 @@ sub deleteKey() {
 
   # CertNanny::Logging->debug('MSG', "Execute: " . $self->hidepin(join(" ", @cmd)));
   # Todo pgk: Testen hidePin
-  if (CertNanny::Util->runCommand(\@cmd, HIDEPWD => 1) != 0) {
+  if (CertNanny::Util->runCommand(\@cmd, HIDEPWD => 1)->{RC} != 0) {
     CertNanny::Logging->error('MSG', "deleteKey(): Could not delete key with ID $keyid");
     return undef;
   }

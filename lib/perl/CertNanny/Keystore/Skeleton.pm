@@ -447,7 +447,7 @@ sub selfSign {
 
   push(@cmd, ('-passin', 'env:PIN')) unless $pin eq "";
   $ENV{PIN} = $pin;
-  if (CertNanny::Util->runCommand(\@cmd) != 0) {
+  if (CertNanny::Util->runCommand(\@cmd)->[RC} != 0) {
     CertNanny::Logging->error('MSG', "Selfsign certifcate creation failed!");
     delete $ENV{PIN};
   }
@@ -598,7 +598,7 @@ sub _createPKCS12 {
     $certfile = CertNanny::Util->getTmpFile();
 
     @cmd = (CertNanny::Util->osq("$openssl"), 'x509', '-in', CertNanny::Util->osq("$args{CERTFILE}"), '-inform', CertNanny::Util->osq("$args{CERTFORMAT}"), '-out', CertNanny::Util->osq("$certfile"), '-outform', 'PEM',);
-    if (CertNanny::Util->runCommand(\@cmd) != 0) {
+    if (CertNanny::Util->runCommand(\@cmd)->[RC} != 0) {
       CertNanny::Logging->error('MSG', "Certificate format conversion failed");
       return undef;
     }
@@ -663,7 +663,7 @@ sub _createPKCS12 {
           '-in', CertNanny::Util->osq("$certfile"), 
           '-inkey', CertNanny::Util->osq("$args{KEYFILE}"), @passin, @name, @cachain);
           
-  if (CertNanny::Util->runCommand(\@cmd) != 0) {
+  if (CertNanny::Util->runCommand(\@cmd)->[RC} != 0) {
     CertNanny::Logging->error('MSG', "PKCS#12 export failed");
     delete $ENV{PIN};
     delete $ENV{EXPORTPIN};

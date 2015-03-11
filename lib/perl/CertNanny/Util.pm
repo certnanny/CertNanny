@@ -135,10 +135,10 @@ sub runCommand {
   my $self    = (shift)->getInstance();
   my $cmd     = shift;
 
-  my %args = (WANTOUT => 0,
-              HIDEPWD => 0,
+  my %args = (HIDEPWD => 0,
               @_);                 # argument pair list
                
+  my $result;
   my @cmdarr;
   if (ref($cmd) eq 'ARRAY') {
     @cmdarr = @$cmd;
@@ -164,6 +164,7 @@ sub runCommand {
       <$PROGRAM>;
     };
     close($PROGRAM);
+    push(@outputArr, $output);
     
     if (($output =~ m/\A [[:ascii:]]* \Z/xms)) {
      	#CertNanny::Logging->debug('MSG', "$output") if ($output);
@@ -171,16 +172,22 @@ sub runCommand {
       #CertNanny::Logging->debug('MSG', "---Binary Data---") if ($output);
     }
   }
+
+  $result->{RC} = $? >> 8;
+  $result->{OUTPUT} = \@outputArr;
+  
     
-  if ($args{WANTOUT}) {
-    if (wantarray()) {
-      return @outputArr;
-    } else {
-      return $output;
-    }
-  } else {
-    return $? >> 8;
-  }
+  #if ($args{WANTOUT}) {
+  #  if (wantarray()) {
+  #    return @outputArr;
+  #  } else {
+  #    return $output;
+  #  }
+  #} else {
+  #  return $? >> 8;
+  #}
+
+  return $result;
 } ## end sub runCommand
 
 
@@ -688,7 +695,7 @@ sub _sha1_base64 {
     my $openssl =$self->{CONFIG}->get('cmd.openssl', 'CMD');
     if (defined($openssl)) {
       my @cmd = (CertNanny::Util->osq("$openssl"), 'dgst', '-sha', CertNanny::Util->osq("$tmpfile"));
-      chomp($sha = CertNanny::Util->runCommand(\@cmd, WANTOUT => 1));
+      chomp($sha = shift(@{CertNanny::Util->runCommand(\@cmd)->{OUTPUT}}));
       if ($sha =~ /^.*\)= (.*)$/) {
         $sha = $1;
       }
@@ -1097,7 +1104,7 @@ sub convertCert {
     push(@cmd, ('-outform', $args{OUTFORMAT}));
 
     $output->{CERTFORMAT} = $args{OUTFORMAT};
-    $output->{CERTDATA} = CertNanny::Util->runCommand(\@cmd, WANTOUT => 1);
+    $output->{CERTDATA}   = shift(@{CertNanny::Util->runCommand(\@cmd)->{OUTPUT}});
     unlink $infile if defined $infile;
 
     if ($? != 0) {

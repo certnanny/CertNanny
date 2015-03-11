@@ -172,7 +172,7 @@ sub getCert {
   @cmd = (CertNanny::Util->osq("$gsk6cmd"), '-cert', '-extract', '-db', CertNanny::Util->osq("$filename"), '-pw', CertNanny::Util->osq("$self->{PIN}"), '-label', CertNanny::Util->osq("$label"), '-target', CertNanny::Util->osq("$certfile"), '-format', 'binary');   
  
   #if (system(join(' ', @cmd)) != 0) {
-  if (CertNanny::Util->runCommand(\@cmd, HIDEPWD => 1) != 0) {  
+  if (CertNanny::Util->runCommand(\@cmd, HIDEPWD => 1)->{RC} != 0) {  
     unlink $certfile;
     CertNanny::Logging->error('MSG', "getCert(): could not extract certificate");
     CertNanny::Logging->debug('MSG', eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "get main certificate from keystore");
@@ -270,7 +270,7 @@ sub installCert {
     my @cmd;
     @cmd = (CertNanny::Util->osq("$gsk6cmd"), '-keydb', '-create', '-type', 'cms', '-db', CertNanny::Util->osq("$newkeystoredb"), '-pw', CertNanny::Util->osq("$self->{PIN}"), '-stash',);
         
-    if (CertNanny::Util->runCommand(\@cmd, HIDEPWD => 1)) {
+    if (CertNanny::Util->runCommand(\@cmd, HIDEPWD => 1)->{RC}) {
       CertNanny::Logging->error('MSG', "Keystore creation failed");
       return undef;
     }
@@ -283,7 +283,7 @@ sub installCert {
     my @calabels;
 
     my $match = $entry->{labelmatch} || "ibmwebspheremq.*";
-    chomp(my @certs = CertNanny::Util->runCommand(\@cmd, WANTOUT => 1, HIDEPWD => 1));
+    chomp(my @certs = @{CertNanny::Util->runCommand(\@cmd, HIDEPWD => 1)->{OUTPUT}});
     
     if (!defined $options->{gsk6cmd}) {
       if (@certs) {
@@ -318,7 +318,7 @@ sub installCert {
       CertNanny::Logging->debug('MSG', "deleting label '$label' from MQ keystore");
       @cmd = (CertNanny::Util->osq("$gsk6cmd"), '-cert', '-delete', '-db', CertNanny::Util->osq("$newkeystoredb"), '-pw', CertNanny::Util->osq("$self->{PIN}"), '-label', CertNanny::Util->osq("$label"),);
     
-      if (CertNanny::Util->runCommand(\@cmd, HIDEPWD => 1)) {
+      if (CertNanny::Util->runCommand(\@cmd, HIDEPWD => 1)->{RC}) {
         CertNanny::Logging->debug('MSG', "Could not delete label $label certificate from keystore");
         #return undef;
       }
@@ -359,7 +359,7 @@ sub installCert {
 
       @cmd = (CertNanny::Util->osq("$gsk6cmd"), '-cert', '-add', '-db', CertNanny::Util->osq("$newkeystoredb"), '-pw', CertNanny::Util->osq("$self->{PIN}"), '-file', CertNanny::Util->osq("$cacertfile"), '-format', 'ascii', '-label', CertNanny::Util->osq("$CN"),);       
    
-      if (CertNanny::Util->runCommand(\@cmd, HIDEPWD => 1)) {
+      if (CertNanny::Util->runCommand(\@cmd, HIDEPWD => 1)->{RC}) {
         unlink $cacertfile;
         CertNanny::Logging->error('MSG', "Could not add certificate to keystore");
         return undef;
@@ -391,7 +391,7 @@ sub installCert {
       @importcmd = (CertNanny::Util->osq("$gsk6cmd"), '-cert', '-import', '-target', CertNanny::Util->osq("$basename"), '-target_pw', CertNanny::Util->osq("$self->{PIN}"), '-file', CertNanny::Util->osq("$pkcs12file"), '-pw', CertNanny::Util->osq("$self->{PIN}"), '-type', 'pkcs12',);      
     }
 
-    if (CertNanny::Util->runCommand(\@importcmd, HIDEPWD => 1)) {
+    if (CertNanny::Util->runCommand(\@importcmd, HIDEPWD => 1)->{RC}) {
       CertNanny::Logging->error('MSG', "Could not import PKCS#12 file to gsk keystore");
       chdir($lastdir);
       return undef;
@@ -513,7 +513,7 @@ sub getKey {
                '-provider', 'IBMJCE', 
                '-type', 'CMS');
 
-    if (CertNanny::Util->runCommand(\@cmd, HIDEPWD => 1)) {
+    if (CertNanny::Util->runCommand(\@cmd, HIDEPWD => 1)->{RC}) {
       CertNanny::Logging->error('MSG', "getKey(): could not extract private key");
       unlink $p8file;
       return undef;
@@ -544,7 +544,7 @@ sub getKey {
     my @cmd;
     @cmd = (CertNanny::Util->osq("$options->{gskcmd}"), '-cert', '-export', '-db', CertNanny::Util->osq("$keystore"), '-pw', CertNanny::Util->osq("$self->{PIN}"), '-label', CertNanny::Util->osq("$label"), '-type cms', '-target', CertNanny::Util->osq("$exportp12"), '-target_pw' , CertNanny::Util->osq("$self->{PIN}"), '-target_type', 'pkcs12');   
 
-    if (CertNanny::Util->runCommand(\@cmd, HIDEPWD => 1)) {
+    if (CertNanny::Util->runCommand(\@cmd, HIDEPWD => 1)->{RC}) {
       CertNanny::Logging->error('MSG', "getKey(): could not extract private key");
       unlink $exportp12;
       return undef;
@@ -563,7 +563,7 @@ sub getKey {
   
     @opensslcmd = (CertNanny::Util->osq("$openssl"), 'pkcs12', '-in', CertNanny::Util->osq("$exportp12"), '-passin', CertNanny::Util->osq("env:PASSIN"),  '-out', CertNanny::Util->osq("$exportkey"), '-nodes' , '-nocerts' );
 
-    if (CertNanny::Util->runCommand(\@opensslcmd, HIDEPWD => 1)) {
+    if (CertNanny::Util->runCommand(\@opensslcmd, HIDEPWD => 1)->{RC}) {
       CertNanny::Logging->error('MSG', "getKey(): could not extract private key");
       unlink $exportkey;
       return undef;
@@ -859,7 +859,7 @@ sub getInstalledCAs {
       # get label name for user certificate
       @cmd = (CertNanny::Util->osq("$gsk6cmd"), '-cert', '-list', '-db', CertNanny::Util->osq("$locName"), '-pw', CertNanny::Util->osq("$self->{PIN}"));
       
-      @certList = CertNanny::Util->runCommand(\@cmd, WANTOUT => 1, HIDEPWD => 1);
+      @certList = @{CertNanny::Util->runCommand(\@cmd, HIDEPWD => 1)->{OUTPUT}};
       foreach my $certlabel (@certList) {
         #if ($_ =~ m/^([^,]*), ([0-3][0-9]\.[0-1][0-9]\.20[0-9][0-9]), (PrivateKeyEntry|trustedCertEntry),.*$/) { # gets Privat Key as well
         # if ($_ =~ m/^([^,]*), ([0-3][0-9]\.[0-1][0-9]\.20[0-9][0-9]), (trustedCertEntry),.*$/) {
@@ -875,7 +875,7 @@ sub getInstalledCAs {
           my $certexport= CertNanny::Util->getTmpFile();  
           @certcmd = (CertNanny::Util->osq("$gsk6cmd"), '-cert', '-extract', '-db', CertNanny::Util->osq("$locName"), '-pw', CertNanny::Util->osq("$self->{PIN}") , '-label' ,CertNanny::Util->osq("$certlabel") ,'-target' ,CertNanny::Util->osq("$certexport"));     
      
-          $rc = CertNanny::Util->runCommand(\@certcmd, HIDEPWD => 1);
+          $rc = CertNanny::Util->runCommand(\@certcmd, HIDEPWD => 1)->{RC};
             
               
           my $certInfo  = CertNanny::Util->getCertInfoHash(CERTFILE => $certexport , CERTFORMAT => 'PEM');   
@@ -1055,7 +1055,7 @@ sub installRoots {
             my @certcmd;
             @certcmd = (CertNanny::Util->osq("$gsk6cmd"), '-cert', '-delete', '-db', CertNanny::Util->osq("$dest"), '-pw', CertNanny::Util->osq("$self->{PIN}") , '-label' ,CertNanny::Util->osq("$installedRootCAs->{$certSHA1}->{'CERTALIAS'}") );           
    
-            if (CertNanny::Util->runCommand(\@certcmd, HIDEPWD => 1)) {
+            if (CertNanny::Util->runCommand(\@certcmd, HIDEPWD => 1)->{RC}) {
               CertNanny::Logging->error('MSG', "Error deleting root cert " . $installedRootCAs->{$certSHA1}->{CERTINFO}->{SubjectName});
             }
           }
@@ -1077,7 +1077,7 @@ sub installRoots {
             my @certcmd;
             @certcmd = (CertNanny::Util->osq("$gsk6cmd"), '-cert', '-add', '-db', CertNanny::Util->osq("$dest"), '-pw', CertNanny::Util->osq("$self->{PIN}") , '-label' ,CertNanny::Util->osq("$alias") , '-file', $tmpFile ,'-format', 'ascii'  );
      
-            if (CertNanny::Util->runCommand(\@certcmd, HIDEPWD => 1)) {
+            if (CertNanny::Util->runCommand(\@certcmd, HIDEPWD => 1)->{RC}) {
               CertNanny::Logging->error('MSG', "Error importing root cert " . $availableRootCAs->{$certSHA1}->{CERTINFO}->{SubjectName});
             } else {
               # collect Postinstallhook information
@@ -1267,8 +1267,7 @@ sub _getCertLabel {
   my @cmd;
   @cmd = (CertNanny::Util->osq("$gsk6cmd"), '-cert', '-list', 'personal', '-db', CertNanny::Util->osq("$filename"), '-pw', CertNanny::Util->osq("$self->{PIN}"));
 
-  my  @certList = CertNanny::Util->runCommand(\@cmd, WANTOUT => 1, HIDEPWD => 1);
-
+  my  @certList = @{CertNanny::Util->runCommand(\@cmd, HIDEPWD => 1)->{OUTPUT}};
   my $label;
   my $match = $self->{OPTIONS}->{ENTRY}->{labelmatch} || "ibmwebspheremq.*";
   

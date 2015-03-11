@@ -203,7 +203,7 @@ sub getCert {
  
   my $openssl = $config->get('cmd.openssl', 'CMD');
   my @cmd = (CertNanny::Util->osq("$openssl"), 'x509', '-in', CertNanny::Util->osq("$derfile_tmp"), '-inform', 'DER');
-  $certdata = CertNanny::Util->runCommand(\@cmd, WANTOUT => 1);
+  $certdata = shift(@{CertNanny::Util->runCommand(\@cmd)->{OUTPUT}});
   
   CertNanny::Logging->debug('MSG', eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "Get main certificate from keystore");
   return {CERTDATA   => $certdata,
@@ -245,7 +245,7 @@ sub installCert {
   my $certfile = $args{CERTFILE};
 
   my @cmd      = ('certreq', '-accept', CertNanny::Util->osq("$certfile"));
-  if (CertNanny::Util->runCommand(\@cmd, HIDEPWD => 1)) {
+  if (CertNanny::Util->runCommand(\@cmd, HIDEPWD => 1)->{RC}) {
     CertNanny::Logging->error('MSG', "installCert(): Certificate could not be imported.");
     return undef;
   }
@@ -273,7 +273,7 @@ sub installCert {
   	my $netshdel    = join(" ", @netshdel);
   	CertNanny::Logging->debug('MSG', "netsh cmd: $netshdel");
        
-    if (CertNanny::Util->runCommand(\@netshdel)) {
+    if (CertNanny::Util->runCommand(\@netshdel)->{RC}) {
       CertNanny::Logging->error('MSG', "installCert(): failed to unbind https certificate for IIS7.");
       #return undef;
     }
@@ -286,7 +286,7 @@ sub installCert {
       my $netsh      = join(" ", @netsh);
       CertNanny::Logging->debug('MSG', "netsh cmd: $netsh");
        
-    	if (CertNanny::Util->runCommand(\@netsh)) {
+    	if (CertNanny::Util->runCommand(\@netsh)->{RC}) {
       	CertNanny::Logging->error('MSG', "installCert(): failed to register https certificate for IIS 7.");
       	#return undef;
     	}
@@ -301,7 +301,7 @@ sub installCert {
       my $netshdel    = join(" ", @netshdel);
       CertNanny::Logging->debug('MSG', "httpcfg cmd: $netshdel");
          
-      if (CertNanny::Util->runCommand(\@netshdel)) {
+      if (CertNanny::Util->runCommand(\@netshdel)->{RC}) {
         CertNanny::Logging->error('MSG', "installCert(): failed to unbind https certificate on IIS 6.");
         #return undef;
       }
@@ -316,7 +316,7 @@ sub installCert {
         my $netsh      = join(" ", @netsh);
         CertNanny::Logging->debug('MSG', "httpcfg cmd: $netsh");
          
-        if (CertNanny::Util->runCommand(\@netsh)) {
+        if (CertNanny::Util->runCommand(\@netsh)->{RC}) {
           CertNanny::Logging->error('MSG', "installCert(): failed to register https certificate on IIS 6.");
           #return undef;
         }
@@ -411,7 +411,7 @@ sub createRequest() {
     #   return undef;
     # }
     
-    my $rc = CertNanny::Util->runCommand(\@cmd);
+    my $rc = CertNanny::Util->runCommand(\@cmd)->{RC};
     if ($rc != 0) {
       CertNanny::Logging->error('MSG', "createRequest(): Executing certreq cmd: " . join(' ', @cmd) . " error: " . $rc);
       return undef;
@@ -572,8 +572,7 @@ sub importP12 {
   push(@cmd, "$args{FILENAME}");
   push(@cmd, "NoExport,NoRoot");
 
-  my $cmd_output = CertNanny::Util->runCommand(\@cmd, WANTOUT => 1);
-
+  my $cmd_output = shift(@{CertNanny::Util->runCommand(\@cmd)->{OUTPUT}})
   #chdir $olddir;
   CertNanny::Logging->debug('MSG', "Dumping output of above command:\n $cmd_output");
   return 1;

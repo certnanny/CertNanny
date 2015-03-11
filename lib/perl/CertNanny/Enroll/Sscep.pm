@@ -49,8 +49,8 @@ sub new {
     return undef;
   }
 
-  $self->{OPTIONS}->{sscep}->{Verbose} = "true" if $config->get('log.level') >= 5;
-  $self->{OPTIONS}->{sscep}->{Debug}   = "true" if $config->get('log.level') >= 6;
+  $self->{OPTIONS}->{sscep}->{Verbose} = "true" if ($config->get('log.level.console') >= 5 || $config->get('log.level.file') >= 5 || $config->get('log.level.syslog') >= 5);
+  $self->{OPTIONS}->{sscep}->{Debug}   = "true" if ($config->get('log.level.console') >= 6 || $config->get('log.level.file') >= 6 || $config->get('log.level.syslog') >= 6);
 
   $self->{certdir} = $entry_options->{scepcertdir};
   if (!defined $self->{certdir}) {
@@ -155,7 +155,11 @@ sub enroll {
     eval {alarm 120};                          # eval not supported in perl 5.7.1 on win32
     $self->readConfig(\%options);
     $self->writeConfigFile();
-    $rc = $self->execute("enroll");
+    my @cmd = (CertNanny::Util->osq("$self->{cmd}"), "enroll", '-f', CertNanny::Util->osq("$self->{config_filename}"));
+    my $result = CertNanny::Util->runCommand(\@cmd);
+    # $rc = $self->execute("enroll");
+    $rc = $result->{RC};
+ 
     eval {alarm 0};                            # eval not supported in perl 5.7.1 on win32
     CertNanny::Logging->info('MSG', "Return code: $rc");
   };
@@ -232,7 +236,11 @@ sub getCA {
     CertNanny::Logging->debug('MSG', "Requesting CA certificates");
 
     $self->writeConfigFile();
-    if ($self->execute("getca") != 0) {
+    my @cmd = (CertNanny::Util->osq("$self->{cmd}"), "getca", '-f', CertNanny::Util->osq("$self->{config_filename}"));
+    my $result = CertNanny::Util->runCommand(\@cmd);
+ 
+    # if ($self->execute("getca") != 0) {
+    if ($result->{RC} != 0) {
       return undef;
     }
 
@@ -305,7 +313,11 @@ sub getNextCA {
 
   $self->writeConfigFile();
 
-  if ($self->execute("getnextca") != 0) {
+  my @cmd = (CertNanny::Util->osq("$self->{cmd}"), "getnextca", '-f', CertNanny::Util->osq("$self->{config_filename}"));
+  my $result = CertNanny::Util->runCommand(\@cmd);
+ 
+  # if ($self->execute("getnextca") != 0) {
+  if ($result->{RC} != 0) {
     CertNanny::Logging->debug('MSG', "error executing CertNanny::Enroll::Scep::getNextCA - may be unavailable currently or not supported by target SCEP server");
     return undef;
   }

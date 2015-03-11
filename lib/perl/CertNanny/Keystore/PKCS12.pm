@@ -143,7 +143,7 @@ sub getCert {
         @cmd = $self->_buildOpenSSLPKCS12Cmd('-nokeys'  => '-nokeys', 
                                              '-clcerts' => '-clcerts');
       }
-      $certData = CertNanny::Util->runCommand(\@cmd, WANTOUT => 1);
+      $certData = shift(@{CertNanny::Util->runCommand(\@cmd)->{OUTPUT}}));
       if (!$certData) {
         $rc = CertNanny::Logging->error('MSG', "getCert(): Could not read instance certificate file $args{CERTFILE}");
       }
@@ -237,7 +237,7 @@ sub getKey {
   my $rc = undef;
 
   my @cmd = $self->_buildOpenSSLPKCS12Cmd('-nocerts' => '-nocerts');
-  my $data = CertNanny::Util->runCommand(\@cmd, WANTOUT => 1);
+  my $data = shift(@{CertNanny::Util->runCommand(\@cmd)->{OUTPUT}}));
   
   if ($data =~ s{ \A .* (?=-----BEGIN) }{}xms) {
     $rc = {KEYDATA   => $data,
@@ -641,7 +641,7 @@ sub installRoots {
                                                       '-inkey'  => '"'.$tmpKey.'"',
                                                       '-name'   => $config->get("keystore.$entryname.label") || 'cert1',
                                                       'ARGS'    => \@CAList);
-              $rc = CertNanny::Util->runCommand(\@cmd);
+              $rc = CertNanny::Util->runCommand(\@cmd)->[RC};
 
               if (!$rc) {
                CertNanny::Logging->debug('MSG', "install params tmpfile:" .$tmpP12 ." dest file: " .  $config->get("keystore.$entryname.location", 'FILE')  );
