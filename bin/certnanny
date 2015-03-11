@@ -19,6 +19,7 @@ use File::Spec;
 use Pod::Usage;
 use Getopt::Long;
 use Data::Dumper;
+use Carp;
 
 use FindBin;
 use lib "$FindBin::RealBin/../lib/perl";
@@ -82,7 +83,7 @@ $cmdLineParam{keystore} = ''            if !defined $cmdLineParam{keystore};
 
 # Instantiate dependend singleton objects
 # Config
-return 1 unless CertNanny::Config->getInstance(%cmdLineParam);
+CertNanny::Config->getInstance(%cmdLineParam) || croak("Configuration File Error");
 # Util
 CertNanny::Util->getInstance(%cmdLineParam,
                              CONFIG => CertNanny::Config->getInstance(%cmdLineParam));

@@ -185,7 +185,7 @@ sub logLevel {
 } ## end sub logLevel
 
 
-sub _Off {
+sub Off {
   my $self = (shift)->getInstance();
   my $target = shift;
 
@@ -382,7 +382,20 @@ sub _print {
   
   push(@$buffer, "${dbg}:${str}");
   
-  if (!$bufferOut) {
+  if ($bufferOut) {
+    if ($args{FLUSH}) {
+      # DESTROY Mode => Flush Buffer no matter where STD* points to
+      while (@$buffer) {
+        $str = shift(@$buffer);
+        if ($str =~ /^([^:]):(.*)$/s) {
+          $dbg = $1;
+          $str = $2;
+        }
+        print STDOUT $str if ($target eq 'out');
+        print STDERR $str if ($target eq 'err');
+      }
+    }
+  } else {
     while (@$buffer) {
       $str = shift(@$buffer);
       if ($str =~ /^([^:]):(.*)$/s) {
@@ -502,6 +515,10 @@ sub Out {
   my $self = (shift)->getInstance();
   my %args = (@_);
   
+  if (!defined($args{STR}) && !defined($args{MSG})) {
+    # Call by Destroy => Flush outBuffer
+    $args{FLUSH} = 1;
+  }
   $self->_log('TARGET', 'out', 
               %args);
 
@@ -513,6 +530,10 @@ sub Err {
   my $self = (shift)->getInstance();
   my %args = (@_);
   
+  if (!defined($args{STR}) || defined($args{MSG})) {
+    # Call by Destroy => Flush outBuffer
+    $args{FLUSH} = 1;
+  }
   $self->_log('TARGET', 'err', 
               'PRIO',   0,
               %args);

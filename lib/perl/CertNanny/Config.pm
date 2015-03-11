@@ -39,6 +39,7 @@ use File::Glob qw(:globally :case);
 use Net::Domain;
 
 use Data::Dumper;
+use Carp;
 
 use CertNanny::Util;
 use CertNanny::Logging;
@@ -484,7 +485,9 @@ sub _parse {
       $self->_inheritConfig($self->{CONFIG}->{keystore}, $entry);
     }
   } else {
-    CertNanny::Logging->error('MSG', "No openssl shell specified");
+    $rc = "No valid openssl shell specified";
+    CertNanny::Logging->error('MSG', $rc);
+    croak("Configuration File Error: " . $rc);
     $rc = undef;
   }
   
