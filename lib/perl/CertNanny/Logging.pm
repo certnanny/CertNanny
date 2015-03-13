@@ -163,9 +163,7 @@ sub DESTROY {
   $self->Err();
   $self->Out();
   return undef unless (exists $self->{TMPFILE});
-  foreach my $file (@{$self->{TMPFILE}}) {
-    unlink $file;
-  }
+  foreach my $file (@{$self->{TMPFILE}}) {unlink $file}
   close STDOUT;
   close STDERR;
 }
@@ -195,9 +193,11 @@ sub Off {
     $| = 1;
     if ($target eq 'err') {
       $self->debug('MSG', 'Error Logging is disabled');
+      close STDERR;
       open STDERR, ">", "/dev/null";
     } else {
       $self->debug('MSG', 'Logging is disabled');
+      close STDOUT;
       open STDOUT, ">", "/dev/null";
     }  
     $logTarget{$target.'console'} = 0;

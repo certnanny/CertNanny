@@ -49,8 +49,8 @@ sub new {
     return undef;
   }
 
-  $self->{OPTIONS}->{sscep}->{Verbose} = "true" if $config->get('log.level') >= 5;
-  $self->{OPTIONS}->{sscep}->{Debug}   = "true" if $config->get('log.level') >= 6;
+  $self->{OPTIONS}->{sscep}->{Verbose} = "true" if ($config->get('log.level.console') >= 5 || $config->get('log.level.file') >= 5 || $config->get('log.level.syslog') >= 5);
+  $self->{OPTIONS}->{sscep}->{Debug}   = "true" if ($config->get('log.level.console') >= 6 || $config->get('log.level.file') >= 6 || $config->get('log.level.syslog') >= 6);
 
   $self->{certdir} = $entry_options->{scepcertdir};
   if (!defined $self->{certdir}) {
@@ -133,6 +133,7 @@ sub enroll {
   my $self    = shift;
   my %options = (@_,);
 
+  my %sscepInfo;
   #($volume,$directories,$file) = File::Spec->splitpath( $path );
   my $olddir = getcwd();
   chdir $self->{certdir};
@@ -143,21 +144,34 @@ sub enroll {
   }
 
   CertNanny::Logging->info('MSG', "Sending request");
-
+  
   my %certs = $self->getCA();
   if (!%certs) {
     CertNanny::Logging->error('MSG', "Could not get CA certs");
     return undef;
   }
-  my $rc;
+
   eval {
     local $SIG{ALRM} = sub {die "alarm\n"};    # NB: \n required
     eval {alarm 120};                          # eval not supported in perl 5.7.1 on win32
     $self->readConfig(\%options);
     $self->writeConfigFile();
-    $rc = $self->execute("enroll");
+    my @cmd = (CertNanny::Util->osq("$self->{cmd}"), "enroll", '-f', CertNanny::Util->osq("$self->{config_filename}"));
+    my $result = CertNanny::Util->runCommand(\@cmd);
+    # $rc = $self->("enroll");
+    $sscepInfo{RC} = $result->{RC};
+ 
+    my $logLevel = CertNanny::Logging->logLevel();
+    foreach my $txt (@{$result->{STDOUT}}) {
+      chomp($txt);
+      CertNanny::Logging->debug('MSG', $txt) if ($logLevel > 4);
+      if ($txt =~ /^.*transaction id: (.*)$/)             {$sscepInfo{TRANSACTIONID} = $1}
+      if ($txt =~ /^.*server returned status code (.*)$/) {$sscepInfo{HTMLSTATUS}    = $1}
+      if ($txt =~ /^.*pkistatus: (.*)$/)                  {$sscepInfo{PKISTATUS}    = $1}
+    }
+ 
     eval {alarm 0};                            # eval not supported in perl 5.7.1 on win32
-    CertNanny::Logging->info('MSG', "Return code: $rc");
+    CertNanny::Logging->info('MSG', "Return code: $sscepInfo{RC}");
   };
 
   chdir $olddir;
@@ -166,20 +180,25 @@ sub enroll {
     # timed out
     die unless $@ eq "alarm\n";                # propagate unexpected errors
     CertNanny::Logging->info('MSG', "Timed out.");
-    return undef;
+    $sscepInfo{SSCEPSTATUS} = "Timed Out";
+    return %sscepInfo;
   }
 
-  if ($rc == 3) {
+  if ($sscepInfo{RC} == 3) {
     # request is pending
     CertNanny::Logging->info('MSG', "Request is still pending");
-    return 1;
+    $sscepInfo{SSCEPSTATUS} = "Request is still pending";
+    return %sscepInfo;
   }
 
-  if ($rc != 0) {
+  if ($sscepInfo{RC} != 0) {
     CertNanny::Logging->error('MSG', "Could not run SCEP enrollment");
-    return undef;
+    $sscepInfo{SSCEPSTATUS} = "Could not run SCEP enrollment";
+    return %sscepInfo;
   }
-  return 1;
+
+  $sscepInfo{RC} = 1;
+  return %sscepInfo;
 } ## end sub enroll
 
 
@@ -209,6 +228,7 @@ sub getCA {
   my $self   = shift;
   my $config = shift;
   unless (defined $self->{certs}->{RACERT} and defined $self->{certs}->{CACERTS}) {
+    
     my $olddir = getcwd();
     chdir $self->{certdir};
     $config->{sscep}->{CACertFile} = 'cacert';
@@ -232,7 +252,17 @@ sub getCA {
     CertNanny::Logging->debug('MSG', "Requesting CA certificates");
 
     $self->writeConfigFile();
-    if ($self->execute("getca") != 0) {
+    my @cmd = (CertNanny::Util->osq("$self->{cmd}"), "getca", '-f', CertNanny::Util->osq("$self->{config_filename}"));
+    my $result = CertNanny::Util->runCommand(\@cmd);
+
+    my $logLevel = CertNanny::Logging->logLevel();
+    foreach my $txt (@{$result->{STDOUT}}) {
+      chomp($txt);
+      CertNanny::Logging->debug('MSG', $txt) if ($logLevel > 5);
+    }
+
+    # if ($self->execute("getca") != 0) {
+    if ($result->{RC} != 0) {
       return undef;
     }
 
@@ -305,7 +335,17 @@ sub getNextCA {
 
   $self->writeConfigFile();
 
-  if ($self->execute("getnextca") != 0) {
+  my @cmd = (CertNanny::Util->osq("$self->{cmd}"), "getnextca", '-f', CertNanny::Util->osq("$self->{config_filename}"));
+  my $result = CertNanny::Util->runCommand(\@cmd);
+ 
+  my $logLevel = CertNanny::Logging->logLevel();
+  foreach my $txt (@{$result->{STDOUT}}) {
+    chomp($txt);
+    CertNanny::Logging->debug('MSG', $txt) if ($logLevel > 5);
+  }
+
+  # if ($self->execute("getnextca") != 0) {
+  if ($result->{RC} != 0) {
     CertNanny::Logging->debug('MSG', "error executing CertNanny::Enroll::Scep::getNextCA - may be unavailable currently or not supported by target SCEP server");
     return undef;
   }

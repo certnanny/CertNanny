@@ -191,7 +191,7 @@ sub getCert {
   # Gets the first certificate found either in CERTDATA or in CERTFILE and 
   # returns it in CERTDATA. 
   # If there is a rest in the input, it is returned in CERTREST
-  CertNanny::Logging->debug('MSG', eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "Get main certificate from keystore");
+  CertNanny::Logging->debug('MSG', (eval 'ref(\$self)' ? "End " : "Start ") . (caller(0))[3] . " Get main certificate from keystore");
   my $self = shift;
 
   CertNanny::Logging->debug('MSG', "Start " . (caller(0))[3] . ": ");
@@ -217,7 +217,7 @@ sub getCert {
   #                  CERTDATA   => $certdata,     # if the cert is available in a scalar
   #                  CERTFORMAT => 'PEM'}         # or 'DER'...
 
-  CertNanny::Logging->debug('MSG', eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "Get main certificate from keystore");
+  CertNanny::Logging->debug('MSG', (eval 'ref(\$self)' ? "End " : "Start ") . (caller(0))[3] . " Get main certificate from keystore");
   return $instancecert;
 } ## end sub getCert
 
@@ -238,7 +238,7 @@ sub installCert {
   # the new key, certificate, CA certificate keychain and collection of Root
   # certificates configured for CertNanny.
   # A true return code indicates that the keystore was installed properly.
-  CertNanny::Logging->debug('MSG', eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "installs a new main certificate from the SCEPT server in the keystore");
+  CertNanny::Logging->debug('MSG', (eval 'ref(\$self)' ? "End " : "Start ") . (caller(0))[3] . " installs a new main certificate from the SCEPT server in the keystore");
   my $self = shift;
   my %args = (@_);    # argument pair list
 
@@ -258,12 +258,12 @@ sub installCert {
 
   if (1) {    # if any error happened
     CertNanny::Logging->error('MSG', "Could not install new keystore");
-    CertNanny::Logging->debug('MSG', eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "installs a new main certificate from the SCEPT server in the keystore");
+    CertNanny::Logging->debug('MSG', (eval 'ref(\$self)' ? "End " : "Start ") . (caller(0))[3] . " installs a new main certificate from the SCEPT server in the keystore");
     return undef;
   }
 
   # only on success:
-  CertNanny::Logging->debug('MSG', eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "installs a new main certificate from the SCEPT server in the keystore");
+  CertNanny::Logging->debug('MSG', (eval 'ref(\$self)' ? "End " : "Start ") . (caller(0))[3] . " installs a new main certificate from the SCEPT server in the keystore");
   return 1;
 } ## end sub installCert
 
@@ -282,7 +282,7 @@ sub getKey {
   #           KEYTYPE   => format (e. g. 'PKCS8' or 'OpenSSL'
   #           KEYPASS   => key pass phrase (only if protected by pass phrase)
   #         or undef on error
-  CertNanny::Logging->debug('MSG', eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "get private key for main certificate from keystore");
+  CertNanny::Logging->debug('MSG', (eval 'ref(\$self)' ? "End " : "Start ") . (caller(0))[3] . " get private key for main certificate from keystore");
   my $self = shift;
 
   # you might want to access keystore configuration here
@@ -303,7 +303,7 @@ sub getKey {
   # 	KEYPASS => $pin,
   #     }
 
-  CertNanny::Logging->debug('MSG', eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "get private key for main certificate from keystore");
+  CertNanny::Logging->debug('MSG', (eval 'ref(\$self)' ? "End " : "Start ") . (caller(0))[3] . " get private key for main certificate from keystore");
   return $key;
 } ## end sub getKey
 
@@ -334,7 +334,7 @@ sub createRequest {
   #
   # If you are able to directly operate on your keystore to generate keys
   # and requests, you might choose to do all this yourself here:
-  CertNanny::Logging->debug('MSG', eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "generate a certificate request");
+  CertNanny::Logging->debug('MSG', (eval 'ref(\$self)' ? "End " : "Start ") . (caller(0))[3] . " generate a certificate request");
   my $self = shift;
 
   # NOTE: you might want to use OpenSSL request generation, see suggestion
@@ -353,7 +353,7 @@ sub createRequest {
   # generate a PKCS#10 PEM encoded request file
   my $requestfile;                                              # ...
 
-  CertNanny::Logging->debug('MSG', eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "generate a certificate request");
+  CertNanny::Logging->debug('MSG', (eval 'ref(\$self)' ? "End " : "Start ") . (caller(0))[3] . " generate a certificate request");
   return {REQUESTFILE => $requestfile,
           KEYFILE     => $keyfile};
 } ## end sub createRequest
@@ -383,7 +383,7 @@ sub selfSign {
   #
   # If you are able to directly operate on your keystore to generate keys
   # and requests, you might choose to do all this yourself here:
-  CertNanny::Logging->debug('MSG', eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "sign the certificate");
+  CertNanny::Logging->debug('MSG', (eval 'ref(\$self)' ? "End " : "Start ") . (caller(0))[3] . " sign the certificate");
   my $self = shift;
 
   my $options   = $self->{OPTIONS};
@@ -447,7 +447,7 @@ sub selfSign {
 
   push(@cmd, ('-passin', 'env:PIN')) unless $pin eq "";
   $ENV{PIN} = $pin;
-  if (CertNanny::Util->runCommand(\@cmd) != 0) {
+  if (CertNanny::Util->runCommand(\@cmd)->{RC} != 0) {
     CertNanny::Logging->error('MSG', "Selfsign certifcate creation failed!");
     delete $ENV{PIN};
   }
@@ -455,7 +455,7 @@ sub selfSign {
   #    openssl req -x509 -days 365 -new -out self-signed-certificate.pem
   # -key pub-sec-key.pem
 
-  CertNanny::Logging->debug('MSG', eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "sign the certificate");
+  CertNanny::Logging->debug('MSG', (eval 'ref(\$self)' ? "End " : "Start ") . (caller(0))[3] . " sign the certificate");
   return {CERT => $outfile};
 }
 
@@ -487,13 +487,13 @@ sub generateKey {
   #
   # If you are able to directly operate on your keystore to generate keys,
   # you might choose to do all this yourself here:
-  CertNanny::Logging->debug('MSG', eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "generate a new keypair");
+  CertNanny::Logging->debug('MSG', (eval 'ref(\$self)' ? "End " : "Start ") . (caller(0))[3] . " generate a new keypair");
   my $self = shift;
 
   # step 1: generate private key or new keystore
   my $keyfile;    # ...
   
-  CertNanny::Logging->debug('MSG', eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "generate a new keypair");
+  CertNanny::Logging->debug('MSG', (eval 'ref(\$self)' ? "End " : "Start ") . (caller(0))[3] . " generate a new keypair");
   return {KEYFILE => $keyfile};
 } ## end sub generateKey
 
@@ -530,7 +530,7 @@ sub _createPKCS12 {
   #   my $self = shift;
   #   return $self->SUPER::createPKCS12(@_) if $self->can("SUPER::createPKCS12");
   # }
-  CertNanny::Logging->debug('MSG', eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "create pkcs12 file");
+  CertNanny::Logging->debug('MSG', (eval 'ref(\$self)' ? "End " : "Start ") . (caller(0))[3] . " create pkcs12 file");
   my $self = shift;
   
   my %args = (FILENAME     => undef,
@@ -598,7 +598,7 @@ sub _createPKCS12 {
     $certfile = CertNanny::Util->getTmpFile();
 
     @cmd = (CertNanny::Util->osq("$openssl"), 'x509', '-in', CertNanny::Util->osq("$args{CERTFILE}"), '-inform', CertNanny::Util->osq("$args{CERTFORMAT}"), '-out', CertNanny::Util->osq("$certfile"), '-outform', 'PEM',);
-    if (CertNanny::Util->runCommand(\@cmd) != 0) {
+    if (CertNanny::Util->runCommand(\@cmd)->{RC} != 0) {
       CertNanny::Logging->error('MSG', "Certificate format conversion failed");
       return undef;
     }
@@ -663,7 +663,7 @@ sub _createPKCS12 {
           '-in', CertNanny::Util->osq("$certfile"), 
           '-inkey', CertNanny::Util->osq("$args{KEYFILE}"), @passin, @name, @cachain);
           
-  if (CertNanny::Util->runCommand(\@cmd) != 0) {
+  if (CertNanny::Util->runCommand(\@cmd)->{RC} != 0) {
     CertNanny::Logging->error('MSG', "PKCS#12 export failed");
     delete $ENV{PIN};
     delete $ENV{EXPORTPIN};
@@ -677,7 +677,7 @@ sub _createPKCS12 {
   unlink $certfile if ($args{CERTFORMAT} eq "DER");
   unlink $cachainfile if (defined $cachainfile);
 
-  CertNanny::Logging->debug('MSG', eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "create pkcs12 file");
+  CertNanny::Logging->debug('MSG', (eval 'ref(\$self)' ? "End " : "Start ") . (caller(0))[3] . " create pkcs12 file");
   return {FILENAME => $args{FILENAME}};
 } ## end sub createPKCS12
 
@@ -710,7 +710,7 @@ sub importP12 {
   #   my $self = shift;
   #   return $self->SUPER::importP12(@_) if $self->can("SUPER::importP12");
   # }
-  CertNanny::Logging->debug('MSG', eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "import pkcs12 file");
+  CertNanny::Logging->debug('MSG', (eval 'ref(\$self)' ? "End " : "Start ") . (caller(0))[3] . " import pkcs12 file");
   my $self = shift;
   my %args = (@_);    # argument pair list
 
@@ -723,11 +723,11 @@ sub importP12 {
                                   SRCCONTENT => CertNanny::Util->readFile($args{FILE}),
                                   FORCE      => 0)) {
     CertNanny::Logging->error('MSG', "Could not write new p12 Keystore, file already exists ?!");
-    CertNanny::Logging->debug('MSG', eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "import pkcs12 file");
+    CertNanny::Logging->debug('MSG', (eval 'ref(\$self)' ? "End " : "Start ") . (caller(0))[3] . " import pkcs12 file");
     return undef;
   }
 
-  CertNanny::Logging->debug('MSG', eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "import pkcs12 file");
+  CertNanny::Logging->debug('MSG', (eval 'ref(\$self)' ? "End " : "Start ") . (caller(0))[3] . " import pkcs12 file");
   return 1;
 } ## end sub importP12
 
@@ -768,10 +768,10 @@ sub getInstalledRoots {
   #   my $self = shift;
   #   return $self->SUPER::getInstalledRoots(@_) if $self->can("SUPER::getInstalledRoots");
   # }
-  CertNanny::Logging->debug('MSG', eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "get all installed root certificates");
+  CertNanny::Logging->debug('MSG', (eval 'ref(\$self)' ? "End " : "Start ") . (caller(0))[3] . " get all installed root certificates");
   my $self = shift;
 
-  CertNanny::Logging->debug('MSG', eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "get all installed root certificates");
+  CertNanny::Logging->debug('MSG', (eval 'ref(\$self)' ? "End " : "Start ") . (caller(0))[3] . " get all installed root certificates");
   return undef;
 } ## end sub getInstalledRoots
 
@@ -803,10 +803,10 @@ sub installRoots {
   #   my $self = shift;
   #   return $self->SUPER::installRoots(@_) if $self->can("SUPER::installRoots");
   # }
-  CertNanny::Logging->debug('MSG', eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "install all available root certificates");
+  CertNanny::Logging->debug('MSG', (eval 'ref(\$self)' ? "End " : "Start ") . (caller(0))[3] . " install all available root certificates");
   my $self = shift;
 
-  CertNanny::Logging->debug('MSG', eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "install all available root certificates");
+  CertNanny::Logging->debug('MSG', (eval 'ref(\$self)' ? "End " : "Start ") . (caller(0))[3] . " install all available root certificates");
   return undef;
 } ## end sub installRoots
 
@@ -836,10 +836,10 @@ sub syncRootCAs {
   #   my $self = shift;
   #   return $self->SUPER::syncRootCAs(@_) if $self->can("SUPER::syncRootCAs");
   # }
-  CertNanny::Logging->debug('MSG', eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "synchronize the unstalled root certificates with the avaiable ones");
+  CertNanny::Logging->debug('MSG', (eval 'ref(\$self)' ? "End " : "Start ") . (caller(0))[3] . " synchronize the unstalled root certificates with the avaiable ones");
   my $self = shift;
 
-  CertNanny::Logging->debug('MSG', eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "synchronize the unstalled root certificates with the avaiable ones");
+  CertNanny::Logging->debug('MSG', (eval 'ref(\$self)' ? "End " : "Start ") . (caller(0))[3] . " synchronize the unstalled root certificates with the avaiable ones");
   return undef;
 }
 

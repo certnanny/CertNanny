@@ -91,7 +91,7 @@ sub genkey() {
   } ## end else [ if ($self->{hsm_options...})]
   push(@cmd, @generateopts);
 
-  my $rc = CertNanny::Util->runCommand(\@cmd);
+  my $rc = CertNanny::Util->runCommand(\@cmd)->{RC};
   if ($rc != 0) {
     CertNanny::Logging->error('MSG', "Could not generate new key in HSM, see logging output.");
     return undef;
