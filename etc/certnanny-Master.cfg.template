@@ -1,19 +1,10 @@
 #############################################
 #
-# Sample configuration file for CertNanny 1.0 X.509 certificate renewal agent
+# Sample configuration file for CertNanny 1.3 X.509 certificate renewal agent
 #
 # 2013-10-10 Arkadius C. Litwinczuk <arkadius.litwinczuk@gmail.com>
 #
 #############################################
-
-
-#Name of the CertNanny service
-# Windows Service Name
-platform.windows.servicename     = CertNanny
-
-#time frame for starting the renewal process (in seconds)
-#once a day  86400
-platform.windows.serviceinterval = 86400
 
 #helper variable to ease configuration
 #can be accesed via $(prefix)
@@ -26,11 +17,13 @@ path.tmpdir                      = $(prefix)tmp/
 #       be OK.
 # 0: fatal, 1: error, 2: notice, 3: info, 4: debug, 5: scep verbose, 6: scep debug
 # ToDo: Change Loglevels to: emergency, 1: alert, 2: critical, 3: error, 4: warning, i5: notice, 6: info, 7: debug
-log.level.console                = 6
-log.level.file                   = 0
-log.level.syslog                 = 3
+log.level.console                = 3
+log.level.file                   = 3
+log.level.syslog                 = 0
+
 # depricated
 # loglevel                         = 1
+
 # Log Detail settings
 # 0: Timestamp, Level, PID, text       i.E.: 2015-01-29 21:47:15 : [debug] [64726] Start CertNanny::do_dump Dump
 # 1: 0 + direct calling proc           i.E.: 2015-01-29 21:47:48 : [debug] [64747] [CertNanny::do_dump(601)] Start CertNanny::do_dump Dump
@@ -38,9 +31,9 @@ log.level.syslog                 = 3
 # 3: 2 + getInstance and Logging procs i.E.: 2015-01-29 21:49:47 : [debug] [64820] [CertNanny::AUTOLOAD(187)->CertNanny::do_dump(601)->CertNanny::Logging::debug(451)->CertNanny::Logging::log(415)] Start CertNanny::do_dump Dump
 log.detail                       = 1
 
-log.out.console                  = 1
-log.out.file                     = $(prefix)logs/certnanny___YEAR__.__MONTH__.__KEYSTORE__.log
-log.out.filelast                 = $(prefix)logs/certnanny___YEAR__.__MONTH__.__KEYSTORE__.last.log
+log.out.console                  = 0
+log.out.file                     = $(prefix)logs/certnanny.log
+#log.out.filelast                 = $(prefix)logs/certnanny___YEAR__.__MONTH__.__KEYSTORE__.last.log
 # Format for syslog parameter: <SysLogIdentifier> <Facility> <Syslog Options separated by , (NO BLANKS ALLOWED)>
 # If you want to user SysLog you should consider configuring you syslogd Daemon
 # For Example the following configures the syslogd to write all Messages from Senders with an SysLogIdentifier
@@ -48,13 +41,14 @@ log.out.filelast                 = $(prefix)logs/certnanny___YEAR__.__MONTH__.__
 # /var/log/certnanny.log. The Logfile is rotated every 5M
 #  > certnanny.log mode=0640 format=bsd rotate=seq compress file_max=5M all_max=50M
 #  ? [CA= Sender certnanny] [<= Level debug] file certnanny.log
-log.out.syslog                   = CertNanny.__KEYSTORE__.log LOG_DAEMON ndelay
+#log.out.syslog                   = CertNanny.__KEYSTORE__.log LOG_DAEMON ndelay
 
 # Err output settings (Console, File, Syslog)
-log.err.console                  = 1
-log.err.file                     = $(prefix)logs/certnanny___YEAR__.__MONTH__.__KEYSTORE__.err
-log.err.filelast                 = $(prefix)logs/certnanny___YEAR__.__MONTH__.__KEYSTORE__.last.err
-log.err.syslog                   = CertNanny.__KEYSTORE__.err LOG_DAEMON ndelay
+log.err.console                  = 0
+log.err.file                     = $(prefix)logs/certnanny.log
+#log.err.filelast                 = $(prefix)logs/certnanny___YEAR__.__MONTH__.__KEYSTORE__.last.err
+#log.err.syslog                   = CertNanny.__KEYSTORE__.err LOG_DAEMON ndelay
+
 # depricated
 # logfile                     = $(prefix)logs/certnanny.log
 
@@ -96,9 +90,10 @@ cmd.ifconfig                     = /sbin/ifconfig
 # or specify the config file to include one by one by absolute or relative path starting from this config files directory
 # include certnanny-local.cfg
 
-keystores                        = openssl java
+#keystores                        = openssl java
+
 # depricated
-#include Keystore-DEFAULT.cfg
+include Keystore-DEFAULT.cfg
 #include Keystore-myJava.cfg
 #include Keystore-myOpenSSL.cfg
 #include Keystore-Windows.cfg

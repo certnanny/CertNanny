@@ -7,11 +7,11 @@
 #Name of the CertNanny service
 platform.windows.servicename = CertNanny
 
-#platform.windows.servicename    = CertNanny
+#platform.windows.servicename = CertNanny
 #time frame for starting the renewal process (in seconds)
-platform.windows.serviceinterval =86400
+platform.windows.serviceinterval = 86400
 
-CNPATH                       = __ENV__ProgramFiles(x86)__\CertNanny
+CNPATH            = __ENV__ProgramFiles(x86)__\CertNanny
 CNDATA 			  = __ENV__ALLUSERSPROFILE__\CertNanny
 
 
@@ -31,12 +31,10 @@ path.tmpdir                      = $(CNDATA)\tmp\
 log.level = 3
 #Name and destination of the certnanny logfile
 
-log.out.console                  = 1
+log.out.console                  = 0
 log.out.file                     = $(CNDATA)logs/certnanny.log
-log.out.syslog                   = tcp://localhost:2486
-log.err.console                  = 1
-log.err.file                     = $(CNDATA)logs/certnanny.err
-log.err.syslog                   = tcp://localhost:2486
+log.err.console                  = 0
+log.err.file                     = $(CNDATA)logs/certnanny.log
 
 #randomWait if this is set there will be a random backoff time while renewing a certificate to ease the stress on the PKI (e.g. 1000 servers run certanny with the same config for a cron job ) 
 randomWait =  300
@@ -64,6 +62,18 @@ cmd.sscep   = $(CNPATH)\OpenSSL\sscep.exe
 #cmd.java    =C:\Program Files\Java\jdk1.6.0_27\bin\java.exe
 #cmd.keytool = C:\Program Files\Java\jdk1.6.0_27\bin\Keytool.exe
 
+####Include keystore configuration files####
+# if you specify a directory all files in the directory will be included
+# include KeystoreConfigDirectory/
+# or specify several files by globbing to be included
+# Include all files starting with "Keystore-" and ending with ".cfg"
+# include Keystore-*.cfg
+# or specify the config file to include one by one by absolute or relative path starting from this config files directory
+# include certnanny-local.cfg
+
+#keystores                        = openssl java
+
+#depricated
 #keystore config include directory all config files in this directory will  be added to the configuration, location realtive to Master .cfg file
 include Keystore-DEFAULT-w32.cfg
 #include Keystore-OpenSSL-PKCS8.cfg
