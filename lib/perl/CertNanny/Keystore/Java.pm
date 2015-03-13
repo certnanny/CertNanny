@@ -57,7 +57,7 @@ sub new {
   croak "cmd.keytool not found" unless (defined $options->{keytool});
   
   @cmd = (CertNanny::Util->osq("$options->{keytool}"), "2>&1");
-  @keys = @{CertNanny::Util->runCommand(\@cmd)->{OUTPUT}};
+  @keys = @{CertNanny::Util->runCommand(\@cmd)->{STDOUT}};
   my $rightKeytoolVersion = 0;
   foreach (@keys) {
     $rightKeytoolVersion |= $_ =~ /-importkeystore/;
@@ -103,7 +103,7 @@ sub new {
   # optional alias defaults to first key
   if (!defined $entry->{alias}) {
     @cmd = $self->_buildKeytoolCmd($entry->{location}, '-list');
-    @keys = @{CertNanny::Util->runCommand(\@cmd)->{OUTPUT}};
+    @keys = @{CertNanny::Util->runCommand(\@cmd)->{STDOUT}};
     @keys = grep m{, keyEntry,$}, @keys;
     if ($?) {
       croak("keystore $entry->{location} cannot be listed");
@@ -208,7 +208,7 @@ sub getCert {
     }
     if ($rc) {
       my @cmd = $self->_buildKeytoolCmd($args{CERTFILE}, '-export', '-rfc', -alias => qq{"$entry->{alias}"});
-      $certData = shift(@{CertNanny::Util->runCommand(\@cmd, HIDEPWD => 1)->{OUTPUT}});
+      $certData = join("", @{CertNanny::Util->runCommand(\@cmd, HIDEPWD => 1)->{STDOUT}});
       if ($? || !defined $certData) {
         chomp($certData);
         CertNanny::Logging->error('MSG', "getCert(): keytool -export failed ($certData)");
@@ -385,7 +385,7 @@ sub getKey {
       push(@cmd, -keypass    => CertNanny::Util->osq("$entry->{key}->{pin}")) if ($entry->{key}->{pin});
       push(@cmd, -new        => CertNanny::Util->osq("$entry->{store}->{pin}")) if ($entry->{store}->{pin});
   
-      $rc = shift(@{CertNanny::Util->runCommand(\@cmd, HIDEPWD => 1)->{OUTPUT}});
+      $rc = join("", @{CertNanny::Util->runCommand(\@cmd, HIDEPWD => 1)->{STDOUT}});
       if ($rc) {
         chomp($rc);
         $rc = CertNanny::Logging->error('MSG', "getKey(): keytool -importkeystore failed ($rc)");
@@ -404,7 +404,7 @@ sub getKey {
     push(@cmd, -deststorepass => CertNanny::Util->osq("$entry->{store}->{pin}")) if ($entry->{store}->{pin});
     push(@cmd, -deststoretype => 'PKCS12');
   
-    $rc = shift(@{CertNanny::Util->runCommand(\@cmd, HIDEPWD => 1)->{OUTPUT}});
+    $rc = join("", @{CertNanny::Util->runCommand(\@cmd, HIDEPWD => 1)->{STDOUT}});
     if ($rc) {
       chomp($rc);
       $rc = CertNanny::Logging->error('MSG', "getKey(): keytool -importkeystore failed ($rc)");
@@ -424,7 +424,7 @@ sub getKey {
       push(@cmd, -nocerts);
       push(@cmd, -nodes);
       $ENV{PIN} = $entry->{store}->{pin};
-      $rc = shift(@{CertNanny::Util->runCommand(\@cmd, HIDEPWD => 1)->{OUTPUT}});
+      $rc = join("", @{CertNanny::Util->runCommand(\@cmd, HIDEPWD => 1)->{STDOUT}});
       delete $ENV{PIN};
       if (!$rc) {
         $rc = CertNanny::Logging->error('MSG', "PKCS12 key extraction failed");
@@ -806,7 +806,7 @@ sub getInstalledCAs {
     if (defined(my $locName = $config->get("keystore.$entryname.location", 'FILE'))) {
       my ($certRef, @certList, $certData, $certSha1, $certAlias, $certCreateDate, $certType, $certFingerprint);
       my @cmd = $self->_buildKeytoolCmd($locName, '-list');
-      @certList = shift(@{CertNanny::Util->runCommand(\@cmd, HIDEPWD => 1)->{OUTPUT}});
+      @certList = @{CertNanny::Util->runCommand(\@cmd, HIDEPWD => 1)->{STDOUT}};
       foreach (@certList) {
         if ($_ =~ m/^([^,]*), (.*?), (PrivateKeyEntry|trustedCertEntry),.*$/) { # gets Privat Key as well
           ($certAlias, $certCreateDate, $certType) = ($1, $2, $3);
@@ -816,7 +816,7 @@ sub getInstalledCAs {
           $certFingerprint = $1;
           @cmd = $self->_buildKeytoolCmd($locName, '-list', '-rfc', '-alias', '"'.$certAlias.'"');
 
-          $certData = shift(@{CertNanny::Util->runCommand(\@cmd, HIDEPWD => 1)->{OUTPUT}});
+          $certData = join("", @{CertNanny::Util->runCommand(\@cmd, HIDEPWD => 1)->{STDOUT}});
           $certRef  = $self->getCert(CERTDATA => $certData);
 
           while ($certRef and ($certData = $certRef->{CERTDATA})) {

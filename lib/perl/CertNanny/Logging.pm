@@ -163,9 +163,7 @@ sub DESTROY {
   $self->Err();
   $self->Out();
   return undef unless (exists $self->{TMPFILE});
-  foreach my $file (@{$self->{TMPFILE}}) {
-    unlink $file;
-  }
+  foreach my $file (@{$self->{TMPFILE}}) {unlink $file}
   close STDOUT;
   close STDERR;
 }

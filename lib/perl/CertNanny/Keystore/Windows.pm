@@ -203,7 +203,7 @@ sub getCert {
  
   my $openssl = $config->get('cmd.openssl', 'CMD');
   my @cmd = (CertNanny::Util->osq("$openssl"), 'x509', '-in', CertNanny::Util->osq("$derfile_tmp"), '-inform', 'DER');
-  $certdata = shift(@{CertNanny::Util->runCommand(\@cmd)->{OUTPUT}});
+  $certdata = join("", @{CertNanny::Util->runCommand(\@cmd)->{STDOUT}});
   
   CertNanny::Logging->debug('MSG', (eval 'ref(\$self)' ? "End " : "Start ") . (caller(0))[3] . " Get main certificate from keystore");
   return {CERTDATA   => $certdata,
@@ -572,7 +572,7 @@ sub importP12 {
   push(@cmd, "$args{FILENAME}");
   push(@cmd, "NoExport,NoRoot");
 
-  my $cmd_output = shift(@{CertNanny::Util->runCommand(\@cmd)->{OUTPUT}});
+  my $cmd_output = join("", @{CertNanny::Util->runCommand(\@cmd)->{STDOUT}});
   #chdir $olddir;
   CertNanny::Logging->debug('MSG', "Dumping output of above command:\n $cmd_output");
   return 1;

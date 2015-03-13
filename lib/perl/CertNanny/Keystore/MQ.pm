@@ -283,7 +283,7 @@ sub installCert {
     my @calabels;
 
     my $match = $entry->{labelmatch} || "ibmwebspheremq.*";
-    chomp(my @certs = @{CertNanny::Util->runCommand(\@cmd, HIDEPWD => 1)->{OUTPUT}});
+    chomp(my @certs = @{CertNanny::Util->runCommand(\@cmd, HIDEPWD => 1)->{STDOUT}});
     
     if (!defined $options->{gsk6cmd}) {
       if (@certs) {
@@ -859,7 +859,7 @@ sub getInstalledCAs {
       # get label name for user certificate
       @cmd = (CertNanny::Util->osq("$gsk6cmd"), '-cert', '-list', '-db', CertNanny::Util->osq("$locName"), '-pw', CertNanny::Util->osq("$self->{PIN}"));
       
-      @certList = @{CertNanny::Util->runCommand(\@cmd, HIDEPWD => 1)->{OUTPUT}};
+      @certList = @{CertNanny::Util->runCommand(\@cmd, HIDEPWD => 1)->{STDOUT}};
       foreach my $certlabel (@certList) {
         #if ($_ =~ m/^([^,]*), ([0-3][0-9]\.[0-1][0-9]\.20[0-9][0-9]), (PrivateKeyEntry|trustedCertEntry),.*$/) { # gets Privat Key as well
         # if ($_ =~ m/^([^,]*), ([0-3][0-9]\.[0-1][0-9]\.20[0-9][0-9]), (trustedCertEntry),.*$/) {
@@ -1267,7 +1267,7 @@ sub _getCertLabel {
   my @cmd;
   @cmd = (CertNanny::Util->osq("$gsk6cmd"), '-cert', '-list', 'personal', '-db', CertNanny::Util->osq("$filename"), '-pw', CertNanny::Util->osq("$self->{PIN}"));
 
-  my  @certList = @{CertNanny::Util->runCommand(\@cmd, HIDEPWD => 1)->{OUTPUT}};
+  my  @certList = @{CertNanny::Util->runCommand(\@cmd, HIDEPWD => 1)->{STDOUT}};
   my $label;
   my $match = $self->{OPTIONS}->{ENTRY}->{labelmatch} || "ibmwebspheremq.*";
   

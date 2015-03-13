@@ -142,20 +142,18 @@ foreach my $cmd (@ARGV) {   # command line parameters are already stripped off. 
                                               parameters  => $params_str,});
 
       if ($ret) {
-        CertNanny::Logging->Out('STR', "Service successfully added.\n");       
-        exit 0;
+        CertNanny::Util->Exit('MSG', "Service successfully added.\n");       
       } else {
-        CertNanny::Logging->Out('STR', "Failed to add service: " . Win32::FormatMessage(Win32::Daemon::GetLastError()) . "\n");
-        exit 1;
+        CertNanny::Util->Exit('MSG', "Failed to add service: " . Win32::FormatMessage(Win32::Daemon::GetLastError()) . "\n",
+                              'RC',  1);
       }
     } elsif ($cmd eq "uninstall") {
       $servicename = CertNanny::Config->getInstance()->get("platform.windows.servicename") || "CertNanny";
       if (Win32::Daemon::DeleteService('', $servicename)) {
-        CertNanny::Logging->Out('STR', "Service successfully uninstalled.\n");
-        exit 0;
+        CertNanny::Util->Exit('MSG', "Service successfully uninstalled.\n");
       } else {
-        CertNanny::Logging->Out('STR', "Failed to uninstall service: " . Win32::FormatMessage(Win32::Daemon::GetLastError()) . "\n");
-        exit 1;
+        CertNanny::Util->Exit('MSG', "Failed to uninstall service: " . Win32::FormatMessage(Win32::Daemon::GetLastError()) . "\n",
+                              'RC',  1);
       }
     } elsif (($cmd eq "renew") or ($cmd eq "check")) {
       # ToDo What other commands are valid for windows -> implementation and test
@@ -168,7 +166,7 @@ foreach my $cmd (@ARGV) {   # command line parameters are already stripped off. 
 } ## end foreach my $cmd (@ARGV)
 
 # if we had commands as arguments, we're done, else we are a service and do a lot of stuff below :)
-exit if (scalar @ARGV > 0);
+CertNanny::Util->Exit() if (scalar @ARGV > 0);       
 
 if ($OSNAME eq 'MSWin32') {
   my $State     = "";
@@ -178,8 +176,8 @@ if ($OSNAME eq 'MSWin32') {
   if (Win32::Daemon::StartService()) {
     CertNanny::Logging->Out('STR', "Successfully started CertNanny service.\n");
   } else {
-    CertNanny::Logging->Out('STR', "Failed to start service: " . Win32::FormatMessage(Win32::Daemon::GetLastError()) . "\n");
-    exit;
+    CertNanny::Util->Exit('MSG', "Failed to start service: " . Win32::FormatMessage(Win32::Daemon::GetLastError()) . "\n",
+                          'RC',  1);
   }
 
   my $starttime = 0;

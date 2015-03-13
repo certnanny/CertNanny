@@ -185,7 +185,7 @@ sub loadKeyInfo() {
   #  CertNanny::Logging->error('MSG', "Could not execute command successfully.");
   #  return undef;
   #}
-  my $output = shift(@{CertNanny::Util->runCommand($cmd, HIDEPWD => 1)->{OUTPUT}});
+  my $output = join("", @{CertNanny::Util->runCommand($cmd, HIDEPWD => 1)->{STDOUT}});
   my $keys = {};
   my @groups = split(/\+ \d+\.\d+/, $output);
   foreach my $group (@groups) {
@@ -386,7 +386,7 @@ sub checkKeySanity() {
     #}
     #close FH;
 
-    my $output = shift(@{CertNanny::Util->runCommand(\@cmd)->{OUTPUT}});
+    my $output = join("", @{CertNanny::Util->runCommand(\@cmd)->{STDOUT}});
     $output =~ m/Modulus=([A-F0-9]+)$/;
     my $modulus = $1;
     unless ($modulus) {

@@ -219,49 +219,45 @@ sub getCert {
 
   my $rc = undef;
   
-  if (!defined $args{CERTFILE} && !defined $args{CERTDATA}) {
-    $args{CERTFILE} = $entry->{location}
-  }
-  
-  if (defined $args{CERTFILE} && defined $args{CERTDATA}) {
-    $rc = CertNanny::Logging->error('MSG', "getCert(): Either CERTFILE or CERTDATA may be defined.");
-  }
-  
-  if ($entry->{location} eq 'rootonly') {
-    $rc = CertNanny::Logging->info('MSG', "getCert(): rootonly keystore with no EE no certificate ");
-  }
+  if (defined($self->{CERT}->{CERTFORMAT})) {
+    $rc = $self->{CERT};
+  } else {
+    if (!defined $args{CERTFILE} && !defined $args{CERTDATA}) {$args{CERTFILE} = $entry->{location}}
+    if (defined $args{CERTFILE} && defined $args{CERTDATA}) {$rc = CertNanny::Logging->error('MSG', "getCert(): Either CERTFILE or CERTDATA may be defined.")}
+    if ($entry->{location} eq 'rootonly') {$rc = CertNanny::Logging->info('MSG', "getCert(): rootonly keystore with no EE no certificate ")}
   
 
-  if (!$rc) {
-    my ($certData, $certFormat, $certRest) = ('', '', '');
-    if (defined $args{CERTFILE}) {
-      $certData = CertNanny::Util->readFile($args{CERTFILE});
-      if (!defined $certData) {
-        $rc = CertNanny::Logging->error('MSG', "getCert(): Could not read instance certificate file $args{CERTFILE}");
-        CertNanny::Logging->debug('MSG', (eval 'ref(\$self)' ? "End " : "Start ") . (caller(0))[3] . " get main certificate from keystore");
-      }
-    } else {
-      $certData = $args{CERTDATA};
-    }
-  
     if (!$rc) {
-      local $/ = undef;
-      if ($certData =~ m/(-----BEGIN CERTIFICATE-----.*?-----END CERTIFICATE-----)(.*?)[\n\r]*$/s) {
-        chomp($certData = $1);
-        chomp($certRest = $2);
-        $certFormat = 'PEM';
+      my ($certData, $certFormat, $certRest) = ('', '', '');
+      if (defined $args{CERTFILE}) {
+        $certData = CertNanny::Util->readFile($args{CERTFILE});
+        if (!defined $certData) {
+          $rc = CertNanny::Logging->error('MSG', "getCert(): Could not read instance certificate file $args{CERTFILE}");
+          CertNanny::Logging->debug('MSG', (eval 'ref(\$self)' ? "End " : "Start ") . (caller(0))[3] . " get main certificate from keystore");
+        }
       } else {
-        # $cerFormat = CertNanny::Util->getCertFormat($certData);
-        $certFormat = 'DER';
+        $certData = $args{CERTDATA};
       }
-      $rc = {CERTDATA   => $certData,
-             CERTFORMAT => $certFormat,
-             CERTREST   => $certRest};
+  
+      if (!$rc) {
+        local $/ = undef;
+        if ($certData =~ m/(-----BEGIN CERTIFICATE-----.*?-----END CERTIFICATE-----)(.*?)[\n\r]*$/s) {
+          chomp($certData = $1);
+          chomp($certRest = $2);
+          $certFormat = 'PEM';
+        } else {
+          # $cerFormat = CertNanny::Util->getCertFormat($certData);
+          $certFormat = 'DER';
+        }
+        $rc = {CERTDATA   => $certData,
+               CERTFORMAT => $certFormat,
+               CERTREST   => $certRest};
+      } else {
+        $rc = undef;
+      }
     } else {
       $rc = undef;
     }
-  } else {
-    $rc = undef;
   }
 
   CertNanny::Logging->debug('MSG', (eval 'ref(\$self)' ? "End " : "Start ") . (caller(0))[3] . " get main certificate from keystore");
@@ -651,7 +647,7 @@ sub createRequest {
     #for inital enrollment we override the DN to use the configured desiered DN rather then the preset enrollment certificates DN
     if ($entry->{INITIALENROLLEMNT} eq 'yes') {
      # $DN = $entry->{initialenroll}->{subject};
-       $DN = $config->get("keystore.$entryname.initialenroll.subject");
+      $DN = $config->get("keystore.$entryname.initialenroll.subject");
     } else {
       $DN = $self->{CERT}->{CERTINFO}->{SubjectName};
     }
@@ -1474,8 +1470,6 @@ sub installCertChain {
 } ## end sub installRoots
 
 
-
-
 sub _createLocalCerts {
   ###########################################################################
   #
@@ -1527,7 +1521,7 @@ sub _createLocalCerts {
     $cmdTemplate = '"' . $self->{OPTIONS}->{CONFIG}->get('cmd.openssl', 'CMD') . '" x509 -subject_hash -subject_hash_old -noout -in "%s"';
 
     foreach $certFile (@certFileList) {
-      chomp(@subject_hashs = @{CertNanny::Util->runCommand(sprintf($cmdTemplate, $certFile))->{OUTPUT}});
+      chomp(@subject_hashs = @{CertNanny::Util->runCommand(sprintf($cmdTemplate, $certFile))->{STDOUT}});
       if (@subject_hashs) {
         CertNanny::Logging->info('MSG', "Valid certificate found: $certFile");
 

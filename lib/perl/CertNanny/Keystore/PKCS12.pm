@@ -143,7 +143,7 @@ sub getCert {
         @cmd = $self->_buildOpenSSLPKCS12Cmd('-nokeys'  => '-nokeys', 
                                              '-clcerts' => '-clcerts');
       }
-      $certData = shift(@{CertNanny::Util->runCommand(\@cmd)->{OUTPUT}});
+      $certData = join("", @{CertNanny::Util->runCommand(\@cmd)->{STDOUT}});
       if (!$certData) {
         $rc = CertNanny::Logging->error('MSG', "getCert(): Could not read instance certificate file $args{CERTFILE}");
       }
@@ -237,7 +237,7 @@ sub getKey {
   my $rc = undef;
 
   my @cmd = $self->_buildOpenSSLPKCS12Cmd('-nocerts' => '-nocerts');
-  my $data = shift(@{CertNanny::Util->runCommand(\@cmd)->{OUTPUT}});
+  my $data = join("", @{CertNanny::Util->runCommand(\@cmd)->{STDOUT}});
   
   if ($data =~ s{ \A .* (?=-----BEGIN) }{}xms) {
     $rc = {KEYDATA   => $data,

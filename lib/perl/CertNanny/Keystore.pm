@@ -86,8 +86,8 @@ sub new {
   $self->{OPTIONS}->{ENTRYNAME}      = $entryname;
 
   croak "No tmp directory specified"            unless defined $self->{OPTIONS}->{'path.tmpdir'};
-  croak "No openssl binary configured or found" unless (defined $self->{OPTIONS}->{'cmd.openssl'});
-  croak "No sscep binary configured or found"   unless (defined $self->{OPTIONS}->{'cmd.sscep'});
+  croak "No openssl binary configured or found" unless defined $self->{OPTIONS}->{'cmd.openssl'};
+  croak "No sscep binary configured or found"   unless defined $self->{OPTIONS}->{'cmd.sscep'};
 
   # dynamically load keystore instance module
   eval "require CertNanny::Keystore::${type}";
@@ -170,9 +170,7 @@ sub DESTROY {
 
   return undef unless (exists $self->{TMPFILE});
 
-  foreach my $file (@{$self->{TMPFILE}}) {
-    unlink $file;
-  }
+  foreach my $file (@{$self->{TMPFILE}}) {unlink $file}
 } ## end sub DESTROY
 
 
@@ -757,17 +755,13 @@ sub k_convertKey {
   }
   push(@cmd, '-passout', 'env:PASSOUT') if ($ENV{PASSOUT} ne "");
 
-  my $cmd = join(' ', @cmd);
-
-  CertNanny::Logging->debug('MSG', "Execute: <" . $cmd . ">");
-
   ### PASSIN: $ENV{PASSOUT}
   ### PASSOUT: $ENV{PASSOUT}
-  $output->{KEYDATA} = `$cmd`;
+  $output->{KEYDATA} = join('', @{CertNanny::Util->runCommand(\@cmd)->{STDOUT}});
 
   delete $ENV{PASSIN};
   delete $ENV{PASSOUT};
-  unlink $infile if defined $infile;
+  CertNanny::Util->forgetTmpFile('FILE', $infile);
 
   if ($? != 0) {
     CertNanny::Logging->error('MSG', "k_convertKey(): Could not convert key");
@@ -859,9 +853,7 @@ WRITEFILES:
   # error checking for temporary file creation
   if ($error) {
     # something went wrong, clean up and bail out
-    foreach my $entry (@args) {
-      unlink $entry->{TMPFILENAME};
-    }
+    foreach my $entry (@args) {unlink $entry->{TMPFILENAME}}
     CertNanny::Logging->error('MSG', "k_saveInstallFile(): could not create new file(s)");
     return undef;
   }
@@ -876,9 +868,7 @@ WRITEFILES:
     my $backupfile = $file . ".backup";
 
     # remove already existing backup file
-    if (-e $backupfile) {
-      unlink $backupfile;
-    }
+    if (-e $backupfile) {unlink $backupfile}
 
     # check if it still persists
     if (-e $backupfile) {
@@ -997,9 +987,9 @@ sub k_renew {
   $self->_renewalState("initial") unless defined $self->_renewalState();
   my $laststate = "n/a";
   
-  CertNanny::Logging->info('MSG', "Certificate Information:\n\tSubjectName: " . $self->{CERT}->{CERTINFO}->{SubjectName}  . "\n\t" .
-                                                              "Serial: "      . $self->{CERT}->{CERTINFO}->{SerialNumber} . "\n\t" . 
-                                                              "Issuer: "      . $self->{CERT}->{CERTINFO}->{IssuerName});
+  CertNanny::Logging->info('MSG', "Certificate Information: SubjectName: " . $self->{CERT}->{CERTINFO}->{SubjectName});
+  CertNanny::Logging->info('MSG', "                         Serial: "      . $self->{CERT}->{CERTINFO}->{SerialNumber}); 
+  CertNanny::Logging->info('MSG', "                         Issuer: "      . $self->{CERT}->{CERTINFO}->{IssuerName});
 
   while ($laststate ne $self->_renewalState()) {
     $laststate = $self->_renewalState();
@@ -1941,7 +1931,7 @@ sub _sendRequest {
   my $scepchecksubjectname ; 
   if(defined $entry->{scepchecksubjectname}){
     $scepchecksubjectname = $entry->{scepchecksubjectname}; 
-  }else{
+  } else {
     $scepchecksubjectname = 'no';
   }
 
@@ -2046,20 +2036,24 @@ sub _sendRequest {
     CertNanny::Logging->debug('MSG', "Old certificate: $oldcertfile");
   } ## end if ($scepsignaturekey ...)
 
-  my %options = (sscep_enroll => {PrivateKeyFile => $requestkeyfile,
-                                  CertReqFile    => $requestfile,
-                                  SignKeyFile    => $oldkeyfile,
-                                  SignCertFile   => $oldcertfile,
-                                  LocalCertFile  => $newcertfile},
-                 sscep        => {CACertFile => $scepracert,});
+  my %enrollerOptions = (sscep_enroll => {PrivateKeyFile => $requestkeyfile,
+                                          CertReqFile    => $requestfile,
+                                          SignKeyFile    => $oldkeyfile,
+                                          SignCertFile   => $oldcertfile,
+                                          LocalCertFile  => $newcertfile},
+                         sscep        => {CACertFile => $scepracert,});
 
   my $enroller = $self->k_getEnroller();
-  $enroller->enroll(%options);
-
+  my %sscepInfo = $enroller->enroll(%enrollerOptions);
+  $self->{STATE}->{DATA}->{SCEP}->{HTMLSTATUS}    = $sscepInfo{HTMLSTATUS}    if defined($sscepInfo{HTMLSTATUS});
+  $self->{STATE}->{DATA}->{SCEP}->{SSCEPSTATUS}   = $sscepInfo{SSCEPSTATUS}   if defined($sscepInfo{SSCEPSTATUS});
+  $self->{STATE}->{DATA}->{SCEP}->{PKISTATUS}     = $sscepInfo{PKISTATUS}     if defined($sscepInfo{PKISTATUS});
+  $self->{STATE}->{DATA}->{SCEP}->{TRANSACTIONID} = $sscepInfo{TRANSACTIONID} if defined($sscepInfo{TRANSACTIONID});
+  
   unless ($self->_hasEngine()) {
-    unlink $requestkeyfile;
-    unlink $oldkeyfile  if (defined $oldkeyfile);
-    unlink $oldcertfile if (defined $oldcertfile);
+    CertNanny::Util->forgetTmpFile('FILE', $requestkeyfile);
+    CertNanny::Util->forgetTmpFile('FILE', $oldkeyfile);
+    CertNanny::Util->forgetTmpFile('FILE', $oldcertfile);
   }
 
   if (-r $newcertfile) {
@@ -2165,8 +2159,8 @@ sub _sendRequest {
         return 0;
       } else {
         CertNanny::Logging->debug('MSG', "Completed clean up after initial enrollment and p12 import.");
-        if (   $entry->{initialenroll}->{auth}->{mode} eq "password"
-            or $entry->{initialenroll}->{auth}->{mode} eq "anonymous") {
+        if ($entry->{initialenroll}->{auth}->{mode} eq "password" or
+            $entry->{initialenroll}->{auth}->{mode} eq "anonymous") {
 
           my $selfsigncert = $entryname . "-selfcert.pem";
           my $outCert = File::Spec->catfile($entry->{statedir}, $selfsigncert);
