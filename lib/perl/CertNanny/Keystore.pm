@@ -1945,13 +1945,13 @@ sub _sendRequest {
 
   CertNanny::Logging->debug('MSG', "request:              <$requestfile>");
   CertNanny::Logging->debug('MSG', "keyfile:              <$requestkeyfile>");
-  CertNanny::Logging->debug('MSG', "sscep:                <" . $config->get('cmd.sscep')) . ">";
-  CertNanny::Logging->debug('MSG', "scepurl:              <" . $entry->{enroll}->{sscep}->{URL}) . ">";
-  CertNanny::Logging->debug('MSG', "scepsignaturekey:     <$scepsignaturekey") . ">";
-  CertNanny::Logging->debug('MSG', "scepchecksubjectname: <" . $scepchecksubjectname) . ">";
+  CertNanny::Logging->debug('MSG', "sscep:                <" . $config->get('cmd.sscep') . ">");
+  CertNanny::Logging->debug('MSG', "scepurl:              <" . $entry->{enroll}->{sscep}->{URL} . ">");
+  CertNanny::Logging->debug('MSG', "scepsignaturekey:     <$scepsignaturekey" . ">");
+  CertNanny::Logging->debug('MSG', "scepchecksubjectname: <" . $scepchecksubjectname . ">");
   CertNanny::Logging->debug('MSG', "scepracert:           <$scepracert>");
   CertNanny::Logging->debug('MSG', "newcertfile:          <$newcertfile>");
-  CertNanny::Logging->debug('MSG', "openssl:              <" . $options->{'cmd.openssl'}) . ">";
+  CertNanny::Logging->debug('MSG', "openssl:              <" . $options->{'cmd.openssl'} . ">");
   my $newkey;
 
   unless ($self->_hasEngine()) {
