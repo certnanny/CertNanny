@@ -757,13 +757,14 @@ sub k_convertKey {
 
   ### PASSIN: $ENV{PASSOUT}
   ### PASSOUT: $ENV{PASSOUT}
-  $output->{KEYDATA} = join('', @{CertNanny::Util->runCommand(\@cmd)->{STDOUT}});
-
+  CertNanny::Logging->error('MSG', $ENV{PASSIN});
+  my $result = CertNanny::Util->runCommand(\@cmd);
+  $output->{KEYDATA}   = join('', @{$result->{STDOUT}});
   delete $ENV{PASSIN};
   delete $ENV{PASSOUT};
   CertNanny::Util->forgetTmpFile('FILE', $infile);
 
-  if ($? != 0) {
+  if ($result->{RC} != 0) {
     CertNanny::Logging->error('MSG', "k_convertKey(): Could not convert key");
     return undef;
   }

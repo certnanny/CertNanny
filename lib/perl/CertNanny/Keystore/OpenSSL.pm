@@ -1572,7 +1572,7 @@ sub _createLocalCerts {
               if (File::Copy::copy($certFile, $target)) {
                 CertNanny::Logging->info('MSG', "Certificate $certFile copied to $target");
               } else {
-                CertNanny::Logging->emergency('MSG', "File creation error: $certFile link/copy to $target");
+                CertNanny::Logging->error('MSG', "File creation error: $certFile link/copy to $target");
                 $rc = 1;
               }
             }

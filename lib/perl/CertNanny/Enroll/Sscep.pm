@@ -102,24 +102,28 @@ sub readConfig {
 } ## end sub readConfig
 
 
-sub execute {
-  my $self      = shift;
-  my $operation = shift;
-
-  my @cmd = (CertNanny::Util->osq("$self->{cmd}"), $operation, '-f', CertNanny::Util->osq("$self->{config_filename}"));
-
-  my $cmd = join(' ', @cmd);
-  CertNanny::Logging->debug('MSG', "Exec: $cmd in " . getcwd());
-  open FH, "$cmd |" or die "Couldn't execute $cmd: $!\n";
-  while (defined(my $line = <FH>)) {
-    chomp($line);
-    CertNanny::Logging->info('STR', "$line\n");
+sub getSscepInfo {
+  my $self = shift;
+  my %args = (@_);
+  
+  my %sscepInfo;
+  
+  $sscepInfo{RC} = $args{RESULT}->{RC};
+ 
+  foreach my $txt (@{$args{RESULT}->{STDOUT}}) {
+    chomp($txt);
+    CertNanny::Logging->verbose('MSG', $txt);
+    if ($txt =~ /^.*transaction id: (.*)$/)             {$sscepInfo{TRANSACTIONID} = $1}
+    if ($txt =~ /^.*server returned status code (.*)$/) {$sscepInfo{HTMLSTATUS}    = $1}
+    if ($txt =~ /^.*pkistatus: (.*)$/)                  {$sscepInfo{PKISTATUS}    = $1}
   }
-  close FH;
-  my $exitval = $? >> 8;
-  CertNanny::Logging->debug('MSG', "sscep returned $exitval\n");
-  return $exitval;
-} ## end sub execute
+  CertNanny::Logging->debug_sscep('MSG', "Sscep RC:             " . $sscepInfo{RC})            if (defined($sscepInfo{RC}));
+  CertNanny::Logging->debug_sscep('MSG', "Sscep HTML Status:    " . $sscepInfo{HTMLSTATUS})    if (defined($sscepInfo{HTMLSTATUS}));
+  CertNanny::Logging->debug_sscep('MSG', "Sscep Transaction ID: " . $sscepInfo{TRANSACTIONID}) if (defined($sscepInfo{TRANSACTIONID}));
+  CertNanny::Logging->debug_sscep('MSG', "Sscep PKI Status:     " . $sscepInfo{PKISTATUS})     if (defined($sscepInfo{PKISTATUS}));
+
+  return %sscepInfo;
+} ## end sub getSscepInfo
 
 
 sub enroll {
@@ -159,17 +163,7 @@ sub enroll {
     my @cmd = (CertNanny::Util->osq("$self->{cmd}"), "enroll", '-f', CertNanny::Util->osq("$self->{config_filename}"));
     my $result = CertNanny::Util->runCommand(\@cmd);
     # $rc = $self->("enroll");
-    $sscepInfo{RC} = $result->{RC};
- 
-    my $logLevel = CertNanny::Logging->logLevel();
-    foreach my $txt (@{$result->{STDOUT}}) {
-      chomp($txt);
-      CertNanny::Logging->debug('MSG', $txt) if ($logLevel > 4);
-      if ($txt =~ /^.*transaction id: (.*)$/)             {$sscepInfo{TRANSACTIONID} = $1}
-      if ($txt =~ /^.*server returned status code (.*)$/) {$sscepInfo{HTMLSTATUS}    = $1}
-      if ($txt =~ /^.*pkistatus: (.*)$/)                  {$sscepInfo{PKISTATUS}    = $1}
-    }
- 
+    %sscepInfo = $self->getSscepInfo('RESULT', $result);
     eval {alarm 0};                            # eval not supported in perl 5.7.1 on win32
     CertNanny::Logging->info('MSG', "Return code: $sscepInfo{RC}");
   };
@@ -227,6 +221,9 @@ sub writeConfigFile {
 sub getCA {
   my $self   = shift;
   my $config = shift;
+  
+  my %sscepInfo;
+  
   unless (defined $self->{certs}->{RACERT} and defined $self->{certs}->{CACERTS}) {
     
     my $olddir = getcwd();
@@ -254,17 +251,8 @@ sub getCA {
     $self->writeConfigFile();
     my @cmd = (CertNanny::Util->osq("$self->{cmd}"), "getca", '-f', CertNanny::Util->osq("$self->{config_filename}"));
     my $result = CertNanny::Util->runCommand(\@cmd);
-
-    my $logLevel = CertNanny::Logging->logLevel();
-    foreach my $txt (@{$result->{STDOUT}}) {
-      chomp($txt);
-      CertNanny::Logging->debug('MSG', $txt) if ($logLevel > 5);
-    }
-
-    # if ($self->execute("getca") != 0) {
-    if ($result->{RC} != 0) {
-      return undef;
-    }
+    %sscepInfo = $self->getSscepInfo('RESULT', $result);
+    if ($result->{RC} != 0) {return undef}
 
     my $scepracert = File::Spec->catfile($self->{certdir}, $config->{sscep}->{CACertFile} . "-0");
 
@@ -311,6 +299,8 @@ sub getNextCA {
   #
   my $self                = shift;
   my $ChainRootCACertFile = shift;
+  
+  my %sscepInfo;
 
   my $scepCertChain;
   my $pemchain;
@@ -337,14 +327,7 @@ sub getNextCA {
 
   my @cmd = (CertNanny::Util->osq("$self->{cmd}"), "getnextca", '-f', CertNanny::Util->osq("$self->{config_filename}"));
   my $result = CertNanny::Util->runCommand(\@cmd);
- 
-  my $logLevel = CertNanny::Logging->logLevel();
-  foreach my $txt (@{$result->{STDOUT}}) {
-    chomp($txt);
-    CertNanny::Logging->debug('MSG', $txt) if ($logLevel > 5);
-  }
-
-  # if ($self->execute("getnextca") != 0) {
+  %sscepInfo = $self->getSscepInfo('RESULT', $result);
   if ($result->{RC} != 0) {
     CertNanny::Logging->debug('MSG', "error executing CertNanny::Enroll::Scep::getNextCA - may be unavailable currently or not supported by target SCEP server");
     return undef;

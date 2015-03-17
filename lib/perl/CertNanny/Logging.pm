@@ -351,7 +351,9 @@ sub _print {
   #              'warning'   => 4,
                 'notice'    => 2,
                 'info'      => 3,
-                'debug'     => 4);
+                'debug'     => 4,
+                'sscep'     => 5,
+                'verbose'   => 6);
 
   # SYSLOG Levels
   # my %level = ('emergency' => 0,
@@ -625,6 +627,28 @@ sub debug {
   my %args = (@_);
 
   $self->Out('PRIO', 'debug', 
+             %args);
+  
+  return 0
+} ## end sub debug
+
+
+sub debug_sscep {
+  my $self = (shift)->getInstance();
+  my %args = (@_);
+
+  $self->Out('PRIO', 'sscep', 
+             %args);
+  
+  return 0
+} ## end sub debug
+
+
+sub verbose {
+  my $self = (shift)->getInstance();
+  my %args = (@_);
+
+  $self->Out('PRIO', 'verbose', 
              %args);
   
   return 0

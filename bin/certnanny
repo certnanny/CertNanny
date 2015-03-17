@@ -321,7 +321,7 @@ Executes the hook HOOK for the keystore KEYSTORE. The --keystore option is manda
                         to LEVEL.
                         If LEVEL is set to a string (i.E. --debug C1F5S2),
                         there will be different debug levels for targets
-                        console (C1 -> level 1), file (f5 -> level5) and
+                        console (C1 -> level 1), file (f5 -> level 5) and
                         syslog (s2-> level 2).
   --verbose             Generate more information about the operations perfor-
                         med by CertNanny (equal debug level 6). The verbose 

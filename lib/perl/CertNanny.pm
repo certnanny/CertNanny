@@ -158,7 +158,9 @@ sub _iterate_entries {
   foreach my $entryname (keys %{$self->{ITEMS}}) {    # Instantiate every keystore, that is configured
     CertNanny::Util->setVariable('NAME',  'KEYSTORE', 
                                  'VALUE', $entryname);
-    CertNanny::Logging->debug('MSG', "Checking keystore <$entryname>");
+    CertNanny::Logging->debug('MSG', "-------------------------------------------");
+    CertNanny::Logging->debug('MSG', "Working on keystore <$entryname>");
+    CertNanny::Logging->debug('MSG', "-------------------------------------------");
     my $keystore = CertNanny::Keystore->new(CONFIG    => $self->{CONFIG},              # give it the whole configuration
                                             ENTRY     => $self->{ITEMS}->{$entryname}, # all keystore parameters from configfile
                                             ENTRYNAME => $entryname);                  # and the keystore name from configfile
@@ -336,43 +338,52 @@ sub do_check {
   my $entryname = $options->{ENTRYNAME};
   my $config    = $options->{CONFIG};
 
+  my $rc = undef;
 
   if($options->{ENTRY}->{'location'} eq 'rootonly') {
     CertNanny::Logging->debug('MSG', "rootonly keystore no EE Certificate to parse");
-    return 1;
+    $rc = 1;
   }
 
-  $keystore->{CERT} = $instance->getCert();
+  if (!$rc) {
+    $keystore->{CERT} = $instance->getCert();
 
-  if (defined($keystore->{CERT})) {
-    $keystore->{CERT}->{CERTINFO} = CertNanny::Util->getCertInfoHash(%{$keystore->{CERT}});
+    if (defined($keystore->{CERT})) {
+      $keystore->{CERT}->{CERTINFO} = CertNanny::Util->getCertInfoHash(%{$keystore->{CERT}});
 
-    if (!$instance->k_checkValidity(0)) {
-      CertNanny::Logging->error('MSG', "Certificate has expired. No automatic renewal can be performed.");
-      CertNanny::Logging->debug('MSG', (eval 'ref(\$self)' ? "End " : "Start ") . (caller(0))[3] . " Check");
-      return $instance->k_executeHook($config->get("keystore.$entryname.hook.warnexpired"));
-      #return 1;
-    }
+      if (!$instance->k_checkValidity(0)) {
+        CertNanny::Logging->debug('MSG', "---------------------------------------------------------------");
+        CertNanny::Logging->error('MSG', "Certificate has expired. No automatic renewal can be performed.");
+        CertNanny::Logging->debug('MSG', "---------------------------------------------------------------");
+        $rc = $instance->k_executeHook($config->get("keystore.$entryname.hook.warnexpired"));
+      } else {
+        $rc = 1;
+        if (!$instance->k_checkValidity($self->{ITEMS}->{$args{ENTRYNAME}}->{autorenew_days})) {
+          CertNanny::Logging->debug('MSG', "---------------------------------------------------------------------------------");
+          CertNanny::Logging->info('MSG', "Certificate is to be scheduled for automatic renewal ($self->{ITEMS}->{$args{ENTRYNAME}}->{autorenew_days}; days prior to expiry)");
+          CertNanny::Logging->debug('MSG', "---------------------------------------------------------------------------------");
+        } else {
+          CertNanny::Logging->debug('MSG', "---------------------------------------------------------------------------------------");
+          CertNanny::Logging->info('MSG', "Certificate has not been scheduled for automatic renewal ($self->{ITEMS}->{$args{ENTRYNAME}}->{autorenew_days}; days prior to expiry)");    
+          CertNanny::Logging->debug('MSG', "---------------------------------------------------------------------------------------");
+        }
 
-    if (!$instance->k_checkValidity($self->{ITEMS}->{$args{ENTRYNAME}}->{autorenew_days})) {
-      CertNanny::Logging->info('MSG', "Certificate is to be scheduled for automatic renewal ($self->{ITEMS}->{$args{ENTRYNAME}}->{autorenew_days}; days prior to expiry)");
+        if (!$instance->k_checkValidity($self->{ITEMS}->{$args{ENTRYNAME}}->{warnexpiry_days})) {
+          CertNanny::Logging->debug('MSG', "---------------------------------------------------------------------------------");
+          CertNanny::Logging->notice('MSG', "WARNEXPIRY Certificate is valid for less than $self->{ITEMS}->{$args{ENTRYNAME}}->{warnexpiry_days} days");
+          CertNanny::Logging->debug('MSG', "---------------------------------------------------------------------------------");
+          $rc = $instance->k_executeHook($config->get("keystore.$entryname.hook.warnexpiry"));
+        }
+      }
     } else {
-      CertNanny::Logging->info('MSG', "Certificate has not been scheduled for automatic renewal ($self->{ITEMS}->{$args{ENTRYNAME}}->{autorenew_days}; days prior to expiry)");    
+      CertNanny::Logging->debug('MSG', "------------------------------------");
+      CertNanny::Logging->error('MSG', "Could not parse instance certificate");
+      CertNanny::Logging->debug('MSG', "------------------------------------");
     }
-
-    if (!$instance->k_checkValidity($self->{ITEMS}->{$args{ENTRYNAME}}->{warnexpiry_days})) {
-      CertNanny::Logging->notice('MSG', "WARNEXPIRY Certificate is valid for less than $self->{ITEMS}->{$args{ENTRYNAME}}->{warnexpiry_days} days");
-      CertNanny::Logging->debug('MSG', (eval 'ref(\$self)' ? "End " : "Start ") . (caller(0))[3] . " Check");
-      return $instance->k_executeHook($config->get("keystore.$entryname.hook.warnexpiry"));
-#      $keystore->{INSTANCE}->k_warnExpiryHook();
-    }
-  } else {
-    CertNanny::Logging->error('MSG', "Could not parse instance certificate");
-    CertNanny::Logging->debug('MSG', (eval 'ref(\$self)' ? "End " : "Start ") . (caller(0))[3] . " Check");
-    return undef;
   }
+
   CertNanny::Logging->debug('MSG', (eval 'ref(\$self)' ? "End " : "Start ") . (caller(0))[3] . " Check");
-  return 1;
+  return $rc;
 } ## end sub do_check
 
 
@@ -404,10 +415,14 @@ sub do_renew {
   }
 
   if($self->{ITEMS}->{$entryname}->{'location'} eq 'rootonly') {
+    CertNanny::Logging->debug('MSG', "---------------------------------------------------------------------------------");
     CertNanny::Logging->debug('MSG', "rootonly keystore skip certificfate check and renewal");
+    CertNanny::Logging->debug('MSG', "---------------------------------------------------------------------------------");
   } else {
     if (!$instance->k_checkValidity(0)) {
+      CertNanny::Logging->debug('MSG', "---------------------------------------------------------------------------------");
       CertNanny::Logging->error('MSG', "Certificate has expired. No automatic renewal can be performed.");
+      CertNanny::Logging->debug('MSG', "---------------------------------------------------------------------------------");
       CertNanny::Logging->debug('MSG', (eval 'ref(\$self)' ? "End " : "Start ") . (caller(0))[3] . " Renew");
       return $instance->k_executeHook($config->get("keystore.$entryname.hook.warnexpired"));
     }
@@ -418,20 +433,28 @@ sub do_renew {
       $instance->k_renew();
     } else {
       if ($self->getOption('force')) {
+        CertNanny::Logging->debug('MSG', "---------------------------------------------------------------------------------");
         CertNanny::Logging->debug('MSG', "Renewal forced (Certificate is still valid for more than $self->{ITEMS}->{$entryname}->{autorenew_days} days)");
+        CertNanny::Logging->debug('MSG', "---------------------------------------------------------------------------------");
         # schedule automatic renewal
         CertNanny::Util->backoffTime($self->{CONFIG});
         $instance->k_renew();
       } else {
+        CertNanny::Logging->debug('MSG', "---------------------------------------------------------------------------------");
         CertNanny::Logging->debug('MSG', "Certificate is still valid for more than $self->{ITEMS}->{$entryname}->{autorenew_days} days");
+        CertNanny::Logging->debug('MSG', "---------------------------------------------------------------------------------");
       }
     }
 
     if (!$instance->k_checkValidity($self->{ITEMS}->{$entryname}->{warnexpiry_days})) {
       if ($self->getOption('force')) {
+        CertNanny::Logging->debug('MSG', "---------------------------------------------------------------------------------");
         CertNanny::Logging->notice('MSG', "Renewal forced (Certificate is valid for less than $self->{ITEMS}->{$entryname}->{warnexpiry_days} days)");
+        CertNanny::Logging->debug('MSG', "---------------------------------------------------------------------------------");
       } else {
+        CertNanny::Logging->debug('MSG', "---------------------------------------------------------------------------------");
         CertNanny::Logging->notice('MSG', "Certificate is valid for less than $self->{ITEMS}->{$entryname}->{warnexpiry_days} days");
+        CertNanny::Logging->debug('MSG', "---------------------------------------------------------------------------------");
         $instance->k_executeHook($config->get("keystore.$entryname.hook.warnexpiry"));
         # $instance->k_warnExpiryHook();
       }

@@ -1124,10 +1124,11 @@ sub convertCert {
     push(@cmd, ('-outform', $args{OUTFORMAT}));
 
     $output->{CERTFORMAT} = $args{OUTFORMAT};
-    $output->{CERTDATA}   = join("", @{CertNanny::Util->runCommand(\@cmd)->{STDOUT}});
+    my $result = CertNanny::Util->runCommand(\@cmd);
+    $output->{CERTDATA}   = join("", @{$result->{STDOUT}});
     CertNanny::Util->forgetTmpFile('FILE', $infile);
 
-    if ($? != 0) {
+    if ($result->{RC} != 0) {
       CertNanny::Logging->error('MSG', "convertCert(): Could not convert certificate");
       return undef;
     }

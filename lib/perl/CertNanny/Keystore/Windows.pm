@@ -984,13 +984,12 @@ sub _installCertchain() {
       }
 
       my @cmd = ('certutil', '-addstore', 'root', CertNanny::Util->osq("$rootToInstall"));
-      my $cmd = join(" ", @cmd);
-
-      CertNanny::Logging->debug('MSG', "Execute: $cmd");
-      my $cmd_output = `$cmd`;
+      my $result = CertNanny::Util->runCommand(\@cmd);
+      my $cmd_output =  join("", @{$result->{STDOUT}});
+      
       CertNanny::Logging->debug('MSG', "certreq output:\n$cmd_output");
-      if ($? != 0) {
-        CertNanny::Logging->error('MSG', "_installCertchain(): Root Certificate could not be imported. Output of command $cmd was:\n$cmd_output");
+      if ($result->{RC} != 0) {
+        CertNanny::Logging->error('MSG', "_installCertchain(): Root Certificate could not be imported. Output of command ".join(' ', @cmd)." was:\n$cmd_output");
         return undef;
       }
 
@@ -1011,13 +1010,11 @@ sub _installCertchain() {
       }
 
       my @cmd = ('certutil', '-addstore', 'CA', CertNanny::Util->osq("$CAToInstall"));
-      my $cmd = join(" ", @cmd);
-
-      CertNanny::Logging->debug('MSG', "Execute: $cmd");
-      my $cmd_output = `$cmd`;
-      CertNanny::Logging->debug('MSG', "certreq output:\n$cmd_output");
-      if ($? != 0) {
-        CertNanny::Logging->error('MSG', "_installCertchain(): Root Certificate could not be imported. Output of command $cmd was:\n$cmd_output");
+      my $result = CertNanny::Util->runCommand(\@cmd);
+      my $cmd_output =  join("", @{$result->{STDOUT}});
+      
+      if ($result->{RC} != 0) {
+        CertNanny::Logging->error('MSG', "_installCertchain(): Root Certificate could not be imported. Output of command ".join(' ', @cmd)." was:\n$cmd_output");
         return undef;
       }
 

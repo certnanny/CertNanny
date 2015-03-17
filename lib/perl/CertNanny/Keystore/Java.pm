@@ -103,9 +103,10 @@ sub new {
   # optional alias defaults to first key
   if (!defined $entry->{alias}) {
     @cmd = $self->_buildKeytoolCmd($entry->{location}, '-list');
-    @keys = @{CertNanny::Util->runCommand(\@cmd)->{STDOUT}};
+    my $result = CertNanny::Util->runCommand(\@cmd);
+    @keys = @{$result->{STDOUT}};
     @keys = grep m{, keyEntry,$}, @keys;
-    if ($?) {
+    if ($result->{RC}) {
       croak("keystore $entry->{location} cannot be listed");
       return undef;
     }
@@ -208,8 +209,9 @@ sub getCert {
     }
     if ($rc) {
       my @cmd = $self->_buildKeytoolCmd($args{CERTFILE}, '-export', '-rfc', -alias => qq{"$entry->{alias}"});
-      $certData = join("", @{CertNanny::Util->runCommand(\@cmd, HIDEPWD => 1)->{STDOUT}});
-      if ($? || !defined $certData) {
+      my $result = CertNanny::Util->runCommand(\@cmd, HIDEPWD => 1);
+      $certData = join("", @{$result->{STDOUT}});
+      if ($result->{RC} || !defined $certData) {
         chomp($certData);
         CertNanny::Logging->error('MSG', "getCert(): keytool -export failed ($certData)");
         CertNanny::Logging->error('MSG', "getCert(): Could not read instance certificate file $args{CERTFILE}");
