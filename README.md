@@ -49,7 +49,20 @@ You will also find the [issue tracker](https://github.com/certnanny/CertNanny/is
 
 [Official milestones/releases are tracked on GitHub.](https://github.com/certnanny/CertNanny/issues/milestones)
 
-### Version 1.2.0  **(Latest stable release)** 
+### Version 1.3.0  **(Latest stable release)** 
+
+Release date: 2015-03-18
+
+Feature and bugfix release:
+- Display keystore status and contents
+- More control over debug level on the commandline
+- New debug target (syslog)
+- Execution of hooks from the commandline
+- Renewal can be forced on the commandline
+- Cleanup of pending requests
+- Improved debugging
+
+### Version 1.2.0
 
 Release date: 2014-11-04
 
