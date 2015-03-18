@@ -57,13 +57,13 @@ sub new {
 
   $certnanny_to_sap_dir = $entry->{certnanny_to_sap_dir};
   if (!$certnanny_to_sap_dir or !-d $certnanny_to_sap_dir) {
-    CertNanny::Logging->error("keystore.$entryname.certnanny_to_sap_dir is either missing or not a directory, please check.");
+    CertNanny::Logging->error('MSG', "keystore.$entryname.certnanny_to_sap_dir is either missing or not a directory, please check.");
     return undef;
   }
 
   $sap_to_certnanny_dir = $entry->{sap_to_certnanny_dir};
   if (!$sap_to_certnanny_dir or !-d $sap_to_certnanny_dir) {
-    CertNanny::Logging->error("keystore.$entryname.sap_to_certnanny_dir is either missing or not a directory, please check.");
+    CertNanny::Logging->error('MSG', "keystore.$entryname.sap_to_certnanny_dir is either missing or not a directory, please check.");
     return undef;
   }
 
@@ -76,17 +76,17 @@ sub new {
 
   my $filename = $entry->{filename};
   if (!$filename) {
-    CertNanny::Logging->info("keystore.$entryname.filename is not specified, will look into $sap_to_certnanny_dir to find a file");
+    CertNanny::Logging->info('MSG', "keystore.$entryname.filename is not specified, will look into $sap_to_certnanny_dir to find a file");
     opendir(DIR, $sap_to_certnanny_dir);
     my @files = grep !/^\.{1,2}$/, readdir(DIR);
     closedir(DIR);
     if (@files > 1) {
-      CertNanny::Logging->error("More than one file in $sap_to_certnanny_dir, cannot determine correct file. Please specify keystore.$entryname.filename.");
+      CertNanny::Logging->error('MSG', "More than one file in $sap_to_certnanny_dir, cannot determine correct file. Please specify keystore.$entryname.filename.");
       return undef;
     }
 
     if (@files == 1) {
-      CertNanny::Logging->error("No file in $sap_to_certnanny_dir, cannot determine correct file. Please specify keystore.$entryname.filename.");
+      CertNanny::Logging->error('MSG', "No file in $sap_to_certnanny_dir, cannot determine correct file. Please specify keystore.$entryname.filename.");
       return undef;
     }
   } ## end if (!$filename)
@@ -97,34 +97,34 @@ sub new {
   $self->{PKCS12}->{SAP_TO_CERTNANNY_DIR} = $sap_to_certnanny_dir;
 
   if (!$filename or !-r ($p12_xml_file = File::Spec->catfile($sap_to_certnanny_dir, $filename))) {
-    CertNanny::Logging->info("No file present in $sap_to_certnanny_dir, no renewal required.");
+    CertNanny::Logging->info('MSG', "No file present in $sap_to_certnanny_dir, no renewal required.");
     die("Aborting...");
     return undef;
   }
 
   if (-r File::Spec->catfile($certnanny_to_sap_dir, $filename)) {
-    CertNanny::Logging->info("The renewed keystore was not imported yet. Will not continue");
+    CertNanny::Logging->info('MSG', "The renewed keystore was not imported yet. Will not continue");
     die("Aborting...");
     return undef;
   }
 
   my $p12_data_tag = $entry->{p12_data_tag};
   if (!$p12_data_tag) {
-    CertNanny::Logging->info("keystore.$entryname.p12_data_tag no specified, will use default 'P12DATA'");
+    CertNanny::Logging->info('MSG', "keystore.$entryname.p12_data_tag no specified, will use default 'P12DATA'");
     $p12_data_tag = 'P12DATA';
   }
   $entry->{p12_data_tag} = $p12_data_tag;
 
   my $p12_pwd_tag = $entry->{p12_pwd_tag};
   if (!$p12_pwd_tag) {
-    CertNanny::Logging->info("keystore.$entryname.p12_pwd_tag no specified, will use default 'PWD'");
+    CertNanny::Logging->info('MSG', "keystore.$entryname.p12_pwd_tag no specified, will use default 'PWD'");
     $p12_pwd_tag = 'PWD';
   }
   $entry->{p12_pwd_tag} = $p12_pwd_tag;
 
   my $p12_xml = CertNanny::Util->readFile($p12_xml_file);
   if (!$p12_xml) {
-    CertNanny::Logging->error("XML file $p12_xml is empty.");
+    CertNanny::Logging->error('MSG', "XML file $p12_xml is empty.");
     return undef;
   }
   $self->{PKCS12}->{XML} = $p12_xml;
@@ -132,7 +132,7 @@ sub new {
   ##$p12_xml =~ m/.*?\<$p12_data_tag\>([A-Za-z0-9\+\/=]+)\<\/$p12_data_tag\>.*?\<$p12_pwd_tag\>(.*)?\<\/$p12_pwd_tag\>.*/s;
   #$p12_xml =~ m/.*?<$p12_data_tag>([\w\d\s+=\/]+?)<\/$p12_data_tag>.*?<$p12_pwd_tag>(.*?)<\/$p12_pwd_tag>.*?/s;
   if ($p12_xml !~ m/.*?<$p12_data_tag>([\w\d\s+=\/]+?)<\/$p12_data_tag>.*?<$p12_pwd_tag>(.*?)<\/$p12_pwd_tag>.*?/s) {
-    CertNanny::Logging->error("Could not parse XML file. Incorrect format");
+    CertNanny::Logging->error('MSG', "Could not parse XML file. Incorrect format");
     return undef;
   }
 
@@ -141,12 +141,12 @@ sub new {
   $p12_data =~ s/\s//g;
   $p12_data = MIME::Base64::decode($p12_data);
   if (!$p12_data) {
-    CertNanny::Logging->error("Could not retrieve PKCS#12 data.");
+    CertNanny::Logging->error('MSG', "Could not retrieve PKCS#12 data.");
     return undef;
   }
 
   if (!$p12_pwd) {
-    CertNanny::Logging->error("Could not get the PKCS#12 password, cannot parse data");
+    CertNanny::Logging->error('MSG', "Could not get the PKCS#12 password, cannot parse data");
     return undef;
   }
 
@@ -201,7 +201,7 @@ sub getCert {
   # Gets the first certificate found either in CERTDATA or in CERTFILE and 
   # returns it in CERTDATA. 
   # If there is a rest in the input, it is returned in CERTREST
-  CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "Get main certificate from keystore");
+  CertNanny::Logging->debug('MSG', (eval 'ref(\$self)' ? "End " : "Start ") . (caller(0))[3] . " Get main certificate from keystore");
   my $self = shift;
 
   my $options   = $self->{OPTIONS};
@@ -215,7 +215,7 @@ sub getCert {
 
   # use this to signal an error
   if (0) {
-    CertNanny::Logging->error("getCert(): some unspecified error happened");
+    CertNanny::Logging->error('MSG', "getCert(): some unspecified error happened");
     return undef;
   }
 
@@ -226,7 +226,7 @@ sub getCert {
   # 	               CERTDATA   => $certdata,     # if the cert is available in a scalar
   # 	               CERTFORMAT => 'PEM'}         # or 'DER'...
  
-  CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "Get main certificate from keystore");
+  CertNanny::Logging->debug('MSG', (eval 'ref(\$self)' ? "End " : "Start ") . (caller(0))[3] . " Get main certificate from keystore");
   return $instancecert;
 } ## end sub getCert
 
@@ -275,7 +275,7 @@ sub installCert {
   if (!CertNanny::Util->writeFile(DSTFILE    => $new_p12_xml_file, 
                                   SRCCONTENT => $new_p12_xml, 
                                   FORCE => 1)) {
-    CertNanny::Logging->error("Could not create temporary file to store PKCS12 XML file");
+    CertNanny::Logging->error('MSG', "Could not create temporary file to store PKCS12 XML file");
     return undef;
   }
 
@@ -287,21 +287,21 @@ sub installCert {
   # This is the location for the NEW XML
   my $new_xml_file = File::Spec->catfile($certnanny_to_sap_dir, $xml_filename);
   if (!unlink $old_xml_file) {
-    CertNanny::Logging->error("Could not delete old XML file. Will continue to prevent loss of renewed certificate.");
+    CertNanny::Logging->error('MSG', "Could not delete old XML file. Will continue to prevent loss of renewed certificate.");
   }
 
   # temporary file written, move it to the certnanny_to_sap_dir
   if ($^O eq "MSWin32") {
     if (!File::Copy::move($new_p12_xml_file, $new_xml_file)) {
       my $output = $!;
-      CertNanny::Logging->error("Could not move temporary file to $certnanny_to_sap_dir: $output");
+      CertNanny::Logging->error('MSG', "Could not move temporary file to $certnanny_to_sap_dir: $output");
       return undef;
     }
   } else {
     my $output = `mv "$new_p12_xml_file" "$new_xml_file"`;
     if ($?) {
       chomp($output);
-      CertNanny::Logging->error("Could not move temporary file to $certnanny_to_sap_dir: $output");
+      CertNanny::Logging->error('MSG', "Could not move temporary file to $certnanny_to_sap_dir: $output");
       return undef;
     }
   }
@@ -604,7 +604,7 @@ sub _getPKCS12File {
   if (!CertNanny::Util->writeFile(DSTFILE    => $p12_file, 
                                   SRCCONTENT => $p12_data, 
                                   FORCE => 1)) {
-    CertNanny::Logging->error("Could not write temporary PKCS#12 file");
+    CertNanny::Logging->error('MSG', "Could not write temporary PKCS#12 file");
     return undef;
   }
   return $p12_file;

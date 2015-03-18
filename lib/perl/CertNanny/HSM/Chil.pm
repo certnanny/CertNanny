@@ -39,12 +39,12 @@ sub new() {
   $entry_options->{enroll}->{$engine_section}->{dynamic_path} = $self->{OPTIONS}->{ENTRY}->{hsm}->{dynamic_path};
 
   unless (defined $hsm_options->{generatekey} and -x $hsm_options->{generatekey}) {
-    CertNanny::Logging->error("No executable defined or found to generate a key for Chil HSM");
+    CertNanny::Logging->error('MSG', "No executable defined or found to generate a key for Chil HSM");
     return undef;
   }
 
   unless (defined $hsm_options->{key}->{type} and (grep $_ eq $hsm_options->{key}->{type}, @avail_keytypes)) {
-    CertNanny::Logging->error(qq("$hsm_options->{key}->{type} is not an available keytype."));
+    CertNanny::Logging->error('MSG', CertNanny::Util->osq("$hsm_options->{key}->{type} is not an available keytype."));
     return undef;
   }
 
@@ -62,7 +62,7 @@ sub genkey() {
   my $key;
   my @generateopts = ();
   foreach my $param (keys %{$self->{hsm_options}->{key}}) {
-    push(@generateopts, qq("$param=$self->{hsm_options}->{key}->{$param}"));
+    push(@generateopts, CertNanny::Util->osq("$param=$self->{hsm_options}->{key}->{$param}"));
   }
 
   my @cmd;
@@ -84,16 +84,16 @@ sub genkey() {
     # but on installation the new key must replace the old one.
     # The old one should be archived if possible, else overwritten.
     # How do applications do this, if they get a new certificate currently?
-    CertNanny::Logging->error("hwcrhk keys not implemented yet. Aborting...");
+    CertNanny::Logging->error('MSG', "hwcrhk keys not implemented yet. Aborting...");
     return undef;
     $key = $self->{ENTRY}->{location};
     push(@cmd, "ident=$key");
   } ## end else [ if ($self->{hsm_options...})]
   push(@cmd, @generateopts);
 
-  my $rc = CertNanny::Util->runCommand(\@cmd);
+  my $rc = CertNanny::Util->runCommand(\@cmd)->{RC};
   if ($rc != 0) {
-    CertNanny::Logging->error("Could not generate new key in HSM, see logging output.");
+    CertNanny::Logging->error('MSG', "Could not generate new key in HSM, see logging output.");
     return undef;
   }
 
@@ -135,12 +135,12 @@ sub getEngineConfiguration() {
   my $self = shift;
 
   if (CertNanny::Util->staticEngine($self->engineid())) {
-    CertNanny::Logging->debug("getEngineConfiguration(): Engine reports to be statically compiled with OpenSSL, not return a configuration as none should be needed.");
+    CertNanny::Logging->debug('MSG', "getEngineConfiguration(): Engine reports to be statically compiled with OpenSSL, not return a configuration as none should be needed.");
     return undef;
   }
 
   # NYI: Not yet implemented. See Utimaco.pm for reference / help
-  CertNanny::Logging->error("getEngineConfiguration(): Unfortunately, the engine is not static and dynamic loading is not yet supported. Please make a version of OpenSSL with a static engine or implement this.");
+  CertNanny::Logging->error('MSG', "getEngineConfiguration(): Unfortunately, the engine is not static and dynamic loading is not yet supported. Please make a version of OpenSSL with a static engine or implement this.");
   die;
 } ## end sub getEngineConfiguration
 

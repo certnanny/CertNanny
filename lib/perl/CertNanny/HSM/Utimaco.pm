@@ -41,18 +41,18 @@ sub new() {
   }
 
   unless (defined $hsm_options->{key}->{type} and (grep $_ eq $hsm_options->{key}->{type}, @avail_keytypes)) {
-    CertNanny::Logging->error(qq("$hsm_options->{key}->{type} is not an available keytype."));
+    CertNanny::Logging->error('MSG', CertNanny::Util->osq("$hsm_options->{key}->{type} is not an available keytype."));
     return undef;
   }
 
   if ($hsm_options->{key}->{type} eq "file") {
-    CertNanny::Logging->error("File-type keys are not supported yet due to an incomplete engine, sorry.");
+    CertNanny::Logging->error('MSG', "File-type keys are not supported yet due to an incomplete engine, sorry.");
     return undef;
   } else {
 
     # keytype = token
     unless (defined $hsm_options->{p11tool} and -x $hsm_options->{p11tool}) {
-      CertNanny::Logging->error("No executable defined or found to generate a key for Utimaco HSM.");
+      CertNanny::Logging->error('MSG', "No executable defined or found to generate a key for Utimaco HSM.");
       return undef;
     }
 
@@ -68,11 +68,11 @@ sub new() {
 
     #set pin from keystore config
     if ($hsm_options->{key}->{login}) {
-      CertNanny::Logging->info("hsm.key.login is set, but it will be overwritten by PIN setting.");
+      CertNanny::Logging->info('MSG', "hsm.key.login is set, but it will be overwritten by PIN setting.");
     }
 
     unless ($entry_options->{key}->{pin}) {
-      CertNanny::Logging->error("You need to set the keystore option key.pin to your login pin.");
+      CertNanny::Logging->error('MSG', "You need to set the keystore option key.pin to your login pin.");
       return undef;
     }
     $hsm_options->{key}->{login} = $entry_options->{key}->{pin};
@@ -81,7 +81,7 @@ sub new() {
     #check mandatory params
     foreach my $param (qw(slot login id)) {
       unless (defined $hsm_options->{key}->{$param}) {
-        CertNanny::Logging->error("The parameter key.$param is mandatory and needs to be set. Aborting...");
+        CertNanny::Logging->error('MSG', "The parameter key.$param is mandatory and needs to be set. Aborting...");
         return undef;
       }
     }
@@ -94,7 +94,7 @@ sub new() {
   $self->{CONFIG}      = $config;
 
   unless ($self->{all_keys} = $self->loadKeyInfo()) {
-    CertNanny::Logging->error("Could not load key information.");
+    CertNanny::Logging->error('MSG', "Could not load key information.");
     return undef;
   }
 
@@ -111,7 +111,7 @@ sub genkey() {
   my $new_label;
 
   unless ($self->checkKeySanity()) {
-    CertNanny::Logging->error("genkey(): Could not complete key sanity check, aborting.");
+    CertNanny::Logging->error('MSG', "genkey(): Could not complete key sanity check, aborting.");
     return undef;
   }
 
@@ -123,29 +123,29 @@ sub genkey() {
       if ($param eq "id") {
         my $current_id = $self->getCurrentKeyNumber();
         if ($current_id == -1) {
-          CertNanny::Logging->error("genkey(): Could not get a valid number for the current key.");
+          CertNanny::Logging->error('MSG', "genkey(): Could not get a valid number for the current key.");
           return undef;
         }
         $current_id += 1;
         $value =~ s/%i/$current_id/;
         $new_label = $value;
       } ## end if ($param eq "id")
-      push(@generateopts, qq($param=$value));
+      push(@generateopts, CertNanny::Util->osq($param=$value));
     } elsif ($param eq "genkey") {
-      $genkeyopt = qq($param=$value);
+      $genkeyopt = CertNanny::Util->osq($param=$value);
     } else {
-      CertNanny::Logging->error(qq("Could not handle parameter $param with value $value."));
+      CertNanny::Logging->error('MSG', CertNanny::Util->osq("Could not handle parameter $param with value $value."));
       return undef;
     }
   } ## end foreach my $param (keys %{$self...})
 
   my @cmd = ($p11tool, @generateopts, $genkeyopt);
 
-  # CertNanny::Logging->debug("Execute: " . $self->hidepin(join(" ", @cmd)));
+  # CertNanny::Logging->debug('MSG', "Execute: " . $self->hidepin(join(" ", @cmd)));
   # Todo pgk: Testen hidePin
-  my $rc = CertNanny::Util->runCommand(\@cmd, HIDEPWD => 1);
+  my $rc = CertNanny::Util->runCommand(\@cmd, HIDEPWD => 1)->{RC};
   if ($rc != 0) {
-    CertNanny::Logging->error("genkey(): Could not generate new key in HSM, see logging output.");
+    CertNanny::Logging->error('MSG', "genkey(): Could not generate new key in HSM, see logging output.");
     return undef;
   }
 
@@ -163,22 +163,29 @@ sub loadKeyInfo() {
   my $login   = $self->{hsm_options}->{key}->{login};
   my @cmd     = ($p11tool, "slot=$slot", "login=$login", "ListObjects");
   my $cmd     = join(" ", @cmd);
-  # CertNanny::Logging->debug("Exec: " . $self->hidepin($cmd));
+  # CertNanny::Logging->debug('MSG', "Exec: " . $self->hidepin($cmd));
   # Todo pgk: Testen hidePin
-  CertNanny::Logging->debug("Exec: " . CertNanny::Util->hidePin($cmd));
-  my $output;
 
-  open FH, "$cmd |" or die "Couldn't execute $cmd: $!\n";
-  while (defined(my $line = <FH>)) {
-    $output .= $line;
-  }
-  close FH;
-  my $exitval = $? >> 8;
-  if ($exitval != 0) {
-    CertNanny::Logging->error("Could not execute command successfully.");
-    return undef;
-  }
-
+  #CertNanny::Logging->debug('MSG', "Exec: " . CertNanny::Util->hidePin($cmd));
+  #my $output;
+  #
+  #open FH, "$cmd |" or die "Couldn't execute $cmd: $!\n";
+  #while (defined(my $line = <FH>)) {
+  #  $output .= $line;
+  #}
+  #close FH;
+  #
+  #    if ($rc) {
+  #      chomp($rc);
+  #      $rc = CertNanny::Logging->error('MSG', "getKey(): keytool -importkeystore failed ($rc)");
+  #    }
+  #  }
+  #my $exitval = $? >> 8;
+  #if ($exitval != 0) {
+  #  CertNanny::Logging->error('MSG', "Could not execute command successfully.");
+  #  return undef;
+  #}
+  my $output = join("", @{CertNanny::Util->runCommand($cmd, HIDEPWD => 1)->{STDOUT}});
   my $keys = {};
   my @groups = split(/\+ \d+\.\d+/, $output);
   foreach my $group (@groups) {
@@ -189,16 +196,16 @@ sub loadKeyInfo() {
     $label =~ s/\s*//g;
     $id =~ s/\s*//g;
     unless ($id and $label) {
-      CertNanny::Logging->error("Could not get id and label from following output: $group");
+      CertNanny::Logging->error('MSG', "Could not get id and label from following output: $group");
       return undef;
     }
     $keys->{$id} = $label;
   } ## end foreach my $group (@groups)
 
-  CertNanny::Logging->debug("Printing all keys...");
+  CertNanny::Logging->debug('MSG', "Printing all keys...");
   foreach my $id (keys %{$keys}) {
     my $label = $keys->{$id};
-    CertNanny::Logging->debug("Found key with id $id and label $label");
+    CertNanny::Logging->debug('MSG', "Found key with id $id and label $label");
   }
 
   return $keys;
@@ -223,7 +230,7 @@ sub getCurrentKeyNumber() {
   my $highest_number = -1;
   my $token_pattern  = $self->{hsm_options}->{key}->{id};
   $token_pattern =~ s/%i/(\\d+)/;
-  CertNanny::Logging->debug("getCurrentKeyNumber(): Will match on token pattern $token_pattern");
+  CertNanny::Logging->debug('MSG', "getCurrentKeyNumber(): Will match on token pattern $token_pattern");
 
   my %all_keys = %{$self->{all_keys}};
   foreach my $id (keys %{$self->{all_keys}}) {
@@ -233,13 +240,13 @@ sub getCurrentKeyNumber() {
     if ($number > $highest_number) {
       $highest_number = $number;
     } elsif ($number == $highest_number) {
-      CertNanny::Logging->error("getCurrentKeyNumber(): Found the same label twice, aborting.");
+      CertNanny::Logging->error('MSG', "getCurrentKeyNumber(): Found the same label twice, aborting.");
       return -1;
     }
   } ## end foreach my $id (keys %{$self...})
 
   if ($highest_number == -1) {
-    CertNanny::Logging->error("getCurrentKeyNumber(): Could not get a valid number, returning");
+    CertNanny::Logging->error('MSG', "getCurrentKeyNumber(): Could not get a valid number, returning");
     return -1;
   }
 
@@ -280,12 +287,12 @@ sub getEngineConfiguration() {
   my $keytype     = $hsm_options->{key}->{type};
   my @config      = ();
   if (CertNanny::Util->staticEngine($self->engineid())) {
-    CertNanny::Logging->debug("getEngineConfiguration(): Engine reports to be statically compiled with OpenSSL, not return a configuration as none should be needed.");
+    CertNanny::Logging->debug('MSG', "getEngineConfiguration(): Engine reports to be statically compiled with OpenSSL, not return a configuration as none should be needed.");
     return undef;
   }
 
   unless (defined $hsm_options->{dynamic_path} and -r $hsm_options->{dynamic_path}) {
-    CertNanny::Logging->error("getEngineConfiguration(): You need to configure a dynamic path or else engine can not be loaded");
+    CertNanny::Logging->error('MSG', "getEngineConfiguration(): You need to configure a dynamic path or else engine can not be loaded");
     die;
   }
   push(@config, {dynamic_path => $hsm_options->{dynamic_path}});
@@ -294,7 +301,7 @@ sub getEngineConfiguration() {
 
   if ($self->engineid() eq "pkcs11") {
     unless (defined $hsm_options->{MODULE_PATH} and -r $hsm_options->{MODULE_PATH}) {
-      CertNanny::Logging->error("getEngineConfiguration(): You need to configure a MODULE_PATH since engineid is pkcs11");
+      CertNanny::Logging->error('MSG', "getEngineConfiguration(): You need to configure a MODULE_PATH since engineid is pkcs11");
       die;
     }
     push(@config, {MODULE_PATH => $hsm_options->{MODULE_PATH}});
@@ -314,7 +321,7 @@ sub getKey() {
   # since we already generated a new key, the old one is the one with one number less
   my $old_key_number = $self->getCurrentKeyNumber() - 1;
   unless ($old_key_number) {
-    CertNanny::Logging->error("Could not get number for old key");
+    CertNanny::Logging->error('MSG', "Could not get number for old key");
     return undef;
   }
 
@@ -322,13 +329,13 @@ sub getKey() {
   $old_key =~ s/%i/$old_key_number/;
 
   unless ($old_key) {
-    CertNanny::Logging->error("Could not get old key");
+    CertNanny::Logging->error('MSG', "Could not get old key");
     return undef;
   }
 
   my $old_key_id = $self->getKeyID($old_key);
   unless ($old_key_id) {
-    CertNanny::Logging->error("Could not get ID for label $old_key");
+    CertNanny::Logging->error('MSG', "Could not get ID for label $old_key");
     return undef;
   }
 
@@ -339,25 +346,25 @@ sub getKey() {
 sub checkKeySanity() {
   my $self = shift;
 
-  CertNanny::Logging->debug("checkKeySanity(): Checking key sanity.");
+  CertNanny::Logging->debug('MSG', "checkKeySanity(): Checking key sanity.");
 
   # 1: get modulus of current certificate
   my $certfile = $self->{ENTRY}->{location};
   unless (-r $certfile) {
-    CertNanny::Logging->error("checkKeySanity(): Cannot find current certificate.");
+    CertNanny::Logging->error('MSG', "checkKeySanity(): Cannot find current certificate.");
     return undef;
   }
 
   my $certinfo = CertNanny::Util->getCertInfoHash(CERTFILE   => $certfile, 
                                                   CERTFORMAT => 'PEM');
   unless ($certinfo) {
-    CertNanny::Logging->error("checkKeySanity(): Cannot get certificate information for current certificate.");
+    CertNanny::Logging->error('MSG', "checkKeySanity(): Cannot get certificate information for current certificate.");
     return undef;
   }
 
   my $certificate_modulus = $certinfo->{Modulus};
   unless ($certificate_modulus) {
-    CertNanny::Logging->error("checkKeySanity(): Cannot get modulus of current certificate.");
+    CertNanny::Logging->error('MSG', "checkKeySanity(): Cannot get modulus of current certificate.");
     return undef;
   }
 
@@ -368,20 +375,22 @@ sub checkKeySanity() {
   foreach my $id (keys %{$self->{all_keys}}) {
     my $label       = $self->{all_keys}->{$id};
     my $requestfile = $self->createDummyCSR($id);
-    my @cmd         = (qq("$openssl"), 'req', '-in', qq("$requestfile"), '-modulus', '-noout');
+    my @cmd         = (CertNanny::Util->osq("$openssl"), 'req', '-in', CertNanny::Util->osq("$requestfile"), '-modulus', '-noout');
 
-    my $cmd = join(" ", @cmd);
-    CertNanny::Logging->debug("Execute: $cmd");
-    my $output;
-    open FH, "$cmd |" or die "checkKeySanity(): Couldn't execute $cmd: $!\n";
-    while (defined(my $line = <FH>)) {
-      $output .= $line;
-    }
-    close FH;
+    #my $cmd = join(" ", @cmd);
+    #CertNanny::Logging->debug('MSG', "Execute: $cmd");
+    #my $output;
+    #open FH, "$cmd |" or die "checkKeySanity(): Couldn't execute $cmd: $!\n";
+    #while (defined(my $line = <FH>)) {
+    #  $output .= $line;
+    #}
+    #close FH;
+
+    my $output = join("", @{CertNanny::Util->runCommand(\@cmd)->{STDOUT}});
     $output =~ m/Modulus=([A-F0-9]+)$/;
     my $modulus = $1;
     unless ($modulus) {
-      CertNanny::Logging->error("checkKeySanity(): Could not retreive Modulus from csr $requestfile, output was: $output");
+      CertNanny::Logging->error('MSG', "checkKeySanity(): Could not retreive Modulus from csr $requestfile, output was: $output");
       return undef;
     }
 
@@ -399,7 +408,7 @@ sub checkKeySanity() {
   $current_key_label =~ m/$key_pattern/;
   my $current_key_number = $1;
   unless ($current_key_number) {
-    CertNanny::Logging->error("checkKeySanity(): Could not get current key number for label $current_key_label");
+    CertNanny::Logging->error('MSG', "checkKeySanity(): Could not get current key number for label $current_key_label");
     return undef;
   }
   $current_key_number = int($current_key_number);
@@ -410,7 +419,7 @@ sub checkKeySanity() {
     next unless ($key_number);
     next unless ($key_number > $current_key_number);
     unless ($self->deleteKey($id)) {
-      CertNanny::Logging->error("checkKeySanity(): Key deletion process not successful, aborting.");
+      CertNanny::Logging->error('MSG', "checkKeySanity(): Key deletion process not successful, aborting.");
       return undef;
     }
   } ## end foreach my $id (keys $self->...)
@@ -427,7 +436,7 @@ sub createDummyCSR() {
   my $self    = shift;
   my $keyid   = shift;
   my $openssl = $self->{CONFIG}->get('cmd.openssl', 'CMD');
-  CertNanny::Logging->debug("Creating dummy CSR for key ID $keyid to get its modulus");
+  CertNanny::Logging->debug('MSG', "Creating dummy CSR for key ID $keyid to get its modulus");
   my $dummy_cfg = {
     openssl_conf => "openssl_def",
 
@@ -449,11 +458,11 @@ sub createDummyCSR() {
   push(@engine_cmd, '-engine',  $self->engineid());
   push(@engine_cmd, '-keyform', $self->keyform());
 
-  my @cmd = (qq("$openssl"), 'req', '-config', qq("$tmpconfigfile"), '-new', '-sha1', '-out', qq("$requestfile"), '-key', qq("$keyid"),);
+  my @cmd = (CertNanny::Util->osq("$openssl"), 'req', '-config', CertNanny::Util->osq("$tmpconfigfile"), '-new', '-sha1', '-out', CertNanny::Util->osq("$requestfile"), '-key', CertNanny::Util->osq("$keyid"),);
   push(@cmd, @engine_cmd);
 
-  if (CertNanny::Util->runCommand(\@cmd) != 0) {
-    CertNanny::Logging->error("Could not create dummy CSR for key ID $keyid");
+  if (CertNanny::Util->runCommand(\@cmd)->{RC} != 0) {
+    CertNanny::Logging->error('MSG', "Could not create dummy CSR for key ID $keyid");
     return undef;
   }
 
@@ -469,21 +478,21 @@ sub deleteKey() {
   my @deleteopts;
   CertNanny::Util->timeStamp();
 
-  CertNanny::Logging->debug("deleteKey(): Deleting key with ID $keyid");
+  CertNanny::Logging->debug('MSG', "deleteKey(): Deleting key with ID $keyid");
   push(@deleteopts, 'Slot=' . $hsm_options->{key}->{slot});
   push(@deleteopts, 'Login=' . $hsm_options->{key}->{login});
   push(@deleteopts, 'Id=$' . $keyid);
 
-  my @cmd = (qq("$p11tool"), @deleteopts, 'DeleteObject');
+  my @cmd = (CertNanny::Util->osq("$p11tool"), @deleteopts, 'DeleteObject');
 
-  # CertNanny::Logging->debug("Execute: " . $self->hidepin(join(" ", @cmd)));
+  # CertNanny::Logging->debug('MSG', "Execute: " . $self->hidepin(join(" ", @cmd)));
   # Todo pgk: Testen hidePin
-  if (CertNanny::Util->runCommand(\@cmd, HIDEPWD => 1) != 0) {
-    CertNanny::Logging->error("deleteKey(): Could not delete key with ID $keyid");
+  if (CertNanny::Util->runCommand(\@cmd, HIDEPWD => 1)->{RC} != 0) {
+    CertNanny::Logging->error('MSG', "deleteKey(): Could not delete key with ID $keyid");
     return undef;
   }
 
-  CertNanny::Logging->debug("deleteKey(): Successfully deleted key with ID $keyid");
+  CertNanny::Logging->debug('MSG', "deleteKey(): Successfully deleted key with ID $keyid");
   return 1;
 
 } ## end sub deleteKey

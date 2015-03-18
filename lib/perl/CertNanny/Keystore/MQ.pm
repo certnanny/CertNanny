@@ -20,15 +20,12 @@ use Carp;
 use File::Copy;
 use File::Basename;
 use Data::Dumper;
+use English;
 
 use CertNanny::Util;
 
 # keyspecific needed modules
 use Cwd;
-use English;
-# use Smart::Comments;
-# use CertNanny::Keystore;
-# use CertNanny::Keystore::OpenSSL;
 
 
 ################################################################################
@@ -131,7 +128,7 @@ sub getCert {
   # Gets the first certificate found either in CERTDATA or in CERTFILE and 
   # returns it in CERTDATA. 
   # If there is a rest in the input, it is returned in CERTREST
-  CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "get main certificate from keystore");
+  CertNanny::Logging->debug('MSG', (eval 'ref(\$self)' ? "End " : "Start ") . (caller(0))[3] . " get main certificate from keystore");
   my $self = shift;
 
   my $options   = $self->{OPTIONS};
@@ -140,7 +137,7 @@ sub getCert {
   my $config    = $options->{CONFIG};
 
   if (exists $self->{CERTINFO}) {
-    CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "get main certificate from keystore");
+    CertNanny::Logging->debug('MSG', (eval 'ref(\$self)' ? "End " : "Start ") . (caller(0))[3] . " get main certificate from keystore");
     return  $self->{CERTINFO};
   }
   
@@ -150,7 +147,7 @@ sub getCert {
   }
 
   if (!-r "$filename") {
-    CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "get main certificate from keystore");
+    CertNanny::Logging->debug('MSG', (eval 'ref(\$self)' ? "End " : "Start ") . (caller(0))[3] . " get main certificate from keystore");
     return undef;
   }
 
@@ -161,28 +158,24 @@ sub getCert {
 
   my $label = $self->_getCertLabel();
   if (!defined $label) {
-    CertNanny::Logging->error("getCert(): could not get label");
-    CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "get main certificate from keystore");
+    CertNanny::Logging->error('MSG', "getCert(): could not get label");
+    CertNanny::Logging->debug('MSG', (eval 'ref(\$self)' ? "End " : "Start ") . (caller(0))[3] . " get main certificate from keystore");
     return undef;
   }
 
   my $certfile = CertNanny::Util->getTmpFile();
 
   # get label name for user certificate
-  CertNanny::Logging->debug("extract cert with label'$label'");
+  CertNanny::Logging->debug('MSG', "extract cert with label <$label>");
    
   my @cmd;
-   if ($OSNAME eq "MSWin32") {
-     @cmd = (qq("$gsk6cmd"), '-cert', '-extract', '-db', qq("$filename"), '-pw', qq("$self->{PIN}"), '-label', qq("$label"), '-target', qq("$certfile"), '-format', 'binary');   
-   }else{
-     @cmd = (qq("$gsk6cmd"), '-cert', '-extract', '-db', qq("$filename"), '-pw', "'".$self->{PIN}."'", '-label', qq("$label"), '-target', qq("$certfile"), '-format', 'binary');   
-   }
+  @cmd = (CertNanny::Util->osq("$gsk6cmd"), '-cert', '-extract', '-db', CertNanny::Util->osq("$filename"), '-pw', CertNanny::Util->osq("$self->{PIN}"), '-label', CertNanny::Util->osq("$label"), '-target', CertNanny::Util->osq("$certfile"), '-format', 'binary');   
  
   #if (system(join(' ', @cmd)) != 0) {
-  if (CertNanny::Util->runCommand(\@cmd, HIDEPWD => 1) != 0) {  
+  if (CertNanny::Util->runCommand(\@cmd, HIDEPWD => 1)->{RC} != 0) {  
     unlink $certfile;
-    CertNanny::Logging->error("getCert(): could not extract certificate");
-    CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "get main certificate from keystore");
+    CertNanny::Logging->error('MSG', "getCert(): could not extract certificate");
+    CertNanny::Logging->debug('MSG', (eval 'ref(\$self)' ? "End " : "Start ") . (caller(0))[3] . " get main certificate from keystore");
     return undef;
   }
 
@@ -190,8 +183,8 @@ sub getCert {
   my $content = CertNanny::Util->readFile($certfile);
   unlink $certfile;
   if (!defined $content) {
-    CertNanny::Logging->error("getCert(): Could not open input file $certfile");
-    CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "get main certificate from keystore");
+    CertNanny::Logging->error('MSG', "getCert(): Could not open input file $certfile");
+    CertNanny::Logging->debug('MSG', (eval 'ref(\$self)' ? "End " : "Start ") . (caller(0))[3] . " get main certificate from keystore");
     return undef;
   }
 
@@ -201,7 +194,7 @@ sub getCert {
   $self->{CERTINFO}->{CERTDATA}   = $content;
   $self->{CERTINFO}->{CERTFORMAT} = "DER";
 
-  CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "get main certificate from keystore gsk");
+  CertNanny::Logging->debug('MSG', (eval 'ref(\$self)' ? "End " : "Start ") . (caller(0))[3] . " get main certificate from keystore gsk");
   return $self->{CERTINFO};
 } ## end sub getCert
 
@@ -245,14 +238,14 @@ sub installCert {
   }
 
   if ($options->{keygenmode} eq "external") {
-    CertNanny::Logging->info("Creating MQ keystore (via PKCS#12)");
+    CertNanny::Logging->info('MSG', "Creating MQ keystore (via PKCS#12)");
 
     # create prototype PKCS#12 file
     my $keyfile  = $self->{STATE}->{DATA}->{RENEWAL}->{REQUEST}->{KEYFILE};
     my $certfile = $args{CERTFILE};
     my $label    = $self->{CERT}->{LABEL};
 
-    CertNanny::Logging->info("Creating prototype PKCS#12 from certfile $certfile, keyfile $keyfile, label $label");
+    CertNanny::Logging->info('MSG', "Creating prototype PKCS#12 from certfile $certfile, keyfile $keyfile, label $label");
 
     #   # build array of ca certificate filenames
     #   my @cachain;
@@ -269,36 +262,28 @@ sub installCert {
     #              CACHAIN => \@cachain);
 
     if (!defined $pkcs12file) {
-      CertNanny::Logging->error("Could not create prototype PKCS#12 from received certificate");
+      CertNanny::Logging->error('MSG', "Could not create prototype PKCS#12 from received certificate");
       return undef;
     }
-    CertNanny::Logging->info("Created PKCS#12 file $pkcs12file");
+    CertNanny::Logging->info('MSG', "Created PKCS#12 file $pkcs12file");
 
     my @cmd;
-    if ($OSNAME eq "MSWin32") {
-      @cmd = (qq("$gsk6cmd"), '-keydb', '-create', '-type', 'cms', '-db', qq("$newkeystoredb"), '-pw', qq("$self->{PIN}"), '-stash',);
-    } else {
-      @cmd = (qq("$gsk6cmd"), '-keydb', '-create', '-type', 'cms', '-db', qq("$newkeystoredb"), '-pw', "'".$self->{PIN}."'", '-stash',);
-    }
+    @cmd = (CertNanny::Util->osq("$gsk6cmd"), '-keydb', '-create', '-type', 'cms', '-db', CertNanny::Util->osq("$newkeystoredb"), '-pw', CertNanny::Util->osq("$self->{PIN}"), '-stash',);
         
-    if (CertNanny::Util->runCommand(\@cmd, HIDEPWD => 1)) {
-      CertNanny::Logging->error("Keystore creation failed");
+    if (CertNanny::Util->runCommand(\@cmd, HIDEPWD => 1)->{RC}) {
+      CertNanny::Logging->error('MSG', "Keystore creation failed");
       return undef;
     }
 
-    CertNanny::Logging->info("New MQ Keystore $newkeystoredb created.");
+    CertNanny::Logging->info('MSG', "New MQ Keystore $newkeystoredb created.");
 
     # remove all certificates from this keystore
-    if ($OSNAME eq "MSWin32") {
-      @cmd = (qq("$gsk6cmd"), '-cert', '-list', '-db', qq("$newkeystoredb"), '-pw', qq("$self->{PIN}"),);
-    } else {
-      @cmd = (qq("$gsk6cmd"), '-cert', '-list', '-db', qq("$newkeystoredb"), '-pw', "'".$self->{PIN}."'",);
-    }
+    @cmd = (CertNanny::Util->osq("$gsk6cmd"), '-cert', '-list', '-db', CertNanny::Util->osq("$newkeystoredb"), '-pw', CertNanny::Util->osq("$self->{PIN}"),);
    
     my @calabels;
 
     my $match = $entry->{labelmatch} || "ibmwebspheremq.*";
-    chomp(my @certs = CertNanny::Util->runCommand(\@cmd, WANTOUT => 1, HIDEPWD => 1));
+    chomp(my @certs = @{CertNanny::Util->runCommand(\@cmd, HIDEPWD => 1)->{STDOUT}});
     
     if (!defined $options->{gsk6cmd}) {
       if (@certs) {
@@ -306,7 +291,7 @@ sub installCert {
           if (($certlabel !~ m/Certificates found/) and ($certlabel !~ m/default, - /)) { 
           $certlabel =~ m/\s*(.*$)/;
           $certlabel = $1;
-          CertNanny::Logging->debug("found label $certlabel");
+          CertNanny::Logging->debug('MSG', "found label $certlabel");
           push(@calabels, $certlabel);
           }
         }
@@ -323,22 +308,18 @@ sub installCert {
           push(@calabels, $_);
         }
       } else {
-        CertNanny::Logging->error("Could not retrieve certificate list in MQ keystore");
+        CertNanny::Logging->error('MSG', "Could not retrieve certificate list in MQ keystore");
         return undef;
       }
     }
 
     # now delete all preloaded CAs
     foreach my $label (@calabels) {
-      CertNanny::Logging->debug("deleting label '$label' from MQ keystore");
-      if ($OSNAME eq "MSWin32") {
-        @cmd = (qq("$gsk6cmd"), '-cert', '-delete', '-db', qq("$newkeystoredb"), '-pw', qq("$self->{PIN}"), '-label', qq("$label"),);
-      } else {
-        @cmd = (qq("$gsk6cmd"), '-cert', '-delete', '-db', qq("$newkeystoredb"), '-pw', "'".$self->{PIN}."'", '-label', qq("$label"),);
-      }
+      CertNanny::Logging->debug('MSG', "deleting label '$label' from MQ keystore");
+      @cmd = (CertNanny::Util->osq("$gsk6cmd"), '-cert', '-delete', '-db', CertNanny::Util->osq("$newkeystoredb"), '-pw', CertNanny::Util->osq("$self->{PIN}"), '-label', CertNanny::Util->osq("$label"),);
     
-      if (CertNanny::Util->runCommand(\@cmd, HIDEPWD => 1)) {
-        CertNanny::Logging->debug("Could not delete label $label certificate from keystore");
+      if (CertNanny::Util->runCommand(\@cmd, HIDEPWD => 1)->{RC}) {
+        CertNanny::Logging->debug('MSG', "Could not delete label $label certificate from keystore");
         #return undef;
       }
     } ## end foreach (@calabels)
@@ -357,7 +338,7 @@ sub installCert {
       my $CN = $RDN[0];
       $CN =~ s/^CN=//;
 
-      CertNanny::Logging->info("Adding certificate '$item->{CERTINFO}->{SubjectName}' from file $item->{CERTFILE}");
+      CertNanny::Logging->info('MSG', "Adding certificate '$item->{CERTINFO}->{SubjectName}' from file $item->{CERTFILE}");
 
       # rewrite certificate into PEM format
       my $cacert = CertNanny::Util->convertCert(OUTFORMAT  => 'PEM',
@@ -365,26 +346,22 @@ sub installCert {
                                                 CERTFORMAT => 'PEM',);
 
       if (!defined $cacert) {
-        CertNanny::Logging->error("installCert(): Could not convert certificate $item->{CERTFILE}");
+        CertNanny::Logging->error('MSG', "installCert(): Could not convert certificate $item->{CERTFILE}");
         return undef;
       }
 
       my $cacertfile = CertNanny::Util->getTmpFile();
       if (!CertNanny::Util->writeFile(DSTFILE    => $cacertfile,
                                       SRCCONTENT => $cacert->{CERTDATA})) {
-        CertNanny::Logging->error("installCert(): Could not write temporary CA file");
+        CertNanny::Logging->error('MSG', "installCert(): Could not write temporary CA file");
         return undef;
       }
 
-      if ($OSNAME eq "MSWin32") {
-        @cmd = (qq("$gsk6cmd"), '-cert', '-add', '-db', qq("$newkeystoredb"), '-pw', qq("$self->{PIN}"), '-file', qq("$cacertfile"), '-format', 'ascii', '-label', qq("$CN"),);       
-      } else {
-        @cmd = (qq("$gsk6cmd"), '-cert', '-add', '-db', qq("$newkeystoredb"), '-pw', "'".$self->{PIN}."'", '-file', qq("$cacertfile"), '-format', 'ascii', '-label', qq("$CN"),);       
-      }
+      @cmd = (CertNanny::Util->osq("$gsk6cmd"), '-cert', '-add', '-db', CertNanny::Util->osq("$newkeystoredb"), '-pw', CertNanny::Util->osq("$self->{PIN}"), '-file', CertNanny::Util->osq("$cacertfile"), '-format', 'ascii', '-label', CertNanny::Util->osq("$CN"),);       
    
-      if (CertNanny::Util->runCommand(\@cmd, HIDEPWD => 1)) {
+      if (CertNanny::Util->runCommand(\@cmd, HIDEPWD => 1)->{RC}) {
         unlink $cacertfile;
-        CertNanny::Logging->error("Could not add certificate to keystore");
+        CertNanny::Logging->error('MSG', "Could not add certificate to keystore");
         return undef;
       }
       unlink $cacertfile;
@@ -400,74 +377,49 @@ sub installCert {
     my ($basename, $dirname) = fileparse($newkeystoredb);
     my $lastdir = getcwd();
     if (!chdir($dirname)) {
-     CertNanny::Logging->error("Could not import PKCS#12 file to keystore (chdir to $dirname failed)");
+     CertNanny::Logging->error('MSG', "Could not import PKCS#12 file to keystore (chdir to $dirname failed)");
      return undef;
     }
     
     my @importcmd;  
 
     if (!defined $options->{gsk6cmd}) {
-      CertNanny::Logging->debug("no gsk6cmd use gskcmd import command ");
-      if ($OSNAME eq "MSWin32") {
-        @importcmd = (qq("$gsk6cmd"), '-cert', '-import', '-db', qq("$pkcs12file"),'-type' ,'pkcs12' ,'-pw', qq("$self->{PIN}"), '-target', qq("$newkeystoredb"), '-target_pw', qq("$self->{PIN}"), '-target_type', 'cms');
-      } else {
-        @importcmd = (qq("$gsk6cmd"), '-cert', '-import', '-db', qq("$pkcs12file"),'-type' ,'pkcs12' ,'-pw', "'".$self->{PIN}."'", '-target', qq("$newkeystoredb"), '-target_pw', "'".$self->{PIN}."'", '-target_type', 'cms'); 
-      }
+      CertNanny::Logging->debug('MSG', "no gsk6cmd use gskcmd import command ");
+      @importcmd = (CertNanny::Util->osq("$gsk6cmd"), '-cert', '-import', '-db', CertNanny::Util->osq("$pkcs12file"),'-type' ,'pkcs12' ,'-pw', CertNanny::Util->osq("$self->{PIN}"), '-target', CertNanny::Util->osq("$newkeystoredb"), '-target_pw', CertNanny::Util->osq("$self->{PIN}"), '-target_type', 'cms');
     } else {
-      CertNanny::Logging->debug("no gskcmd use gsk6cmd import command ");
-      if ($OSNAME eq "MSWin32") {
-        @importcmd = (qq("$gsk6cmd"), '-cert', '-import', '-target', qq("$basename"), '-target_pw', qq("$self->{PIN}"), '-file', qq("$pkcs12file"), '-pw', qq("$self->{PIN}"), '-type', 'pkcs12',);      
-      } else {
-        @importcmd = (qq("$gsk6cmd"), '-cert', '-import', '-target', qq("$basename"), '-target_pw', "'".$self->{PIN}."'", '-file', qq("$pkcs12file"), '-pw', "'".$self->{PIN}."'", '-type', 'pkcs12',);         
-      }
+      CertNanny::Logging->debug('MSG', "no gskcmd use gsk6cmd import command ");
+      @importcmd = (CertNanny::Util->osq("$gsk6cmd"), '-cert', '-import', '-target', CertNanny::Util->osq("$basename"), '-target_pw', CertNanny::Util->osq("$self->{PIN}"), '-file', CertNanny::Util->osq("$pkcs12file"), '-pw', CertNanny::Util->osq("$self->{PIN}"), '-type', 'pkcs12',);      
     }
 
-    if (CertNanny::Util->runCommand(\@importcmd, HIDEPWD => 1)) {
-      CertNanny::Logging->error("Could not import PKCS#12 file to gsk keystore");
+    if (CertNanny::Util->runCommand(\@importcmd, HIDEPWD => 1)->{RC}) {
+      CertNanny::Logging->error('MSG', "Could not import PKCS#12 file to gsk keystore");
       chdir($lastdir);
       return undef;
     }
     chdir($lastdir);
 
-    CertNanny::Logging->info("Keystore created");
+    CertNanny::Logging->info('MSG', "Keystore created");
   } else {
     if ($options->{keygenmode} eq "internal") {
-      CertNanny::Logging->info("Internal key generation not supported");
-
-      #   my @cmd = (qq("$gsk6cmd"),
-      #        '-certreq',
-      #        '-create',
-      #        '-file',
-      #        qq("$result->{REQUESTFILE}"),
-      #        '-db',
-      #        qq("$kdbfile"),
-      #        '-pw',
-      #        qq("$self->{PIN}"),
-      #        '-dn',
-      #        qq("$DN"),
-      #        '-label',
-      #        qq("$label"),
-      #        '-size',
-      #        '1024');
-
+      CertNanny::Logging->info('MSG', "Internal key generation not supported");
       return undef;
     } ## end if ($options->...)
   } ## end else
 
   # now replace the old keystore with the new one
   if (!-r $newkeystoredb) {
-    CertNanny::Logging->error("Could not access new prototype keystore file $newkeystoredb");
+    CertNanny::Logging->error('MSG', "Could not access new prototype keystore file $newkeystoredb");
     return undef;
   }
 
-  CertNanny::Logging->info("Installing MQ keystore");
+  CertNanny::Logging->info('MSG', "Installing MQ keystore");
   my $oldlocation = $entry->{location};
 
   my @newkeystore = ();
   foreach my $ext (qw(.crl .rdb .kdb .sth)) {
     my $data = CertNanny::Util->readFile($newkeystorebase . $ext);
     if (!defined $data) {
-      CertNanny::Logging->error("Could not read new keystore file " . $newkeystorebase . $ext);
+      CertNanny::Logging->error('MSG', "Could not read new keystore file " . $newkeystorebase . $ext);
       return undef;
     }
 
@@ -481,7 +433,7 @@ sub installCert {
   # try to write the new keystore
 
   if (!$self->k_saveInstallFile(@newkeystore)) {
-    CertNanny::Logging->error("Could not install new keystore");
+    CertNanny::Logging->error('MSG', "Could not install new keystore");
     return undef;
   }
 
@@ -503,7 +455,7 @@ sub getKey {
   #           KEYTYPE   => format (e. g. 'PKCS8' or 'OpenSSL'
   #           KEYPASS   => key pass phrase (only if protected by pass phrase)
   #         or undef on error
-  CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "get private key for main certificate from keystore");
+  CertNanny::Logging->debug('MSG', (eval 'ref(\$self)' ? "End " : "Start ") . (caller(0))[3] . " get private key for main certificate from keystore");
   my $self = shift;
 
   my $options   = $self->{OPTIONS};
@@ -516,7 +468,7 @@ sub getKey {
   if ($options->{gsk6cmd}) {
     # initialize Java and GSKit environment
     if (!$self->_getIBMJavaEnvironment()) {
-      CertNanny::Logging->error("Could not determine IBM Java environment");
+      CertNanny::Logging->error('MSG', "Could not determine IBM Java environment");
       return undef;
     }
 
@@ -527,7 +479,7 @@ sub getKey {
 
     my $label = $self->_getCertLabel();
     if (!defined $label) {
-      CertNanny::Logging->error("Could not get certificate label");
+      CertNanny::Logging->error('MSG', "Could not get certificate label");
       return undef;
     }
 
@@ -536,7 +488,7 @@ sub getKey {
 
     my $extractkey_jar = File::Spec->catfile($config->get("path.libjava", "FILE"), 'ExtractKey.jar');
     if (!-r $extractkey_jar) {
-      CertNanny::Logging->error("getKey(): could not locate ExtractKey.jar file");
+      CertNanny::Logging->error('MSG', "getKey(): could not locate ExtractKey.jar file");
       return undef;
     }
 
@@ -546,23 +498,23 @@ sub getKey {
 
     my @gsklibdir;
     if (defined $options->{gsklibdir}) {
-      @gsklibdir = ('-Djava.library.path=' . qq("$options->{gsklibdir}"));
+      @gsklibdir = ('-Djava.library.path=' . CertNanny::Util->osq("$options->{gsklibdir}"));
       $ENV{PATH} .= $separator . $self->{OPTIONS}->{gsklibdir};
     }
   
-    my @cmd = (qq("$options->{JAVA}"), 
-               '-classpath', qq("$classpath"), 
+    my @cmd = (CertNanny::Util->osq("$options->{JAVA}"), 
+               '-classpath', CertNanny::Util->osq("$classpath"), 
                'de.cynops.java.crypto.keystore.ExtractKey', @gsklibdir, 
-               '-keystore', qq("$keystore"), 
-               '-storepass', qq("$self->{PIN}"), 
-               '-keypass', qq("$self->{PIN}"), 
-               '-key', qq("$label"), 
-               '-keyfile', qq("$p8file"), 
+               '-keystore', CertNanny::Util->osq("$keystore"), 
+               '-storepass', CertNanny::Util->osq("$self->{PIN}"), 
+               '-keypass', CertNanny::Util->osq("$self->{PIN}"), 
+               '-key', CertNanny::Util->osq("$label"), 
+               '-keyfile', CertNanny::Util->osq("$p8file"), 
                '-provider', 'IBMJCE', 
                '-type', 'CMS');
 
-    if (CertNanny::Util->runCommand(\@cmd, HIDEPWD => 1)) {
-      CertNanny::Logging->error("getKey(): could not extract private key");
+    if (CertNanny::Util->runCommand(\@cmd, HIDEPWD => 1)->{RC}) {
+      CertNanny::Logging->error('MSG', "getKey(): could not extract private key");
       unlink $p8file;
       return undef;
     }
@@ -578,7 +530,7 @@ sub getKey {
 
     my $label = $self->_getCertLabel();
     if (!defined $label) {
-      CertNanny::Logging->error("Could not get certificate label");
+      CertNanny::Logging->error('MSG', "Could not get certificate label");
       return undef;
     }
   
@@ -590,21 +542,17 @@ sub getKey {
     chmod 0600, $exportp12;
   
     my @cmd;
-    if ($OSNAME eq "MSWin32") {
-      @cmd = (qq("$options->{gskcmd}"), '-cert', '-export', '-db', qq("$keystore"), '-pw', qq("$self->{PIN}"), '-label', qq("$label"), '-type cms', '-target', qq("$exportp12"), '-target_pw' , qq("$self->{PIN}"), '-target_type', 'pkcs12');   
-    } else {
-      @cmd = (qq("$options->{gskcmd}"), '-cert', '-export', '-db', qq("$keystore"), '-pw', "'".$self->{PIN}."'", '-label', qq("$label"), '-type cms', '-target', qq("$exportp12"), '-target_pw' , "'".$self->{PIN}."'", '-target_type', 'pkcs12');  
-    }
+    @cmd = (CertNanny::Util->osq("$options->{gskcmd}"), '-cert', '-export', '-db', CertNanny::Util->osq("$keystore"), '-pw', CertNanny::Util->osq("$self->{PIN}"), '-label', CertNanny::Util->osq("$label"), '-type cms', '-target', CertNanny::Util->osq("$exportp12"), '-target_pw' , CertNanny::Util->osq("$self->{PIN}"), '-target_type', 'pkcs12');   
 
-    if (CertNanny::Util->runCommand(\@cmd, HIDEPWD => 1)) {
-      CertNanny::Logging->error("getKey(): could not extract private key");
+    if (CertNanny::Util->runCommand(\@cmd, HIDEPWD => 1)->{RC}) {
+      CertNanny::Logging->error('MSG', "getKey(): could not extract private key");
       unlink $exportp12;
       return undef;
     }
   
     my $openssl = $config->get('cmd.openssl', 'CMD');
     if (!defined $openssl) {
-      CertNanny::Logging->error("No openssl shell specified");
+      CertNanny::Logging->error('MSG', "No openssl shell specified");
       return undef;
     };
   
@@ -613,10 +561,10 @@ sub getKey {
     my $exportkey = CertNanny::Util->getTmpFile();
     chmod 0600, $exportkey;
   
-    @opensslcmd = (qq("$openssl"), 'pkcs12', '-in', qq("$exportp12"), '-passin', qq("env:PASSIN"),  '-out', qq("$exportkey"), '-nodes' , '-nocerts' );
+    @opensslcmd = (CertNanny::Util->osq("$openssl"), 'pkcs12', '-in', CertNanny::Util->osq("$exportp12"), '-passin', CertNanny::Util->osq("env:PASSIN"),  '-out', CertNanny::Util->osq("$exportkey"), '-nodes' , '-nocerts' );
 
-    if (CertNanny::Util->runCommand(\@opensslcmd, HIDEPWD => 1)) {
-      CertNanny::Logging->error("getKey(): could not extract private key");
+    if (CertNanny::Util->runCommand(\@opensslcmd, HIDEPWD => 1)->{RC}) {
+      CertNanny::Logging->error('MSG', "getKey(): could not extract private key");
       unlink $exportkey;
       return undef;
     }
@@ -627,11 +575,11 @@ sub getKey {
     unlink $exportp12;
   
     if ((!defined $keydata) or ($keydata eq "")) {
-      CertNanny::Logging->error("getKey(): Could not convert private key via pkcs12 export");
+      CertNanny::Logging->error('MSG', "getKey(): Could not convert private key via pkcs12 export");
       return undef;
     }
   
-    CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "get private key for main certificate from keystore via pkcs12 export");
+    CertNanny::Logging->debug('MSG', (eval 'ref(\$self)' ? "End " : "Start ") . (caller(0))[3] . " get private key for main certificate from keystore via pkcs12 export");
   
     return {KEYDATA   => $keydata,
             KEYTYPE   => 'OpenSSL',
@@ -640,11 +588,11 @@ sub getKey {
 
 
   if ((!defined $keydata) or ($keydata eq "")) {
-    CertNanny::Logging->error("getKey(): Could not convert private key");
+    CertNanny::Logging->error('MSG', "getKey(): Could not convert private key");
     return undef;
   }
 
-  CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "get private key for main certificate from keystore");
+  CertNanny::Logging->debug('MSG', (eval 'ref(\$self)' ? "End " : "Start ") . (caller(0))[3] . " get private key for main certificate from keystore");
   return {KEYDATA   => $keydata,
           KEYTYPE   => 'PKCS8',
           KEYFORMAT => 'DER'};  # no keypass, unencrypted
@@ -680,7 +628,7 @@ sub createRequest {
   my $self = shift;
 
   if ($self->{OPTIONS}->{keygenmode} eq "external") {
-    CertNanny::Logging->info("External request generation (using OpenSSL)");
+    CertNanny::Logging->info('MSG', "External request generation (using OpenSSL)");
     return $self->SUPER::createRequest() if $self->can("SUPER::createRequest");
   }
 
@@ -855,7 +803,7 @@ sub getInstalledCAs {
   #   my $self = shift;
   #   return $self->SUPER::getInstalledCAs(@_) if $self->can("SUPER::getInstalledCAs");
   # }
-  CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "get all installed root certificates gsk");
+  CertNanny::Logging->debug('MSG', (eval 'ref(\$self)' ? "End " : "Start ") . (caller(0))[3] . " get all installed root certificates gsk");
   my $self = shift;
   my %args = (@_);
 
@@ -893,7 +841,7 @@ sub getInstalledCAs {
   CertNanny::Util->writeFile(DSTFILE => $tmpCertFile,
                              SRCCONTENT => $cert->{'RAW'}->{'PEM'}, 
                              APPEND  => 0 );
-  CertNanny::Logging->debug(Dumper($cert)); 
+  CertNanny::Logging->debug('MSG', Dumper($cert)); 
   my  $certSha1 = CertNanny::Util->getCertSHA1(CERTFILE => $tmpCertFile);  
   
   $ignoreCertHashes{$certSha1->{'CERTSHA1'}} = $certSha1->{'CERTSHA1'} ;    
@@ -909,33 +857,25 @@ sub getInstalledCAs {
       
       my @cmd ;
       # get label name for user certificate
-      if ($OSNAME eq "MSWin32") {
-        @cmd = (qq("$gsk6cmd"), '-cert', '-list', '-db', qq("$locName"), '-pw', qq("$self->{PIN}"));
-      } else {
-        @cmd = (qq("$gsk6cmd"), '-cert', '-list', '-db', qq("$locName"), '-pw', "'".$self->{PIN}."'");
-      }
+      @cmd = (CertNanny::Util->osq("$gsk6cmd"), '-cert', '-list', '-db', CertNanny::Util->osq("$locName"), '-pw', CertNanny::Util->osq("$self->{PIN}"));
       
-      @certList = CertNanny::Util->runCommand(\@cmd, WANTOUT => 1, HIDEPWD => 1);
+      @certList = @{CertNanny::Util->runCommand(\@cmd, HIDEPWD => 1)->{STDOUT}};
       foreach my $certlabel (@certList) {
         #if ($_ =~ m/^([^,]*), ([0-3][0-9]\.[0-1][0-9]\.20[0-9][0-9]), (PrivateKeyEntry|trustedCertEntry),.*$/) { # gets Privat Key as well
         # if ($_ =~ m/^([^,]*), ([0-3][0-9]\.[0-1][0-9]\.20[0-9][0-9]), (trustedCertEntry),.*$/) {
         #  ($certAlias, $certCreateDate, $certType) = ($1, $2, $3);
         #}
-        CertNanny::Logging->debug("analyzing $gsk6cmd output line <$certlabel>"); 
+        CertNanny::Logging->debug('MSG', "analyzing $gsk6cmd output line <$certlabel>"); 
         if( ! ( $certlabel =~ m/Certificates found/ ) and ! ( $certlabel =~ m/default, - / )) {
          
           $certlabel =~ m/\s*(.*$)/;
           $certlabel = $1;
-          CertNanny::Logging->debug("found certLabel <$certlabel>"); 
+          CertNanny::Logging->debug('MSG', "found certLabel <$certlabel>"); 
           my @certcmd;
           my $certexport= CertNanny::Util->getTmpFile();  
-          if ($OSNAME eq "MSWin32") {
-            @certcmd = (qq("$gsk6cmd"), '-cert', '-extract', '-db', qq("$locName"), '-pw', qq("$self->{PIN}") , '-label' ,qq("$certlabel") ,'-target' ,qq("$certexport"));     
-          } else {
-            @certcmd = (qq("$gsk6cmd"), '-cert', '-extract', '-db', qq("$locName"), '-pw', "'".$self->{PIN}."'" , '-label' ,qq("$certlabel") ,'-target' ,qq("$certexport"));      
-          }
+          @certcmd = (CertNanny::Util->osq("$gsk6cmd"), '-cert', '-extract', '-db', CertNanny::Util->osq("$locName"), '-pw', CertNanny::Util->osq("$self->{PIN}") , '-label' ,CertNanny::Util->osq("$certlabel") ,'-target' ,CertNanny::Util->osq("$certexport"));     
      
-          $rc = CertNanny::Util->runCommand(\@certcmd, HIDEPWD => 1);
+          $rc = CertNanny::Util->runCommand(\@certcmd, HIDEPWD => 1)->{RC};
             
               
           my $certInfo  = CertNanny::Util->getCertInfoHash(CERTFILE => $certexport , CERTFORMAT => 'PEM');   
@@ -960,7 +900,7 @@ sub getInstalledCAs {
                   
               $certFound->{$certSha1->{CERTSHA1}} = $self->{$certTyp}->{$certSha1->{CERTSHA1}};
             } else {
-              CertNanny::Logging->debug("skiping certLabel $certlabel"); 
+              CertNanny::Logging->debug('MSG', "skiping certLabel <$certlabel>"); 
             }
           }            
           unlink $certexport;        
@@ -972,8 +912,8 @@ sub getInstalledCAs {
   
   
   
-  #CertNanny::Logging->debug("__installed rootCAs \n". Dumper($certFound) );
-  CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "get all installed root certificates gsk");
+  #CertNanny::Logging->debug('MSG', "__installed rootCAs \n". Dumper($certFound) );
+  CertNanny::Logging->debug('MSG', (eval 'ref(\$self)' ? "End " : "Start ") . (caller(0))[3] . " get all installed root certificates gsk");
   return $certFound;
 } ## end sub getInstalledCAs
 
@@ -1037,7 +977,7 @@ sub installRoots {
   # #Error 146: GSKKM_ERR_INVALID_CERT_CHAIN
   # #Part of the certificate chain is missing
 
-  CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "Install all available root certificates");
+  CertNanny::Logging->debug('MSG', (eval 'ref(\$self)' ? "End " : "Start ") . (caller(0))[3] . " Install all available root certificates");
   my $self = shift;
   my %args = (@_);
 
@@ -1058,17 +998,17 @@ sub installRoots {
     $origin = File::Spec->canonpath($entry->{location});
   }
   my $dest = $origin . ".work";
-  CertNanny::Logging->debug("Creating Working copy of <$origin> as <$dest>");
+  CertNanny::Logging->debug('MSG', "Creating Working copy of <$origin> as <$dest>");
   
   if(! copy($origin, $dest)){
-    CertNanny::Logging->error("Could not create working copy of <$origin> as <$dest>");
-    CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "Install all available root certificates");
+    CertNanny::Logging->error('MSG', "Could not create working copy of <$origin> as <$dest>");
+    CertNanny::Logging->debug('MSG', (eval 'ref(\$self)' ? "End " : "Start ") . (caller(0))[3] . " Install all available root certificates");
     return 1;
   }
   
   # set rc 0 if TARGET is not defined or TARGET is LOCATION otherwise 1
   my $rc = (defined($args{TARGET}) and ($args{TARGET} ne 'LOCATION'));
-  CertNanny::Logging->debug("Target: ". $args{TARGET});
+  CertNanny::Logging->debug('MSG', "Target: ". $args{TARGET});
   
   # run only if no TARGET is defined or TARGET is LOCATION
   if (!$rc) {
@@ -1081,7 +1021,7 @@ sub installRoots {
     if (!defined($availableRootCAs)) {
       my $rootCertList = $self->k_getAvailableRootCerts();
       if (!defined($rootCertList)) {
-        $rc = CertNanny::Logging->error("No root certificates found in " . $config-get("keystore.$entryname.TrustedRootCA.AUTHORITATIVE.Directory", 'FILE'));
+        $rc = CertNanny::Logging->error('MSG', "No root certificates found in " . $config-get("keystore.$entryname.TrustedRootCA.AUTHORITATIVE.Directory", 'FILE'));
       }
   
       if (!$rc) {
@@ -1091,9 +1031,9 @@ sub installRoots {
           my $certSHA1 = CertNanny::Util->getCertSHA1(%{$certRef})->{CERTSHA1};
           if (exists($availableRootCAs->{$certSHA1})) {
             if (exists($availableRootCAs->{$certSHA1}->{CERTFILE}) and ($certRef->{CERTFILE})) {
-              CertNanny::Logging->debug("Identical root certificate in <" . $availableRootCAs->{$certSHA1}->{CERTFILE} . "> and <" . $certRef->{CERTFILE} . ">");
+              CertNanny::Logging->debug('MSG', "Identical root certificate in <" . $availableRootCAs->{$certSHA1}->{CERTFILE} . "> and <" . $certRef->{CERTFILE} . ">");
             } else {
-              CertNanny::Logging->debug("Identical root certificate <" . $availableRootCAs->{$certSHA1}->{CERTINFO}->{SubjectName} . "> found.");
+              CertNanny::Logging->debug('MSG', "Identical root certificate <" . $availableRootCAs->{$certSHA1}->{CERTINFO}->{SubjectName} . "> found.");
             }
           } else {
             $availableRootCAs->{$certSHA1} = $certRef;
@@ -1103,7 +1043,7 @@ sub installRoots {
     }
 
     if (!defined($availableRootCAs)) {
-      $rc = CertNanny::Logging->error("No root certificates found in " . $config-get("keystore.$entryname.TrustedRootCA.AUTHORITATIVE.dir", 'FILE'));
+      $rc = CertNanny::Logging->error('MSG', "No root certificates found in " . $config-get("keystore.$entryname.TrustedRootCA.AUTHORITATIVE.dir", 'FILE'));
     } else {
       #  my $locName = $self->_generateKeystore();
       $rc = 1 if (!$dest);
@@ -1111,16 +1051,12 @@ sub installRoots {
         # delete every root CA, that does not exist in $availableRootCAs from keystore
         foreach my $certSHA1 (keys %{$installedRootCAs}) {
           if (!exists($availableRootCAs->{$certSHA1}) && ($self->k_getCertType($installedRootCAs->{$certSHA1}) eq 'installedRootCAs')) {
-            CertNanny::Logging->debug("Deleting root cert " . $installedRootCAs->{$certSHA1}->{CERTINFO}->{SubjectName});
+            CertNanny::Logging->debug('MSG', "Deleting root cert " . $installedRootCAs->{$certSHA1}->{CERTINFO}->{SubjectName});
             my @certcmd;
-            if ($OSNAME eq "MSWin32") {
-              @certcmd = (qq("$gsk6cmd"), '-cert', '-delete', '-db', qq("$dest"), '-pw', qq("$self->{PIN}") , '-label' ,qq("$installedRootCAs->{$certSHA1}->{'CERTALIAS'}") );           
-            } else {
-              @certcmd = (qq("$gsk6cmd"), '-cert', '-delete', '-db', qq("$dest"), '-pw', "'".$self->{PIN}."'" , '-label' ,qq("$installedRootCAs->{$certSHA1}->{'CERTALIAS'}") );
-            }  
+            @certcmd = (CertNanny::Util->osq("$gsk6cmd"), '-cert', '-delete', '-db', CertNanny::Util->osq("$dest"), '-pw', CertNanny::Util->osq("$self->{PIN}") , '-label' ,CertNanny::Util->osq("$installedRootCAs->{$certSHA1}->{'CERTALIAS'}") );           
    
-            if (CertNanny::Util->runCommand(\@certcmd, HIDEPWD => 1)) {
-              CertNanny::Logging->error("Error deleting root cert " . $installedRootCAs->{$certSHA1}->{CERTINFO}->{SubjectName});
+            if (CertNanny::Util->runCommand(\@certcmd, HIDEPWD => 1)->{RC}) {
+              CertNanny::Logging->error('MSG', "Error deleting root cert " . $installedRootCAs->{$certSHA1}->{CERTINFO}->{SubjectName});
             }
           }
         }
@@ -1128,7 +1064,7 @@ sub installRoots {
         # copy every root CA, that does not exist in $installedRootCAs to keystore
         foreach my $certSHA1 (keys  %{$availableRootCAs}) {
           if (!exists($installedRootCAs->{$certSHA1})) {
-            CertNanny::Logging->debug("Importing root cert " . $availableRootCAs->{$certSHA1}->{CERTINFO}->{SubjectName});
+            CertNanny::Logging->debug('MSG', "Importing root cert " . $availableRootCAs->{$certSHA1}->{CERTINFO}->{SubjectName});
             my $tmpFile = CertNanny::Util->getTmpFile();
             CertNanny::Util->writeFile(DSTFILE => $tmpFile,
                                        SRCFILE => $availableRootCAs->{$certSHA1}->{'CERTFILE'});
@@ -1139,14 +1075,10 @@ sub installRoots {
             }
             
             my @certcmd;
-            if ($OSNAME eq "MSWin32") {
-               @certcmd = (qq("$gsk6cmd"), '-cert', '-add', '-db', qq("$dest"), '-pw', qq("$self->{PIN}") , '-label' ,qq("$alias") , '-file', $tmpFile ,'-format', 'ascii'  );
-            } else {
-               @certcmd = (qq("$gsk6cmd"), '-cert', '-add', '-db', qq("$dest"), '-pw', "'".$self->{PIN}."'" , '-label' ,qq("$alias") , '-file', $tmpFile ,'-format', 'ascii'  );
-            }      
+            @certcmd = (CertNanny::Util->osq("$gsk6cmd"), '-cert', '-add', '-db', CertNanny::Util->osq("$dest"), '-pw', CertNanny::Util->osq("$self->{PIN}") , '-label' ,CertNanny::Util->osq("$alias") , '-file', $tmpFile ,'-format', 'ascii'  );
      
-            if (CertNanny::Util->runCommand(\@certcmd, HIDEPWD => 1)) {
-              CertNanny::Logging->error("Error importing root cert " . $availableRootCAs->{$certSHA1}->{CERTINFO}->{SubjectName});
+            if (CertNanny::Util->runCommand(\@certcmd, HIDEPWD => 1)->{RC}) {
+              CertNanny::Logging->error('MSG', "Error importing root cert " . $availableRootCAs->{$certSHA1}->{CERTINFO}->{SubjectName});
             } else {
               # collect Postinstallhook information
               $self->{hook}->{Type}   .= 'FILE' . ','                                                               if (defined($self->{hook}->{Type})   && ($self->{hook}->{Type}   !~ m/FILE/s));
@@ -1160,14 +1092,14 @@ sub installRoots {
       
       # copy the temp keystore to $location an delete temp keystore
       if (!File::Copy::copy($dest, $origin)) {
-        $rc = CertNanny::Logging->error("Could not copy new store <$dest> to current store <$origin>");
+        $rc = CertNanny::Logging->error('MSG', "Could not copy new store <$dest> to current store <$origin>");
       } else {
         eval {unlink($dest)};
       }
     }
   }
   
-  CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "Install all available root certificates gsk");
+  CertNanny::Logging->debug('MSG', (eval 'ref(\$self)' ? "End " : "Start ") . (caller(0))[3] . " Install all available root certificates gsk");
   return $rc;
 } ## end sub installRoots
 
@@ -1189,24 +1121,15 @@ sub _buildGskCmd {
   }
   
 
-  my @cmd = (qq("$gsk6cmd"));
+  my @cmd = (CertNanny::Util->osq("$gsk6cmd"));
   # Commands-keydb - create | -cert -add |  -cert -import | -cert -list
-  push(@cmd, -db        => qq("$entry->{db}"))        if ($entry->{db});
-  if ($OSNAME eq "MSWin32") {      
-     push(@cmd, -pw        => qq("$entry->{pw}"))       if ($entry->{pw});
-  }else{
-     push(@cmd, -pw => ("'".$entry->{pw}."'")) if ($entry->{pw});
-  }
-  push(@cmd, -target    => qq("$entry->{target}"))    if ($entry->{target});
-    if ($OSNAME eq "MSWin32") {
-     push(@cmd, -target_pw =>qq("$entry->{target_pw}")) if ($entry->{target_pw});
-  }else{
-     push(@cmd, -target_pw => ("'".$entry->{target_pw}."'")) if ($entry->{target_pw});
-  }
-
-  push(@cmd, -label     => qq("$entry->{label}"))     if ($entry->{label});
-  push(@cmd, -file      => qq("$entry->{file}"))      if ($entry->{file});
-  push(@cmd, -format    => qq("$entry->{format}"))    if ($entry->{format});
+  push(@cmd, -db        => CertNanny::Util->osq("$entry->{db}"))        if ($entry->{db});
+  push(@cmd, -pw        => CertNanny::Util->osq("$entry->{pw}"))        if ($entry->{pw});
+  push(@cmd, -target    => CertNanny::Util->osq("$entry->{target}"))    if ($entry->{target});
+  push(@cmd, -target_pw => CertNanny::Util->osq("$entry->{target_pw}")) if ($entry->{target_pw});
+  push(@cmd, -label     => CertNanny::Util->osq("$entry->{label}"))     if ($entry->{label});
+  push(@cmd, -file      => CertNanny::Util->osq("$entry->{file}"))      if ($entry->{file});
+  push(@cmd, -format    => CertNanny::Util->osq("$entry->{format}"))    if ($entry->{format});
   push(@cmd, @_);
   @cmd;
 }
@@ -1238,12 +1161,12 @@ sub _getIBMJavaEnvironment {
       $gsk6cmd = $options->{gskcmd};   
     }
 
-    my $cmd = qq("$gsk6cmd") . " -version";
+    my $cmd = CertNanny::Util->osq("$gsk6cmd") . " -version";
 
-    CertNanny::Logging->debug("Execute: $cmd");
+    CertNanny::Logging->debug('MSG', "Execute: <$cmd>");
     open my $fh, $cmd . '|';
     if (!$fh) {
-      CertNanny::Logging->error("getIBMJavaEnvironment(): could not run gskit command line executable");
+      CertNanny::Logging->error('MSG', "getIBMJavaEnvironment(): could not run gskit command line executable");
       return undef;
     }
 
@@ -1259,13 +1182,13 @@ sub _getIBMJavaEnvironment {
       }
     }
     close $fh;
-    CertNanny::Logging->error("getIBMJavaEnvironment(): could not determine GSK classpath");
+    CertNanny::Logging->error('MSG', "getIBMJavaEnvironment(): could not determine GSK classpath");
     return undef;
   } else {
     # assume we have a Unix-like system
     my $javacmd = File::Spec->catfile($ENV{JAVA_HOME}, 'bin', 'java');
     if (!-x $javacmd) {
-      CertNanny::Logging->error("getIBMJavaEnvironment(): could not determine Java executable (JAVA_HOME not set?)");
+      CertNanny::Logging->error('MSG', "getIBMJavaEnvironment(): could not determine Java executable (JAVA_HOME not set?)");
       return undef;
     }
     $options->{JAVA} = $javacmd;
@@ -1278,12 +1201,12 @@ sub _getIBMJavaEnvironment {
     }
 
     my $cmd = ". $gsk6cmd >/dev/null 2>&1 ; echo \$JAVA_FLAGS";
-    CertNanny::Logging->debug("Execute: $cmd");
+    CertNanny::Logging->debug('MSG', "Execute: <$cmd>");
     my $classpath = `$cmd`;
     chomp $classpath;
 
     if (($? != 0) or (!defined $classpath) or ($classpath eq "")) {
-      CertNanny::Logging->error("getIBMJavaEnvironment(): could not determine GSK classpath");
+      CertNanny::Logging->error('MSG', "getIBMJavaEnvironment(): could not determine GSK classpath");
       return undef;
     }
 
@@ -1291,7 +1214,7 @@ sub _getIBMJavaEnvironment {
     $classpath =~ s/-?-\w+//g;
     $classpath =~ s/^\s+|\s+$//g ;
 
-    CertNanny::Logging->debug("gsk6cmd classpath: $classpath");
+    CertNanny::Logging->debug('MSG', "gsk6cmd classpath: $classpath");
 
     $options->{GSKIT_CLASSPATH} = $classpath;
 
@@ -1309,7 +1232,7 @@ sub _unStash {
 
   my $content = CertNanny::Util->readFile($stashfile);
   if (!defined $content) {
-    CertNanny::Logging->error("_unStash(): Could not open input file $stashfile");
+    CertNanny::Logging->error('MSG', "_unStash(): Could not open input file $stashfile");
     return undef;
   }
 
@@ -1340,27 +1263,11 @@ sub _getCertLabel {
      $gsk6cmd = $self->{OPTIONS}->{gskcmd};   
   }
 
-
   # get label name for user certificate
-   my @cmd;
-  if ($OSNAME eq "MSWin32") {  
-     @cmd = (qq("$gsk6cmd"), '-cert', '-list', 'personal', '-db', qq("$filename"), '-pw', qq("$self->{PIN}"));
-  }else{
-     @cmd = (qq("$gsk6cmd"), '-cert', '-list', 'personal', '-db', qq("$filename"), '-pw', "'".$self->{PIN}."'");
-  }
+  my @cmd;
+  @cmd = (CertNanny::Util->osq("$gsk6cmd"), '-cert', '-list', 'personal', '-db', CertNanny::Util->osq("$filename"), '-pw', CertNanny::Util->osq("$self->{PIN}"));
 
-
-  #my $fh;
-  #if (!open $fh, join(" ", @cmd) . "|") {
-
-# if (CertNanny::Util->runCommand(\@cmd,WANTOUT => 1, HIDEPWD => 1) != 0) { 
-#  CertNanny::Logging->error("getCert(): could not run gsk6cmd");
-#    return undef;
-#  }
-  #binmode $fh;
-
-  my  @certList = CertNanny::Util->runCommand(\@cmd, WANTOUT => 1, HIDEPWD => 1);
-
+  my  @certList = @{CertNanny::Util->runCommand(\@cmd, HIDEPWD => 1)->{STDOUT}};
   my $label;
   my $match = $self->{OPTIONS}->{ENTRY}->{labelmatch} || "ibmwebspheremq.*";
   
@@ -1370,28 +1277,13 @@ sub _getCertLabel {
    $entry =~ s{ \A [\-!*]+ \s* }{}xms;
    if ($entry =~ m/$match/) { 
     $label = $entry;
-    CertNanny::Logging->debug("found label '$label'");
+    CertNanny::Logging->debug('MSG', "found label '$label'");
     }
   }
-  #my $label;
-  #my $match = $self->{OPTIONS}->{ENTRY}->{labelmatch} || "ibmwebspheremq.*";
-
-  #while (<$fh>) {
-  #  chomp;
-  #  next if /Certificates in database/;
-  #  s/^\s*//;
-  #  s/\s*$//;
-  #  if (!defined $match
-  #      or /$match/) {
-  #    $label = $_;
-  #    last;
-  #  }
- # } ## end while (<$fh>)
-  #close $fh;
   chomp($label);
 
   if (!defined $label) {
-    CertNanny::Logging->error("getCert(): could not get label");
+    CertNanny::Logging->error('MSG', "getCert(): could not get label");
     return undef;
   }
  $label =~ s/^\s+|\s+$//g ;
@@ -1414,7 +1306,7 @@ sub getCertLocation {
   # Output: caller gets a hash ref:
   #           <locationname in lowercase> => <Location>
   #         or undef on error
-  CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "get the key specific locations for certificates");
+  CertNanny::Logging->debug('MSG', (eval 'ref(\$self)' ? "End " : "Start ") . (caller(0))[3] . " get the key specific locations for certificates");
   my $self = shift;
   my %args = (TYPE => 'TrustedRootCA',
               @_);
@@ -1444,7 +1336,7 @@ sub getCertLocation {
     }
   }
 
-  CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "get the key specific locations for certificates");
+  CertNanny::Logging->debug('MSG', (eval 'ref(\$self)' ? "End " : "Start ") . (caller(0))[3] . " get the key specific locations for certificates");
   return $rc
 } ## end sub getKey
 

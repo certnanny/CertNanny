@@ -39,6 +39,7 @@ use File::Glob qw(:globally :case);
 use Net::Domain;
 
 use Data::Dumper;
+use Carp;
 
 use CertNanny::Util;
 use CertNanny::Logging;
@@ -76,7 +77,7 @@ sub new {
     $self->{CONFIGFILE} = $args{config};
     $self->{CONFIGPATH} = (fileparse($self->{CONFIGFILE}))[1];
 
-    CertNanny::Logging->info("CertNanny started with configfile <$self->{CONFIGFILE}>");
+    CertNanny::Logging->info('MSG', "CertNanny started with configfile <$self->{CONFIGFILE}>");
 
     $self->_parse() || return undef;
   }
@@ -472,10 +473,10 @@ sub _parse {
       foreach my $filename1 (keys %{$self->{CONFIGFILES}}) {
         foreach my $filename2 (keys %{$self->{CONFIGFILES}}) {
           if (($filename1 ne $filename2) && ($self->{CONFIGFILES}{$filename1}{SHA} eq $self->{CONFIGFILES}{$filename2}{SHA})) {
-            CertNanny::Logging->error("double configfile: $filename1 SHA1: $self->{CONFIGFILES}{$filename1}{SHA} <> $filename2 SHA1: $self->{CONFIGFILES}{$filename2}{SHA}");
+            CertNanny::Logging->error('MSG', "double configfile: <$filename1> SHA1: $self->{CONFIGFILES}{$filename1}{SHA} <> $filename2 SHA1: $self->{CONFIGFILES}{$filename2}{SHA}");
           }
         }
-        CertNanny::Logging->info("$filename1 SHA1: $self->{CONFIGFILES}{$filename1}{SHA}");
+        CertNanny::Logging->info('MSG', "<$filename1> SHA1: $self->{CONFIGFILES}{$filename1}{SHA}");
       }
     } ## end else [ if (exists($self->{CONFIGFILES...}))]
 
@@ -484,7 +485,9 @@ sub _parse {
       $self->_inheritConfig($self->{CONFIG}->{keystore}, $entry);
     }
   } else {
-    CertNanny::Logging->error("No openssl shell specified");
+    $rc = "No valid openssl shell specified";
+    CertNanny::Logging->error('MSG', $rc);
+    croak("Configuration File Error: " . $rc);
     $rc = undef;
   }
   
@@ -501,8 +504,8 @@ sub _sha1_hex {
   my $sha;
   my $openssl = $self->get('cmd.openssl', 'CMD');
   if (defined($openssl)) {
-    my @cmd = (qq("$openssl"), 'dgst', '-sha', qq("$file"));
-    chomp($sha = CertNanny::Util->runCommand(\@cmd, WANTOUT => 1));
+    my @cmd = (CertNanny::Util->osq($openssl), 'dgst', '-sha', CertNanny::Util->osq($file));
+    chomp($sha = shift(@{CertNanny::Util->runCommand(\@cmd)->{STDOUT}}));
     if ($sha =~ /^.*\)= (.*)$/) {
       $sha = $1;
     }
@@ -517,7 +520,6 @@ sub _parseFile {
   my $configFile   = shift || $self->{CONFIGFILE};
   my $configPrefix = shift;
   
-  # CertNanny::Logging->printout(sprintf("Parsing <%s> in dir <%s> with prefix <%s>\n", $configFile, $configPath, $configPrefix));
   # Parsing is done in the following steps
   #  - initialize datastructures (only done once)
   #  - read all lines
@@ -546,7 +548,7 @@ sub _parseFile {
     $self->{CFGFLAG} = {};
   } ## end if (!exists($self->{CONFIGFILES...}))
 
-  CertNanny::Logging->debug("reading $configFile");
+  CertNanny::Logging->debug('MSG', "reading <$configFile>");
 
   #  - read all lines
   seek $handle,0,0;
@@ -599,13 +601,13 @@ sub _parseFile {
         $var = $var->{$confPart};
       }
       if ($doDupCheck && defined($var->{$key})) {
-        CertNanny::Logging->printerr("Config file $configFile ERROR: duplicate value definition in line $lnr ($line)\n");
+        CertNanny::Logging->error('STR', "Config file <$configFile> ERROR: duplicate value definition in line $lnr ($line)\n");
       }
       
       while ($val =~ m{__ENV__(.*?)__}xms) {
         my $envvar = $1;
         if (! exists $ENV{$envvar}) {
-          CertNanny::Logging->info("Config file $configFile WARNING: Environment variable $envvar referenced in line $lnr does not exist");
+          CertNanny::Logging->info('MSG', "Config file <$configFile> WARNING: Environment variable $envvar referenced in line $lnr does not exist");
         }
         my $myENVvar = $ENV{$envvar} || '';
         $val =~ s{__ENV_(.*?)__}{$myENVvar}xms;
@@ -614,7 +616,7 @@ sub _parseFile {
       $var->{$key} = $val;
     } else {
       if ($line !~ /^(include|keystores)\s+(.+)$/) {
-        CertNanny::Logging->printerr("Config file $configFile ERROR: parse error in line $lnr ($line)\n");
+        CertNanny::Logging->error('STR', "Config file <$configFile> ERROR: parse error in line $lnr ($line)\n");
       }
     }
   }
@@ -634,7 +636,6 @@ sub _parseFile {
 
   #  - recursive execute _parsefile for all includes
   while (($lnr, $line) = each(%lines)) {
-    # CertNanny::Logging->printerr("Line: $line\n");
     if ($line =~ /^\s*(include|keystores)[\s=]+(.+)\s*$/) {
       my $includeType = $1;
       my @includeList = split(' ', $2);
