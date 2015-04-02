@@ -182,7 +182,7 @@ sub runCommand {
     }
     $self->forgetTmpFile('FILE', $tmpFile);
   }
-  $result->{STDOUT} = \@stdoutArr;
+  $result->{STDERR} = \@stderrArr;
 
   return $result;
 } ## end sub runCommand

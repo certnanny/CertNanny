@@ -47,7 +47,7 @@ sub new {
 
   my @cmd;
   my @keys;
-
+  
   # Needs at least
   #  - Keytool executable
   #  - Java executable
@@ -56,13 +56,15 @@ sub new {
   $options->{keytool} = $config->get('cmd.keytool', 'CMD');
   croak "cmd.keytool not found" unless (defined $options->{keytool});
   
-  @cmd = (CertNanny::Util->osq("$options->{keytool}"), "2>&1");
-  @keys = @{CertNanny::Util->runCommand(\@cmd)->{STDOUT}};
+  @cmd = CertNanny::Util->osq("$options->{keytool}");
+  @keys = @{CertNanny::Util->runCommand(\@cmd)->{STDERR}};
   my $rightKeytoolVersion = 0;
   foreach (@keys) {
-    $rightKeytoolVersion |= $_ =~ /-importkeystore/;
-  }  
-  croak "Wrong keytool version (<=1.5cmd): $options->{keytool}" unless $rightKeytoolVersion;
+    if ($_ =~ /-importkeystore/) {
+      $rightKeytoolVersion = 1;
+    }
+  }
+  croak "Wrong keytool version (<=1.5cmd): $options->{keytool}" if !$rightKeytoolVersion;
   
   $options->{java}   = $config->get('cmd.java', 'CMD');
   $options->{java} ||= File::Spec->catfile($ENV{JAVA_HOME}, 'bin', 'java') if (defined $ENV{JAVA_HOME});

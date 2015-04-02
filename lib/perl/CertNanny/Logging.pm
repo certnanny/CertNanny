@@ -479,7 +479,7 @@ sub _log {
   my $logStr = '';
   if (defined($args{PRIO})) {
     # confess "Not a hash ref" unless (ref($arg) eq "HASH");
-    return undef unless (defined $args{MSG});
+    return undef unless (defined $args{MSG} || defined $args{STR});
     my ($subroutine, $i, $line) = ('', 0, 0);
     # It's a debug, notice, etc. message, so we add a timestamp, etc.
     while (defined(caller($i))) {
@@ -536,8 +536,7 @@ sub Err {
     # Call by Destroy => Flush outBuffer
     $args{FLUSH} = 1;
   }
-  $self->_log('TARGET', 'err', 
-              'PRIO',   0,
+  $self->_log('TARGET', 'err',
               %args);
 
   return 1;

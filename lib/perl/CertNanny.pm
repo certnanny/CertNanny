@@ -229,7 +229,12 @@ sub do_dump {
   my $config    = $self->{CONFIG};
   my $target = $self->getOption('keystore');
 
-  if ($self->{OPTION}->{object} eq 'data') {
+  # If a dump is requested, it should go to console not matter what is specified by commandline or configfile
+  CertNanny::Logging->switchConsoleErr('STATUS', 1);
+  CertNanny::Logging->switchConsoleOut('STATUS', 1);
+  # and by the way we do not want all the junk on the concole
+  CertNanny::Logging->logLevel('TARGET', 'console', 'LEVEL', 0);
+  if ($self->{OPTION}->{object}  =~ /^data/) {
     my @hashname;
     $self->_dumpValue(\%{$config->{CONFIG}}, \@hashname);
   } elsif ($self->{OPTION}->{object} eq 'cfg') {
@@ -318,8 +323,8 @@ sub do_dump {
                                    'VALUE', 'Common');
     }
   } else {
-    CertNanny::Logging->switchConsoleErr('STATUS', 1);
-    CertNanny::Logging->Err('STR', "Missing Argument: --object cfg|data|keystore|certificate   specifies the object to be dumped\n");
+#    CertNanny::Logging->switchConsoleErr('STATUS', 1);
+    CertNanny::Logging->Err('STR', "Missing Argument: --object cfg|data|key|cert   specifies the object to be dumped\n");
   }
   
   CertNanny::Logging->debug('MSG', (eval 'ref(\$self)' ? "End " : "Start ") . (caller(0))[3] . " Dump");
@@ -381,7 +386,7 @@ sub do_check {
       CertNanny::Logging->debug('MSG', "------------------------------------");
     }
   }
-
+  
   CertNanny::Logging->debug('MSG', (eval 'ref(\$self)' ? "End " : "Start ") . (caller(0))[3] . " Check");
   return $rc;
 } ## end sub do_check

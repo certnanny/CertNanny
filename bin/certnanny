@@ -283,74 +283,73 @@ certnanny - Certificate monitoring and renewal client
 
 certnanny [OPTIONS...] COMMAND [ARGUMENTS...]    
  
-  check                 Check all configured keystores
-  renew                 Run automatic renewal on all configured keystores
-  enroll                Run inital enrollment for configured keystores 
-                        that do NOT have a certificate installed.
-  cleanup               Clear the internal state of CertNanny for a pending 
-                        certificate renewal.
-  install               Install CertNanny as a Windows Service (applicable
-                        only on Windows platforms)
-  uninstall             Uninstall CertNanny service (applicable only on 
-                        Windows platforms)
-  updateRootCA          Run trusted root CA certificate update via SCEP 
-  test                  Test the keystore integrity
-  dump                  Dump the content of CertNanny Objects to STDOUT. The
-                        Object to be dumped is given as an argument. Valid 
-                        arguments are
-                          cfg        : Dump content of the configuration file.
-                          data       : Dump internal data structure
-                          keystore   : Dump defined keystores and related
-                                       configuration files
-                          certificate: Dump certificate information
-  executeHook --hook HOOK --keystore KEYSTORE [--define KEY=VALUE]
-
-Executes the hook HOOK for the keystore KEYSTORE. The --keystore option is mandatory.
-
-
+  check            Check all configured keystores.
+  renew            Run automatic renewal on all configured keystores.
+  enroll           Run inital enrollment for configured keystores
+                   that do NOT have a certificate installed.
+  cleanup          Clear the internal state of CertNanny for a pending 
+                   certificate renewal.
+  install          Install CertNanny as a Windows Service (applicable
+                   only on Windows platforms).
+  uninstall        Uninstall CertNanny service (applicable only on 
+                   Windows platforms).
+  updateRootCA     Run trusted root CA certificate update via SCEP 
+  test             Test the keystore integrity.
+  dump             Dump the content of a CertNanny object to STDOUT.
+                   Mandatory option is --obj to specify the object.
+  executeHook      Executes a hook for a specific keystore. 
+                   Mandatory options are --key and --hook.
+  
 =head1 OPTIONS
 
-  --help                Brief help message
-  --man                 Full documentation
+  --help           Brief help message.
+  --man            Full documentation.
 
-  --config FILE         specify config file to use
-  --debug [LEVEL]       Override loglevel in CertNanny configuration file. 
-                        LEVEL is optional.
-                        If LEVEL is a number between 1-6 (i.E.: --debug 5) the
-                        output to all possible debug target is set identically
-                        to LEVEL.
-                        If LEVEL is set to a string (i.E. --debug C1F5S2),
-                        there will be different debug levels for targets
-                        console (C1 -> level 1), file (f5 -> level 5) and
-                        syslog (s2-> level 2).
-  --verbose             Generate more information about the operations perfor-
-                        med by CertNanny (equal debug level 6). The verbose 
-                        information will be written to STDERR. 
-  --keystore KEYSTORE   Optional. Limit specified CertNanny command to keystore 
-                        KEYSTORE. 
-                        Default: all configured keystores
-                        Optional
-  --force               Optional. If specified forces the execution of certain 
-                        activities, e. g. a renewal operation even though the 
-                        existing is still valid.
-  --dryrun              Optional. If specified the command will not perform an 
-                        actual SCEP request, instead dump data to STDOUT (see 
-                        renew command).
+  --cfg FILE       specify config file to use. Synonyms are --cfgfile,
+                   --conf or --config
+  --debug [LEVEL]  Override loglevel in CertNanny configuration file. 
+                   LEVEL is optional.
+                   If LEVEL is a number between 1-6 (i.E.: --debug 5) the
+                   output to all possible debug target is set identically
+                   to LEVEL.
+                   If LEVEL is set to a string (i.E. --debug c1f5s2),
+                   there will be different debug levels for targets
+                   console (c1 -> level 1), file (f5 -> level 5) and
+                   syslog (s2-> level 2).
+  --verbose        Generate more information about the operations perfor-
+                   med by CertNanny (equal debug level 6). The verbose 
+                   information will be written to STDERR. 
+  --key KEYSTORE   Optional. Limit specified CertNanny command to keystore 
+                   KEYSTORE. Synonym is --keystore
+                   Default: all configured keystores
+  --force          If specified forces the execution of certain activities, 
+                   e.g. a renewal operation even though the existing 
+                   certificate is still valid.
 
 =head1 ARGUMENTS
 
-  --challengepassword PWD     specify a challenge password to use for an
-                              initial enrollment (all keystores)
-  --win_user USER             specify alternative Windows username to run the 
-                              Windows Service
-  --win_password PWD          specify password corresponding to win_user
-  --hook HOOK                 Execute the spezified hook
-  --define KEY=VALUE          Overwrite the KEY at Hook execution with the 
-                              given value
-  --object cfg|certificate|   specifies the object to be dumped
-           data|keystore                
+  --challenge PWD  specify a challenge password to use for an inital
+                   enrollment (all keystores).
+                   Synonym is --challengepassword
+  --usr USER       specify alternative Windows username to run the 
+                   Windows Service.
+                   Synonyms are --win_usr or --win_user
+  --pwd PWD        specify password corresponding to win_user.
+                   Synonyms are --win_password or --win_pwd
+  --hook HOOK      Execute the spezified hook.
+  --def KEY=VALUE  Overwrite the KEY at Hook execution with the 
+                   given value.
+  --obj cfg|cert|  specifies the object to be dumped.
+        data|key   Possible Values are:
+                     cfg : Dump content of the configuration file.
+                     data: Dump internal data structure
+                     key : Dump defined keystores and related
+                           configuration files
+                     cert: Dump certificate information
+                   Synonym is --object
                         
-                        
+
+
 =head1 DESCRIPTION
 
 CertNanny usecases:

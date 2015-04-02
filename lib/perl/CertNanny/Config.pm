@@ -520,6 +520,8 @@ sub _parseFile {
   my $configFile   = shift || $self->{CONFIGFILE};
   my $configPrefix = shift;
   
+  my $rc = undef;
+  
   # Parsing is done in the following steps
   #  - initialize datastructures (only done once)
   #  - read all lines
@@ -533,138 +535,142 @@ sub _parseFile {
     $configFile = $configPath . $configFile;
     $handle     = new IO::File "<" . $configFile;
   }
-  return undef if (!defined $handle);
+  if (!defined $handle) {
+    CertNanny::Logging->error('STR', "Config file <$configFile> ERROR: Could not read file!\n");
+  } else {
+    # Initialize Hash
+    if (!exists($self->{CONFIGFILES})) {
+      $self->{CONFIGFILES} = \my %dummy;
+      $self->{CFGMTIME} = (stat($configFile))[9];
 
-  # Initialize Hash
-  if (!exists($self->{CONFIGFILES})) {
-    $self->{CONFIGFILES} = \my %dummy;
-    $self->{CFGMTIME} = (stat($configFile))[9];
+      # set implicit defaults
+      $self->{CONFIG}  = {keystore => {DEFAULT => {autorenew_days   => 30,
+                                                   warnexpiry_days  => 20,
+                                                   type             => 'none',
+                                                   scepsignaturekey => 'new',},},};
+      $self->{CFGFLAG} = {};
+    } ## end if (!exists($self->{CONFIGFILES...}))
 
-    # set implicit defaults
-    $self->{CONFIG}  = {keystore => {DEFAULT => {autorenew_days   => 30,
-                                                 warnexpiry_days  => 20,
-                                                 type             => 'none',
-                                                 scepsignaturekey => 'new',},},};
-    $self->{CFGFLAG} = {};
-  } ## end if (!exists($self->{CONFIGFILES...}))
+    CertNanny::Logging->debug('MSG', "Config file <$configFile> INFO: Reading");
 
-  CertNanny::Logging->debug('MSG', "reading <$configFile>");
-
-  #  - read all lines
-  seek $handle,0,0;
-  my $lnr = 0;
-  my $line; 
-  my %lines;
-  while (chomp($line = <$handle>)) {
-    $lnr++;
-    $line =~ s/^\s+|\s+$|\r\n//g; # Remove leading Blanks, trailing Blanks, Windows EOL
-    $line =~ s/^#.*//g;           # comment lines
-    $lines{$lnr} = $line if $line;
-  }
-  $handle->close();
+    #  - read all lines
+    seek $handle,0,0;
+    my $lnr = 0;
+    my $line; 
+    my %lines;
+    while (chomp($line = <$handle>)) {
+      $lnr++;
+      $line =~ s/^\s+|\s+$|\r\n//g; # Remove leading Blanks, trailing Blanks, Windows EOL
+      $line =~ s/^#.*//g;           # comment lines
+      $lines{$lnr} = $line if $line;
+    }
+    $handle->close();
   
-  #  - evaluate all lines
-  my %keystore;
-  my @prefix = split(/\./, $configPrefix);
-  while (($lnr, $line) = each(%lines)) {
-    if ($line =~ /^(.+?)\s*=\s*(\S.*?)\s*(\s#\s.*)?$/ || /^(\S.*?)\s*=?\s*(\s#\s.*)?$/) {
-      my @path = split(/\./, $1);
-      for (my $i=0; $i<=$#prefix; $i++) {
-        if ($prefix[$i] ne $path[$i]) {
-          @path = (@prefix, @path); 
-          last;
+    #  - evaluate all lines
+    my %keystore;
+    my @prefix = split(/\./, $configPrefix);
+    while (($lnr, $line) = each(%lines)) {
+      if ($line =~ /^(.+?)\s*=\s*(\S.*?)\s*(\s#\s.*)?$/ || /^(\S.*?)\s*=?\s*(\s#\s.*)?$/) {
+        my @path = split(/\./, $1);
+        for (my $i=0; $i<=$#prefix; $i++) {
+          if ($prefix[$i] ne $path[$i]) {
+            @path = (@prefix, @path); 
+            last;
+          }
         }
-      }
-      $keystore{$path[1]} = 1 if (lc($path[0]) eq 'keystore');
-      my ($val, $var);
-      if (defined($2) && $2 !~ /^\s*#\s.*$/) {
-        $val = $2;
-        $var = $self->{CONFIG};
-      } else {
-        $var = $self->{CFGFLAG};
-      }
-      my $key  = pop(@path);
-
-      my $doDupCheck;
-      foreach my $confPart (@path) {
-        $doDupCheck = ("$confPart" ne "DEFAULT");
-        # if ("$confPart" eq "DEFAULT") {
-        #   $doDupCheck = 0;
-        # } else {
-        #   $doDupCheck = 1;
-        #   $confPart = lc($confPart);
-        # }
-        if (!exists $var->{$confPart}) {
-          $var->{$confPart} = {};
-          $var->{$confPart}->{INHERIT} = "DEFAULT";
-        }
-        $var = $var->{$confPart};
-      }
-      if ($doDupCheck && defined($var->{$key})) {
-        CertNanny::Logging->error('STR', "Config file <$configFile> ERROR: duplicate value definition in line $lnr ($line)\n");
-      }
-      
-      while ($val =~ m{__ENV__(.*?)__}xms) {
-        my $envvar = $1;
-        if (! exists $ENV{$envvar}) {
-          CertNanny::Logging->info('MSG', "Config file <$configFile> WARNING: Environment variable $envvar referenced in line $lnr does not exist");
-        }
-        my $myENVvar = $ENV{$envvar} || '';
-        $val =~ s{__ENV_(.*?)__}{$myENVvar}xms;
-      }
-
-      $var->{$key} = $val;
-    } else {
-      if ($line !~ /^(include|keystores)\s+(.+)$/) {
-        CertNanny::Logging->error('STR', "Config file <$configFile> ERROR: parse error in line $lnr ($line)\n");
-      }
-    }
-  }
-
-  #  - replace all found variables
-  while (($lnr, $line) = each(%lines)) {
-    _replaceVariables($self, \%lines, $lnr);
-  }
-
-  #  - store content for operation 'status'
-  $self->{CONFIGFILES}{$configFile}{CONTENT} = \%lines;
-
-  #  - store keystores, that are defined by this configfile
-  my @dummy;
-  foreach (keys(%keystore)) {push (@dummy, $_)}
-  $self->{CONFIGFILES}{$configFile}{KEYSTORE} = \@dummy;
-
-  #  - recursive execute _parsefile for all includes
-  while (($lnr, $line) = each(%lines)) {
-    if ($line =~ /^\s*(include|keystores)[\s=]+(.+)\s*$/) {
-      my $includeType = $1;
-      my @includeList = split(' ', $2);
-      foreach my $item (@includeList) {
-        my $prefix;
-        my $configFileGlob;
-        my @configFileList;
-        if ($includeType eq 'keystores') {
-          $configFileGlob = 'Keystore-'.$item.'.cfg';
-          $prefix         = 'keystore.' . $item;
+        $keystore{$path[1]} = 1 if (lc($path[0]) eq 'keystore');
+        my ($val, $var);
+        if (defined($2) && $2 !~ /^\s*#\s.*$/) {
+          $val = $2;
+          $var = $self->{CONFIG};
         } else {
-          $configFileGlob = $item;
+          $var = $self->{CFGFLAG};
+        }
+        my $key  = pop(@path);
+
+        my $doDupCheck;
+        foreach my $confPart (@path) {
+          $doDupCheck = ("$confPart" ne "DEFAULT");
+          # if ("$confPart" eq "DEFAULT") {
+          #   $doDupCheck = 0;
+          # } else {
+          #   $doDupCheck = 1;
+          #   $confPart = lc($confPart);
+          # }
+          if (!exists $var->{$confPart}) {
+            $var->{$confPart} = {};
+            $var->{$confPart}->{INHERIT} = "DEFAULT";
+          }
+          $var = $var->{$confPart};
+        }
+        if ($doDupCheck && defined($var->{$key})) {
+          CertNanny::Logging->error('STR', "Config file <$configFile> ERROR: Duplicate value definition in line $lnr ($line)\n");
+        }
+      
+        while ($val =~ m{__ENV__(.*?)__}xms) {
+          my $envvar = $1;
+          if (! exists $ENV{$envvar}) {
+            CertNanny::Logging->info('MSG', "Config file <$configFile> WARNING: Environment variable $envvar referenced in line $lnr does not exist");
+          }
+          my $myENVvar = $ENV{$envvar} || '';
+          $val =~ s{__ENV_(.*?)__}{$myENVvar}xms;
         }
 
-        # Test if $configFileGlob contains regular files
-        @configFileList = @{CertNanny::Util->fetchFileList($configFileGlob)};
-   
-        if (!@configFileList) {
-          $configFileGlob = $configPath . $configFileGlob;
-          @configFileList = @{CertNanny::Util->fetchFileList($configFileGlob)};
-        }
-        foreach my $file (@configFileList) {
-          $self->_parseFile((fileparse($file))[1], $file, $prefix);
+        $var->{$key} = $val;
+      } else {
+        if ($line !~ /^(include|keystores)\s+(.+)$/) {
+          CertNanny::Logging->error('STR', "Config file <$configFile> ERROR: Parse error in line $lnr ($line)\n");
         }
       }
     }
-  }
-  1;
-} ## end sub _parseFile
+
+    #  - replace all found variables
+    while (($lnr, $line) = each(%lines)) {
+      _replaceVariables($self, \%lines, $lnr);
+    }
+
+    #  - store content for operation 'status'
+    $self->{CONFIGFILES}{$configFile}{CONTENT} = \%lines;
+
+    #  - store keystores, that are defined by this configfile
+    my @dummy;
+    foreach (keys(%keystore)) {push (@dummy, $_)}
+    $self->{CONFIGFILES}{$configFile}{KEYSTORE} = \@dummy;
+
+    #  - recursive execute _parsefile for all includes
+    while (($lnr, $line) = each(%lines)) {
+      if ($line =~ /^\s*(include|keystores)[\s=]+(.+)\s*$/) {
+        my $includeType = $1;
+        my @includeList = split(' ', $2);
+        foreach my $item (@includeList) {
+          my $prefix;
+          my $configFileGlob;
+          my @configFileList;
+          if ($includeType eq 'keystores') {
+            $configFileGlob = 'Keystore-'.$item.'.cfg';
+            $prefix         = 'keystore.' . $item;
+          } else {
+            $configFileGlob = $item;
+          }
+
+          # Test if $configFileGlob contains regular files
+          @configFileList = @{CertNanny::Util->fetchFileList($configFileGlob)};
+   
+          if (!@configFileList) {
+            $configFileGlob = $configPath . $configFileGlob;
+            @configFileList = @{CertNanny::Util->fetchFileList($configFileGlob)};
+          }
+          foreach my $file (@configFileList) {
+            $self->_parseFile((fileparse($file))[1], $file, $prefix);
+          }
+        }
+      }
+    }
+    $rc = 1;
+  };
+  
+  return $rc;
+  } ## end sub _parseFile
 
 
 sub _replaceVariables {
