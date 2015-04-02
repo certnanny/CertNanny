@@ -165,9 +165,13 @@ sub _iterate_entries {
                                             ENTRY     => $self->{ITEMS}->{$entryname}, # all keystore parameters from configfile
                                             ENTRYNAME => $entryname);                  # and the keystore name from configfile
     # Keystore exists -> normal Operation
-    if ($keystore) {
+    if (ref($keystore)) {
       $self->$action(ENTRYNAME => $entryname,
                      KEYSTORE  => $keystore);
+    } elsif (defined($keystore)) {
+      CertNanny::Logging->Err('STR', "Keystore: $entryname: $keystore\n");
+      CertNanny::Util->Exit('RC',  '1', 
+                            'MSG', "Keystore: $entryname: $keystore\n");
     } else {
       # Keystore does not exists -> create new Keystore (enroll) no matter wether we did a renew or an enroll
       CertNanny::Logging->error('MSG', "Could not instantiate keystore <$entryname>");
@@ -576,13 +580,13 @@ sub do_enroll {
             #$self->{INSTANCE}->k_retrieveState() or return undef;
 
             # check if we can write to the file
-            $newkeystore->{INSTANCE}->k_storeState() || croak "Could not write state file $newkeystore->{STATE}->{FILE}";
+            if ($newkeystore->{INSTANCE}->k_storeState()) {croak "Could not write state file $newkeystore->{STATE}->{FILE}"}
           } ## end if ($renewalstate eq 'sendrequest')
 
           if ($renewalstate eq 'completed') {
             my $isValid = $newkeystore->{INSTANCE}->k_checkValidity($self->{ITEMS}->{$args{ENTRY}}->{autorenew_days});
             CertNanny::Logging->info('MSG', "Initial enrollment completed successfully. Onbehalf.");
-            $newkeystore->{INSTANCE}->k_storeState() || croak "Could not write state file $newkeystore->{STATE}->{FILE}";
+            if ($newkeystore->{INSTANCE}->k_storeState()) {croak "Could not write state file $newkeystore->{STATE}->{FILE}"}
           }
         } else {
           CertNanny::Logging->info('MSG', "Initial enrollment request still pending.");
@@ -728,7 +732,7 @@ sub do_enroll {
 
         if (defined $renewalstate and $renewalstate eq 'sendrequest') {
           CertNanny::Logging->info('MSG', "Initial enrollment request send.");
-          $keystore->{INSTANCE}->k_storeState() || croak "Could not write state file $keystore->{STATE}->{FILE}";
+          if ($keystore->{INSTANCE}->k_storeState()) {croak "Could not write state file $keystore->{STATE}->{FILE}"}
         }
 
         if (!defined $renewalstate) {

@@ -58,8 +58,7 @@ sub new {
   # sample sanity checks for configuration settings
   foreach my $parameter (qw(location)) {
     if (!defined $entry->{$parameter} || (!-r $entry->{$parameter})) {
-      croak("keystore.$parameter $entry->{$parameter} not defined, does not exist or unreadable");
-      return undef;
+      return "keystore.$parameter $entry->{$parameter} not defined, does not exist or unreadable";
     }
   }
 
@@ -70,7 +69,9 @@ sub new {
   $self->k_retrieveState() || return undef;
 
   # check if we can write to the file
-  $self->k_storeState()    || croak "Could not write state file $self->{STATE}->{FILE}";
+  if (my $storeErrState = $self->k_storeState()) {
+    return $storeErrState;
+  }
 
   # return new keystore object
   return $self;

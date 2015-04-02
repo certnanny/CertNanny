@@ -54,30 +54,18 @@ sub new {
   #  - location
   #  - pin
   $options->{keytool} = $config->get('cmd.keytool', 'CMD');
-  croak "cmd.keytool not found" unless (defined $options->{keytool});
+  return "cmd.keytool not found" if ! defined($options->{keytool});
   
   @cmd = CertNanny::Util->osq("$options->{keytool}");
   @keys = @{CertNanny::Util->runCommand(\@cmd)->{STDERR}};
-  my $rightKeytoolVersion = 0;
-  foreach (@keys) {
-    if ($_ =~ /-importkeystore/) {
-      $rightKeytoolVersion = 1;
-    }
-  }
-  croak "Wrong keytool version (<=1.5cmd): $options->{keytool}" if !$rightKeytoolVersion;
+  return "Wrong keytool version (<=1.5cmd): $options->{keytool}" if ! grep {/-importkeystore/} @keys;
   
   $options->{java}   = $config->get('cmd.java', 'CMD');
-  $options->{java} ||= File::Spec->catfile($ENV{JAVA_HOME}, 'bin', 'java') if (defined $ENV{JAVA_HOME});
-  croak "cmd.java not found in config and JAVA_HOME not set"  unless (defined $options->{java});
+  $options->{java} ||= File::Spec->catfile($ENV{JAVA_HOME}, 'bin', 'java') if defined($ENV{JAVA_HOME});
+  return "cmd.java not found in config and JAVA_HOME not set" if ! defined($options->{java});
 
-  if (!defined $entry->{location}) {
-    croak("keystore.$entryname.location not defined");
-    return undef;
-  }
-  if (!-r $entry->{location}) {
-    croak("keystore file $entry->{location} not readable");
-    return undef;
-  }
+  return "keystore.$entryname.location not defined" if ! (defined $entry->{location});
+  return "keystore file $entry->{location} not readable" if (!-r $entry->{location});
   
 #  if (!$config->get("keystore.$entryname.TrustedRootCA.GENERATED.Directory")) {
 #    # TrustedRootCA.GENERATED.Directory must be definied in order for k_syncRootCAs to work. For Java it is identical top location
@@ -89,10 +77,7 @@ sub new {
     $config->set("keystore.$entryname.TrustedRootCA.GENERATED.Location", $entry->{location});
   }
 
-  if (!defined $entry->{store}->{pin}) {
-    croak("keystore.$entryname.store.pin not defined");
-    return undef;
-  }
+  return "keystore.$entryname.store.pin not defined" if ! (defined $entry->{store}->{pin});
   
   # optional keypin defaults to storepin
   if (!defined $entry->{key}->{pin}) {
@@ -108,18 +93,10 @@ sub new {
     my $result = CertNanny::Util->runCommand(\@cmd);
     @keys = @{$result->{STDOUT}};
     @keys = grep m{, keyEntry,$}, @keys;
-    if ($result->{RC}) {
-      croak("keystore $entry->{location} cannot be listed");
-      return undef;
-    }
-    if (@keys == 0) {
-      croak("keystore $entry->{location} does not contain a key");
-      return undef;
-    }
-    if (@keys > 1) {
-      croak("keystore $entry->{location} contains muliple keys, cannot determine alias. Please configure keystore.$entryname.alias.");
-      return undef;
-    }
+    return "keystore $entry->{location} cannot be listed" if ($result->{RC});
+    return "keystore $entry->{location} does not contain a key" if (@keys == 0);
+    return "keystore $entry->{location} contains muliple keys, cannot determine alias. Please configure keystore.$entryname.alias." if (@keys > 1);
+
     ($entry->{alias}) = $keys[0] =~ m{^([^,]*)};
     CertNanny::Logging->info('MSG', "Using $entry->{alias} as default for keystore.$entryname.alias.");
   } ## end if (!defined $entry->{...})
@@ -144,7 +121,9 @@ sub new {
   $self->k_retrieveState() || return undef;
 
   # check if we can write to the file
-  $self->k_storeState()    || croak "Could not write state file $self->{STATE}->{FILE}";
+  if (my $storeErrState = $self->k_storeState()) {
+    return $storeErrState;
+  }
 
   # return new keystore object
   return $self;

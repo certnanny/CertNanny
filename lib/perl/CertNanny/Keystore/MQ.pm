@@ -53,25 +53,24 @@ sub new {
   $options->{gsk6cmd} = $config->get('cmd.gsk6cmd', 'CMD');
   $options->{gskcmd} = $config->get('cmd.gskcmd', 'CMD');
 
-if(defined $options->{gsk6cmd}){
-  # on certain platforms we need cannot find the location of the
-  #   GSKit library directory ourselves, in this case it must be configured.
-  $options->{gsklibdir} = $config->get('path.gsklib', 'FILE');
-  $options->{gsklibdir} = undef if ($options->{gsklibdir} eq '');
-  croak "gsk6cmd not found" unless (defined $options->{gsk6cmd} and -x $options->{gsk6cmd});
+  if (defined $options->{gsk6cmd}){
+    # on certain platforms we need cannot find the location of the
+    #   GSKit library directory ourselves, in this case it must be configured.
+    $options->{gsklibdir} = $config->get('path.gsklib', 'FILE');
+    $options->{gsklibdir} = undef if ($options->{gsklibdir} eq '');
+    return "gsk6cmd not found" unless (defined $options->{gsk6cmd} and -x $options->{gsk6cmd});
 
-  $options->{JAVA} = $config->get('cmd.java', 'CMD');
-  if (defined $ENV{JAVA_HOME}) {
-    $options->{JAVA} ||= File::Spec->catfile($ENV{JAVA_HOME}, 'bin', 'java');
-  }
+    $options->{JAVA} = $config->get('cmd.java', 'CMD');
+    if (defined $ENV{JAVA_HOME}) {
+      $options->{JAVA} ||= File::Spec->catfile($ENV{JAVA_HOME}, 'bin', 'java');
+    }
 
-  $options->{GSKIT_CLASSPATH} = $config->get('path.gskclasspath', 'FILE');
-}else{
-  if(!defined $options->{gskcmd}){
-    croak "gskcmd not found" unless (defined $options->{gsk6cmd});
+    $options->{GSKIT_CLASSPATH} = $config->get('path.gskclasspath', 'FILE');
+  } else {
+    if (!defined $options->{gskcmd}){
+      return "gskcmd not found" unless (defined $options->{gsk6cmd});
+    }
   }
- 
-}
 
   # set key generation operation mode:
   # internal: create RSA key and request with MQ keystore
@@ -83,14 +82,16 @@ if(defined $options->{gsk6cmd}){
   }
 
   # SANITY CHECKS
-  croak "Illegal keygenmode: $options->{keygenmode}" unless ($options->{keygenmode} =~ /^(external)$/);
+  return "Illegal keygenmode: $options->{keygenmode}" unless ($options->{keygenmode} =~ /^(external)$/);
 
   # RETRIEVE AND STORE STATE
   # get previous renewal status
   $self->k_retrieveState() || return undef;
 
   # check if we can write to the file
-  $self->k_storeState()    || croak "Could not write state file $self->{STATE}->{FILE}";
+  if (my $storeErrState = $self->k_storeState()) {
+    return $storeErrState;
+  }
 
   # return new keystore object
   return $self;

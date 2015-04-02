@@ -160,7 +160,9 @@ sub new {
   $self->k_retrieveState() || return undef;
 
   # check if we can write to the file
-  $self->k_storeState()    || croak "Could not write state file $self->{STATE}->{FILE}";
+  if (my $storeErrState = $self->k_storeState()) {
+    return $storeErrState;
+  }
 
   # return new keystore object
   return $self;

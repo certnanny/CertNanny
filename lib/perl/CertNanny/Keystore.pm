@@ -63,11 +63,11 @@ sub new {
  
   # statedir and scepcertdir must exist and be writeable
   foreach my $item (qw(statedir scepcertdir)) {
-    if (!exists $entry->{$item}) {croak "No $item specified for keystore " . $entry->{location};}
-    if (!-d $entry->{$item})     {croak "$item directory $entry->{$item} does not exist";}
+    if (!exists $entry->{$item}) {return "No $item specified for keystore " . $entry->{location};}
+    if (!-d $entry->{$item})     {return "$item directory $entry->{$item} does not exist";}
     if (!-x $entry->{$item} or
         !-r $entry->{$item} or
-        !-w $entry->{$item})  {croak "Insufficient permissions for $item $entry->{$item}";}
+        !-w $entry->{$item})  {return "Insufficient permissions for $item $entry->{$item}";}
   } ## end foreach my $item (qw(statedir scepcertdir))
 
   # if there is no statefile defined, create one
@@ -85,9 +85,9 @@ sub new {
   $self->{OPTIONS}->{'cmd.sscep'}    = $config->get('cmd.sscep',   'CMD');
   $self->{OPTIONS}->{ENTRYNAME}      = $entryname;
 
-  croak "No tmp directory specified"            unless defined $self->{OPTIONS}->{'path.tmpdir'};
-  croak "No openssl binary configured or found" unless defined $self->{OPTIONS}->{'cmd.openssl'};
-  croak "No sscep binary configured or found"   unless defined $self->{OPTIONS}->{'cmd.sscep'};
+  return "No tmp directory specified"            if ! defined($self->{OPTIONS}->{'path.tmpdir'});
+  return "No openssl binary configured or found" if ! defined($self->{OPTIONS}->{'cmd.openssl'});
+  return "No sscep binary configured or found"   if ! defined($self->{OPTIONS}->{'cmd.sscep'});
 
   # dynamically load keystore instance module
   eval "require CertNanny::Keystore::${type}";
@@ -102,12 +102,10 @@ sub new {
   # configuration and return undef if options are not appropriate
   eval "\$self->{INSTANCE} = new CertNanny::Keystore::$type((\%args,                   # give it whole configuration plus all keystore parameters and keystore name from configfile
                                                              \%{\$self->{OPTIONS}}))"; # give it some common parameters from configfile
-  if ($@) {
-    CertNanny::Logging->Err('STR', join('', $@));
+  if (! ref($self->{INSTANCE})) {
+    CertNanny::Logging->Err('STR', "Could not initialize keystore handler '$type' for keystore '$self->{OPTIONS}->{ENTRYNAME}': $self->{INSTANCE}\n");
     return undef;
   }
-
-  croak "Could not initialize keystore handler '$type'. Aborted." unless defined $self->{INSTANCE};
 
   # get certificate
   if (defined $self->{INSTANCE}->{OPTIONS}->{ENTRY}->{INITIALENROLLEMNT}
@@ -156,7 +154,9 @@ sub new {
     $self->k_retrieveState() or return;
   
     # check if we can write to the file
-    $self->k_storeState() || croak "Could not write state file $self->{STATE}->{FILE}";
+    if (my $storeErrState = $self->k_storeState()) {
+      return $storeErrState;
+    }
   }
   
   return $self;
@@ -530,7 +530,7 @@ sub k_storeState {
 
       my $fh;
       if (!open $fh, '>', $tmpFile) {
-        croak "Error writing Keystore state ($file). Could not write state to tmp. file $tmpFile";
+        return "Error writing Keystore state ($file). Could not write state to tmp. file $tmpFile";
       }
       print $fh $dump->Dump;
       close $fh;
@@ -546,26 +546,26 @@ sub k_storeState {
             CertNanny::Logging->debug('MSG', "Error moving <$tmpFile> to <$file>. Rollback.");
             File::Copy::move($bakFile, $file);
             eval {unlink($tmpFile);};
-            croak "Error moving keystore tmp. state file <$tmpFile> to <$file>";
+            return "Error moving keystore tmp. state file <$tmpFile> to <$file>";
           }
         } else {
           CertNanny::Logging->debug('MSG', "Error creating backup <$bakFile> of state file <$file>");
           eval {unlink($bakFile);};
-          croak "Error creating backup <$bakFile> of state file <$file>";
+          return "Error creating backup <$bakFile> of state file <$file>";
         }
       } else {
         CertNanny::Logging->debug('MSG', "Statefile <$file> does not exists. No backup needed.");
         if (!File::Copy::move($tmpFile, $file)) {
           CertNanny::Logging->debug('MSG', "Error moving keystore tmp. state file <$tmpFile> to <$file>");
           eval {unlink($tmpFile);};
-          croak "Error moving keystore tmp. state file <$tmpFile> to <$file>";
+          return "Error moving keystore tmp. state file <$tmpFile> to <$file>";
         }
       }
     } ## end if (ref $self->{STATE}...)
   }
 
   CertNanny::Logging->debug('MSG', (eval 'ref(\$self)' ? "End " : "Start ") . (caller(0))[3] . " stored CertNanny state");
-  return 1;
+  return 0;
 } ## end sub k_storeState
 
 

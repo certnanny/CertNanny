@@ -73,13 +73,11 @@ sub new {
       #   - keyfile
       #   - location
       if (!defined $entry->{key}->{file} || (!-r $entry->{key}->{file}) && !defined $entry->{hsm}) {
-        croak("keystore.key.file $entry->{key}->{file} not defined, does not exist or unreadable");
-        return undef;
+        return "keystore.key.file $entry->{key}->{file} not defined, does not exist or unreadable";
       }
  
       if (!defined $entry->{location} || (!-r $entry->{location})) {
-        croak("keystore.location $entry->{location} not defined, does not exist or unreadable");
-        return undef;
+        return "keystore.location $entry->{location} not defined, does not exist or unreadable";
       }
     } ## end else [ if (defined $config->...)] 
   
@@ -98,8 +96,7 @@ sub new {
       }
 
       if ($self->{$format} !~ m{ \A (?: DER | PEM ) \z }xms) {
-        croak("Incorrect ." . lc($format) . " specification '" . $self->{$format} . "'");
-        return undef;
+        return "Incorrect ." . lc($format) . " specification '" . $self->{$format} . "'";
       }
     } ## end foreach my $format (qw(FORMAT KEYFORMAT CACERTFORMAT ROOTCACERTFORMAT))
 
@@ -107,8 +104,7 @@ sub new {
     $self->{KEYTYPE} = $entry->{key}->{type} || 'OpenSSL';
 
     if ($self->{KEYTYPE} !~ m{ \A (?: OpenSSL | PKCS8 ) \z }xms) {
-      croak("Incorrect keystore type $self->{KEYTYPE}");
-      return undef;
+      return "Incorrect keystore type $self->{KEYTYPE}";
     }
     $self->{KEYFORMAT} = $entry->{key}->{format} || 'PEM';
     # SANITY CHECKS
@@ -116,14 +112,12 @@ sub new {
     if (defined $self->{PIN} && ($self->{PIN} ne "") &&
                                 ($self->{KEYTYPE} eq 'OpenSSL') &&
                                 ($self->{KEYFORMAT} eq 'DER')) {
-      croak("DER encoded OpenSSL keystores cannot be encrypted");
-      return undef;
+      return "DER encoded OpenSSL keystores cannot be encrypted";
     }
 
     # sanity check: Root CA bundle in DER format does not make sense
     if (($self->{ROOTCACERTFORMAT} eq 'DER') && defined $entry->{rootcacertbundle}) {
-      croak("DER encoded Root CA bundles are not supported. Fix .format and/or .rootcacertformat and/or .rootcabundle config settings");
-      return undef;
+      return "DER encoded Root CA bundles are not supported. Fix .format and/or .rootcacertformat and/or .rootcabundle config settings";
     }
 
     # if we want to use an HSM
@@ -144,11 +138,11 @@ sub new {
       my $hsm = $self->{HSM};
       unless ($hsm->can('createRequest') and $hsm->can('genkey')) {
         unless ($hsm->can('engineid')) {
-          croak("HSM does not provide function engineid(), can not continue.");
+          return "HSM does not provide function engineid(), can not continue.";
         }
 
         unless ($hsm->can('keyform')) {
-          croak("HSM does not provide function keyform(), can not continue.");
+          return "HSM does not provide function keyform(), can not continue.";
         }
       }
     } ## end if ($entry->{hsm}->{type})
@@ -168,7 +162,10 @@ sub new {
     $self->k_retrieveState() || return undef;
 
     # check if we can write to the file
-    $self->k_storeState()    || croak "Could not write state file $self->{STATE}->{FILE}";
+    if (my $storeErrState = $self->k_storeState()) {
+      return $storeErrState;
+    }
+    
   } #location root only 
   # return new keystore object
   return $self;

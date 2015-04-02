@@ -487,7 +487,7 @@ sub _parse {
   } else {
     $rc = "No valid openssl shell specified";
     CertNanny::Logging->error('MSG', $rc);
-    croak("Configuration File Error: " . $rc);
+    CertNanny::Logging->Err('STR', "Configuration File Error: " . $rc . "\n");
     $rc = undef;
   }
   
