@@ -868,7 +868,7 @@ sub getInstalledCAs {
         CertNanny::Logging->debug('MSG', "analyzing $gsk6cmd output line <$certlabel>"); 
         if( ! ( $certlabel =~ m/Certificates found/ ) and ! ( $certlabel =~ m/default, - / )) {
          
-          $certlabel =~ m/\s*(.*$)/;
+          $certlabel =~ m/\W*(.*$)/;
           $certlabel = $1;
           CertNanny::Logging->debug('MSG', "found certLabel <$certlabel>"); 
           my @certcmd;
