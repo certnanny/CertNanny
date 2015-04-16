@@ -757,7 +757,6 @@ sub k_convertKey {
 
   ### PASSIN: $ENV{PASSOUT}
   ### PASSOUT: $ENV{PASSOUT}
-  CertNanny::Logging->error('MSG', $ENV{PASSIN});
   my $result = CertNanny::Util->runCommand(\@cmd);
   $output->{KEYDATA}   = join('', @{$result->{STDOUT}});
   delete $ENV{PASSIN};

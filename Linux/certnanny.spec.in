@@ -34,7 +34,7 @@ make
 %install
 mkdir -p $RPM_BUILD_ROOT
 mkdir -p $RPM_BUILD_ROOT/opt/CertNanny/lib/perl/
-tar -C lib/perl -c -f - --exclude=DAEMON.PM --exclude=daemon.DLL . | tar -C $RPM_BUILD_ROOT/opt/CertNanny/lib/perl/ -x -v -f -
+tar -C lib/perl -c -f - --exclude=DAEMON.PM --exclude=daemon.DLL --exclude=Windows.pm --exclude=WindowsIIS.pm . | tar -C $RPM_BUILD_ROOT/opt/CertNanny/lib/perl/ -x -v -f -
 mkdir -p $RPM_BUILD_ROOT/var/CertNanny/state
 mkdir -p $RPM_BUILD_ROOT/var/CertNanny/AuthoritativeRootcerts
 mkdir -p $RPM_BUILD_ROOT/var/CertNanny/etc
@@ -50,7 +50,6 @@ install -D -m 644 etc/certreq.inf $RPM_BUILD_ROOT/var/CertNanny/etc/certreq.inf
 install -D -m 644 etc/Keystore-MQ.cfg.template $RPM_BUILD_ROOT/var/CertNanny/etc/Keystore-MQ.cfg.template
 install -D -m 644 etc/Keystore-OpenSSL.cfg.template $RPM_BUILD_ROOT/var/CertNanny/etc/Keystore-OpenSSL.cfg.template
 install -D -m 644 etc/Keystore-DEFAULT.cfg.template $RPM_BUILD_ROOT/var/CertNanny/etc/Keystore-DEFAULT.cfg.template
-install -D -m 644 etc/Keystore-Windows.cfg.template $RPM_BUILD_ROOT/var/CertNanny/etc/Keystore-Windows.cfg.template
 install -D -m 644 etc/Keystore-OpenSSL-PKCS8.cfg.template $RPM_BUILD_ROOT/var/CertNanny/etc/Keystore-OpenSSL-PKCS8.cfg.template
 install -D -m 644 etc/certnanny-Master.cfg.template $RPM_BUILD_ROOT/var/CertNanny/etc/certnanny-Master.cfg.template
 mkdir -p $RPM_BUILD_ROOT/usr/bin
@@ -75,7 +74,6 @@ rm -rf $RPM_BUILD_ROOT
 /var/CertNanny/etc/Keystore-MQ.cfg.template
 /var/CertNanny/etc/Keystore-OpenSSL.cfg.template
 /var/CertNanny/etc/Keystore-DEFAULT.cfg.template
-/var/CertNanny/etc/Keystore-Windows.cfg.template
 /var/CertNanny/etc/Keystore-OpenSSL-PKCS8.cfg.template
 /var/CertNanny/etc/certnanny-Master.cfg.template
 %dir /var/CertNanny/AuthoritativeRootcerts 
