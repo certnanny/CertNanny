@@ -613,7 +613,8 @@ sub k_checkclearState {
 
   # clean state entry
   if ($forceClear || $self->{STATE}->{DATA}->{RENEWAL}->{TRYCOUNT} == 0) {
-    foreach my $entry (qw( CERTFILE KEYFILE REQUESTFILE )) {
+    foreach my $entry (qw( CERTFILE KEYFILE REQUESTFILE TEMPKEYSTORE )) {
+      CertNanny::Logging->debug('MSG', 'Unlinking'.$self->{STATE}->{DATA}->{RENEWAL}->{$entry}));
       eval {unlink $self->{STATE}->{DATA}->{RENEWAL}->{REQUEST}->{$entry};};
     }
 
