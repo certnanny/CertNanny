@@ -977,6 +977,9 @@ sub _generateKeystore {
     }
   }
 
+  $self->{STATE}->{DATA}->{RENEWAL}->{REQUEST}->{TEMPKEYSTORE} = $newKeystoreLocation;
+  CertNanny::Logging->debug('MSG', Dumper($self->{STATE}->{DATA}->{RENEWAL}));
+
   return $newKeystoreLocation;
 } ## end sub _generateKeystore
 
