@@ -795,10 +795,7 @@ sub do_cleanup {
   my $entryname = $options->{ENTRYNAME};
   my $config    = $options->{CONFIG};
 
-  my $myKeystore  = $self->getOption('keystore');
-  if (!defined($myKeystore) || ($myKeystore eq $entryname)) {
-    $instance->k_checkclearState(1);
-  }
+  $instance->k_checkclearState(1);
 
   CertNanny::Logging->debug('MSG', (eval 'ref(\$self)' ? "End " : "Start ") . (caller(0))[3] . " CleanUp");
   return 1;
@@ -840,28 +837,25 @@ sub do_executeHook {
   my $entryname = $options->{ENTRYNAME};
   my $config    = $options->{CONFIG};
 
-  my $myKeystore  = $self->getOption('keystore');
-  if (!defined($myKeystore) || ($myKeystore eq $entryname)) {
-    my $hook        = $self->getOption('hook');
-    my $definitions = $self->getOption('define');
-    my %args;
-    foreach (@{$definitions}) {
-      (my $key, my $value) = split('=');
-      $args{$key} = $value;
-    }
+  my $hook        = $self->getOption('hook');
+  my $definitions = $self->getOption('define');
+  my %args;
+  foreach (@{$definitions}) {
+    (my $key, my $value) = split('=');
+    $args{$key} = $value;
+  }
   
-    if ($hook) {
-      my $hookdef = "keystore.$entryname.hook.$hook";
-      my $hookcmd = $config->get($hookdef);
-      if ($hookcmd) {
-        CertNanny::Logging->Out('STR', "Executing hook <$hookdef> with command <$hookcmd>\n");
-        $keystore->k_executeHook($hookcmd, %args);
-      } else {
-        CertNanny::Logging->Out('STR', "No command defined for hook <$hookdef>\n");
-      }
+  if ($hook) {
+    my $hookdef = "keystore.$entryname.hook.$hook";
+    my $hookcmd = $config->get($hookdef);
+    if ($hookcmd) {
+      CertNanny::Logging->Out('STR', "Executing hook <$hookdef> with command <$hookcmd>\n");
+      $keystore->k_executeHook($hookcmd, %args);
     } else {
-      CertNanny::Logging->Out('STR', "No hook specified for execHook\n");
+      CertNanny::Logging->Out('STR', "No command defined for hook <$hookdef>\n");
     }
+  } else {
+    CertNanny::Logging->Out('STR', "No hook specified for execHook\n");
   }
   
   CertNanny::Logging->debug('MSG', (eval 'ref(\$self)' ? "End " : "Start ") . (caller(0))[3] . " Info");
