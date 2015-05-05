@@ -271,7 +271,7 @@ sub do_dump {
         CertNanny::Logging->Out('STR', "\n");
       }
     }
-  } elsif ($self->{OPTION}->{object} eq 'keystore') {
+  } elsif ($self->{OPTION}->{object} eq '^key') {
     my @keystores = (sort {lc($a) cmp lc($b)} keys(%{$config->{CONFIG}->{'keystore'}}));
     foreach my $keystore (@keystores) {
       next if (defined($target) && ($target ne $keystore));
@@ -284,7 +284,7 @@ sub do_dump {
         }
       }
     }
-  } elsif ($self->{OPTION}->{object} =~ /cert.*/) {
+  } elsif ($self->{OPTION}->{object} =~ /^cert/) {
     my @keystores = (sort {lc($a) cmp lc($b)} keys(%{$config->{CONFIG}->{'keystore'}}));
     foreach my $keystore (@keystores) {
       next if (defined($target) && ($target ne $keystore));
