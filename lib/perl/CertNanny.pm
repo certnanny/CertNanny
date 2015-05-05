@@ -156,6 +156,9 @@ sub _iterate_entries {
   my $loglevel = $self->{CONFIG}->get('log.level') || 3;
 
   foreach my $entryname (keys %{$self->{ITEMS}}) {    # Instantiate every keystore, that is configured
+    my $myKeystore  = $self->getOption('keystore');
+    next if (defined($myKeystore) || ($myKeystore ne $entryname));
+    
     CertNanny::Util->setVariable('NAME',  'KEYSTORE', 
                                  'VALUE', $entryname);
     CertNanny::Logging->debug('MSG', "-------------------------------------------");
