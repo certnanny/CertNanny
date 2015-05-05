@@ -19,10 +19,6 @@ use File::Spec;
 use Pod::Usage;
 use Getopt::Long;
 use Data::Dumper;
-use Carp;
-
-use FindBin;
-use lib "$FindBin::RealBin/../lib/perl";
 
 use CertNanny;
 use CertNanny::Util;
