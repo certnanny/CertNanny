@@ -241,10 +241,10 @@ sub do_dump {
   CertNanny::Logging->switchConsoleOut('STATUS', 1);
   # and by the way we do not want all the junk on the concole
   CertNanny::Logging->logLevel('TARGET', 'console', 'LEVEL', 0);
-  if ($self->{OPTION}->{object}  =~ /^data/) {
+  if ($self->{OPTION}->{object} =~ /^data/) {
     my @hashname;
     $self->_dumpValue(\%{$config->{CONFIG}}, \@hashname);
-  } elsif ($self->{OPTION}->{object} eq 'cfg') {
+  } elsif ($self->{OPTION}->{object} =~ /^cfg|^config/) {
     foreach my $configFileName (sort {lc($a) cmp lc($b)} keys %{$config->{CONFIGFILES}}) {
       my $printthiskeystore = 0;
       if (defined($target)) {
@@ -274,7 +274,7 @@ sub do_dump {
         CertNanny::Logging->Out('STR', "\n");
       }
     }
-  } elsif ($self->{OPTION}->{object} eq '^key') {
+  } elsif ($self->{OPTION}->{object} =~ /^key/) {
     my @keystores = (sort {lc($a) cmp lc($b)} keys(%{$config->{CONFIG}->{'keystore'}}));
     foreach my $keystore (@keystores) {
       next if (defined($target) && ($target ne $keystore));
