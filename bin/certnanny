@@ -59,7 +59,7 @@ GetOptions(\%cmdLineParam, qw(help|?
                               dryrun|dry
                               hook=s
                               define|def=s@
-                              challengepassword|challange=s
+                              challengepassword|challenge=s
                               object|obj=s
                               win_user|win_usr|usr=s
                               win_password|win_pwd|pwd=s
