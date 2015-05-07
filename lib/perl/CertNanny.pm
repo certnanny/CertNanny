@@ -543,8 +543,8 @@ sub do_enroll {
         $keystore->{INSTANCE}->{OPTIONS}->{ENTRY}->{enroll}->{engine_section}  = undef;
         $keystore->{INSTANCE}->{OPTIONS}->{ENTRY}->{enroll}->{sscep}->{engine} = undef;
 
-        #Start the initial enrollment runining an native openSSL keystore renewal
-        my $ret = $keystore->{INSTANCE}->k_renew();
+        #Start the initial enrollment running an native openSSL keystore renewal
+        $keystore->{INSTANCE}->k_renew();
     
         # Restoring old values
         $entry->{type}          = $save{type};
@@ -725,8 +725,8 @@ sub do_enroll {
         $keystore->{INSTANCE}->{OPTIONS}->{ENTRY}->{enroll}->{engine_section}  = undef;
         $keystore->{INSTANCE}->{OPTIONS}->{ENTRY}->{enroll}->{sscep}->{engine} = undef;
 
-        #Start the initial enrollment runining an native openSSL keystore renewal
-        my $ret = $keystore->{INSTANCE}->k_renew();
+        #Start the initial enrollment running an native openSSL keystore renewal
+        $keystore->{INSTANCE}->k_renew();
 
         my $renewalstate = $keystore->{INSTANCE}->{STATE}->{DATA}->{RENEWAL}->{STATUS};
 
