@@ -983,10 +983,12 @@ sub k_checkValidity {
 sub k_renew {
 
   # handle renewal operation
+  CertNanny::Logging->debug('MSG', (eval 'ref(\$self)' ? "End " : "Start ") . (caller(0))[3] . " Renewal");
   my $self = shift;
 
   $self->_renewalState("initial") unless defined $self->_renewalState();
   my $laststate = "n/a";
+  my $rc = 1;
   
   CertNanny::Logging->info('MSG', "Certificate Information: SubjectName: " . $self->{CERT}->{CERTINFO}->{SubjectName});
   CertNanny::Logging->info('MSG', "                         Serial: "      . $self->{CERT}->{CERTINFO}->{SerialNumber}); 
@@ -1003,18 +1005,16 @@ sub k_renew {
       $self->{STATE}->{DATA}->{RENEWAL}->{REQUEST} = $self->createRequest();
 
       if (!defined $self->{STATE}->{DATA}->{RENEWAL}->{REQUEST}) {
-        CertNanny::Logging->error('MSG', "Could not create certificate request");
+        $rc = CertNanny::Logging->error('MSG', "Could not create certificate request");
         $self->k_checkclearState(0);
-        return undef;
       }
-      $self->_renewalState("sendrequest");
+      $self->_renewalState("sendrequest") if ($rc);
     } elsif ($self->_renewalState() eq "sendrequest") {
       CertNanny::Logging->info('MSG', "State: sendrequest");
 
       if (!$self->_sendRequest()) {
-        CertNanny::Logging->error('MSG', "Could not send request");
+        $rc = CertNanny::Logging->error('MSG', "Could not send request");
         $self->k_checkclearState(0);
-        return undef;
       }
     } elsif ($self->_renewalState() eq "completed") {
       CertNanny::Logging->info('MSG', "State: completed");
@@ -1026,13 +1026,13 @@ sub k_renew {
       $self->k_checkclearState(1);
       last;
     } else {
-      CertNanny::Logging->error('MSG', "State unknown: " . $self->_renewalState());
-      return undef;
+      $rc = CertNanny::Logging->error('MSG', "State unknown: " . $self->_renewalState());
     }
 
   } ## end while ($laststate ne $self...)
 
-  return 1;
+  CertNanny::Logging->debug('MSG', (eval 'ref(\$self)' ? "End " : "Start ") . (caller(0))[3] . " Sending request");
+  return $rc;
 } ## end sub k_renew
 
 
