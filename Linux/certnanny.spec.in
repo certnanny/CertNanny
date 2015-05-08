@@ -10,7 +10,7 @@ Summary:      Certificate renewal agent
 Version:      VERSIONINFO
 Release:      1
 Source:       %{name}-%{version}.tar.gz
-URL:          http://www.cynops.de/oss/CertNanny/
+URL:          https://github.com/certnanny/CertNanny
 BuildRoot:    %{_tmppath}/%{name}-build
 Requires:     openssl, sscep
 
