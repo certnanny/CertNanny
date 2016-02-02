@@ -2002,9 +2002,16 @@ sub _sendRequest {
       return undef;
     }
 
+    my %hook_args = (
+        '__NEWCERT_NOTAFTER__'  => $newcert->{CERTINFO}->{NotAfter},
+        '__NEWCERT_NOTBEFORE__' => $newcert->{CERTINFO}->{NotBefore},
+    );
+    if($self->_hasEngine()) {
+       $hook_args{'__OLDKEY__'} = $oldkeyfile;
+       $hook_args{'__NEWKEY__'} = $requestkeyfile;
+    }
     $self->k_executeHook($entry->{hook}->{renewal}->{install}->{pre},
-                         '__NEWCERT_NOTAFTER__'  => $newcert->{CERTINFO}->{NotAfter},
-                         '__NEWCERT_NOTBEFORE__' => $newcert->{CERTINFO}->{NotBefore},);
+                         %hook_args);
 
     if (exists $entry->{INITIALENROLLEMNT}
         and $entry->{INITIALENROLLEMNT} eq 'yes') {
@@ -2117,9 +2124,16 @@ sub _sendRequest {
     if (defined $rc and $rc) {
       $self->_renewalState("completed");
 
-      $self->k_executeHook($entry->{hook}->{renewal}->{install}->{post},
-                           '__NEWCERT_NOTAFTER__'  => $newcert->{CERTINFO}->{NotAfter},
-                           '__NEWCERT_NOTBEFORE__' => $newcert->{CERTINFO}->{NotBefore},);
+      my %hook_args = (
+        '__NEWCERT_NOTAFTER__'  => $newcert->{CERTINFO}->{NotAfter},
+        '__NEWCERT_NOTBEFORE__' => $newcert->{CERTINFO}->{NotBefore},
+      );
+      if($self->_hasEngine()) {
+        $hook_args{'__OLDKEY__'} = $oldkeyfile;
+        $hook_args{'__NEWKEY__'} = $requestkeyfile;
+      }
+      $self->k_executeHook($entry->{hook}->{renewal}->{install}->{post}, 
+        %hook_args);
 
       # done
       CertNanny::Logging->debug(eval 'ref(\$self)' ? "End" : "Start", (caller(0))[3], "Sending request");
