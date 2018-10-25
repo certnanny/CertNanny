@@ -4,7 +4,7 @@ CertNanny is a client-side program that allows fully automatic renewal of certif
 
 The basic idea is to have a number of local keystores that are monitored for expiring certificates. If a certificate is about to expire, the program automatically creates a new certificate request with the existing certificate data, enrolls the request with the configured CA and polls the CA for the issued certificate. Once the certificate is ready, a new keystore with the new certificate is composed and replaces the old keystore.
 
-## Confused? [Watch the movie!](https://cynops.de/download/CertNanny-In-Action.mov)
+## Confused? [Watch the movie!](https://cynops.de/download/CertNanny-in-action-new.m4v)
 
 ## Requirements
 
