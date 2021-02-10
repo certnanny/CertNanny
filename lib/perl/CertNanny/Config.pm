@@ -506,7 +506,7 @@ sub _sha1_hex {
   my $sha;
   my $openssl = $self->get('cmd.openssl', 'FILE');
   if (defined($openssl)) {
-    my @cmd = (qq("$openssl"), 'dgst', '-sha', qq("$file"));
+    my @cmd = (qq("$openssl"), 'dgst', '-sha1', qq("$file"));
     chomp($sha = CertNanny::Util->runCommand(\@cmd, WANTOUT => 1));
     if ($sha =~ /^.*\)= (.*)$/) {
       $sha = $1;
